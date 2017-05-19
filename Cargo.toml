@@ -1,0 +1,6 @@
+[package]
+name = "feo-boy"
+version = "0.1.0"
+authors = ["Andy Russell <arussell123@gmail.com>"]
+
+[dependencies]
