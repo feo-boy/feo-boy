@@ -4,7 +4,7 @@
 
 use errors::*;
 
-const BIOS_SIZE: usize = 0x00FF;
+const BIOS_SIZE: usize = 0x0100;
 
 /// The memory manager unit.
 pub struct Mmu {
@@ -12,7 +12,20 @@ pub struct Mmu {
     bios: [u8; BIOS_SIZE],
 
     /// ROM banks 0 and 1.
-    rom: [u8; 0x4000],
+    ///
+    /// Bank 1 may be switched banks may be switched by the cartridge.
+    rom: [u8; 0x8000],
+
+    /// Cartridge external RAM.
+    eram: [u8; 0x2000],
+
+    /// Working RAM.
+    wram: [u8; 0x2000],
+
+    /// Zero-page RAM.
+    ///
+    /// High speed.
+    zram: [u8; 0x0080],
 
     /// True if the BIOS is currently mapped into memory.
     in_bios: bool,
@@ -22,7 +35,10 @@ impl Mmu {
     pub fn new() -> Self {
         Mmu {
             bios: [0; BIOS_SIZE],
-            rom: [0; 0x4000],
+            rom: [0; 0x8000],
+            eram: [0; 0x2000],
+            wram: [0; 0x2000],
+            zram: [0; 0x0080],
             in_bios: true,
         }
     }
@@ -43,9 +59,29 @@ impl Mmu {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x0000...0x0100 if self.in_bios => self.bios[address as usize],
-            0x0000...0x8000 => self.rom[address as usize],
-            _ => unimplemented!(),
+            0x0000...0x00FF if self.in_bios => self.bios[address as usize],
+            0x0000...0x7FFF => self.rom[address as usize],
+            0x8000...0x9FFF => {
+                unimplemented!();
+            }
+            0xA000...0xBFFF => {
+                let index = address & 0x1FFF;
+
+                self.eram[index as usize]
+            }
+            0xC000...0xFE00 => {
+                // Addresses E000-FDFF are known as "shadow RAM." They contain an exact copy of
+                // addresses C000-DFFF, until the last 512 bytes of the map.
+                let index = address & 0x1FFF;
+
+                self.wram[index as usize]
+            }
+            0xFF80...0xFFFF => {
+                let index = address & 0x7F;
+
+                self.zram[index as usize]
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -67,5 +103,74 @@ impl Mmu {
 
     fn unmap_bios(&mut self) {
         self.in_bios = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Mmu;
+
+    #[test]
+    fn bios() {
+        let mut mmu = Mmu::new();
+        assert!(mmu.in_bios);
+
+        mmu.bios[0] = 1;
+        assert_eq!(mmu.read_byte(0x0000), 1);
+
+        mmu.bios[0xFF] = 2;
+        assert_eq!(mmu.read_byte(0x00FF), 2);
+    }
+
+    #[test]
+    fn rom() {
+        let mut mmu = Mmu::new();
+        mmu.unmap_bios();
+
+        mmu.rom[0] = 1;
+        assert_eq!(mmu.read_byte(0x0000), 1);
+
+        mmu.rom[0x100] = 2;
+        assert_eq!(mmu.read_byte(0x0100), 2);
+
+        mmu.rom[0x7FFF] = 3;
+        assert_eq!(mmu.read_byte(0x7FFF), 3);
+    }
+
+    #[test]
+    fn eram() {
+        let mut mmu = Mmu::new();
+
+        mmu.eram[0] = 1;
+        assert_eq!(mmu.read_byte(0xA000), 1);
+
+        mmu.eram[0x1FFF] = 2;
+        assert_eq!(mmu.read_byte(0xBFFF), 2);
+    }
+
+    #[test]
+    fn wram() {
+        let mut mmu = Mmu::new();
+
+        mmu.wram[0] = 1;
+        assert_eq!(mmu.read_byte(0xC000), 1);
+        assert_eq!(mmu.read_byte(0xE000), 1);
+
+        mmu.wram[0x1FFF] = 2;
+        assert_eq!(mmu.read_byte(0xDFFF), 2);
+
+        mmu.wram[0x1FFF - 512] = 3;
+        assert_eq!(mmu.read_byte(0xFDFF), 3);
+    }
+
+    #[test]
+    fn zram() {
+        let mut mmu = Mmu::new();
+
+        mmu.zram[0] = 1;
+        assert_eq!(mmu.read_byte(0xFF80), 1);
+
+        mmu.zram[0x7F] = 2;
+        assert_eq!(mmu.read_byte(0xFFFF), 2);
     }
 }
