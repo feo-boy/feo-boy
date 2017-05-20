@@ -2,6 +2,10 @@
 //!
 //! Contains an implementation of a memory manager unit.
 
+use std::default::Default;
+use std::fmt::{self, Debug, Formatter};
+use std::result::Result as StdResult;
+
 use errors::*;
 
 const BIOS_SIZE: usize = 0x0100;
@@ -131,6 +135,31 @@ impl Mmu {
 
     fn unmap_bios(&mut self) {
         self.in_bios = false;
+    }
+}
+
+impl Debug for Mmu {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let bios = self.bios[..].fmt(f);
+        let rom = self.rom[..].fmt(f);
+        let eram = self.eram[..].fmt(f);
+        let wram = self.wram[..].fmt(f);
+        let zram = self.zram[..].fmt(f);
+
+        f.debug_struct("Mmu")
+            .field("in_bios", &self.in_bios)
+            .field("bios", &bios)
+            .field("rom", &rom)
+            .field("eram", &eram)
+            .field("wram", &wram)
+            .field("zram", &zram)
+            .finish()
+    }
+}
+
+impl Default for Mmu {
+    fn default() -> Self {
+        Mmu::new()
     }
 }
 
