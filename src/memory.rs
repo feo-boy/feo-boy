@@ -13,7 +13,7 @@ pub struct Mmu {
 
     /// ROM banks 0 and 1.
     ///
-    /// Bank 1 may be switched banks may be switched by the cartridge.
+    /// Bank 1 memory may be switched to other banks by the cartridge.
     rom: [u8; 0x8000],
 
     /// Cartridge external RAM.
@@ -69,13 +69,14 @@ impl Mmu {
 
                 self.eram[index as usize]
             }
-            0xC000...0xFE00 => {
+            0xC000...0xFDFF => {
                 // Addresses E000-FDFF are known as "shadow RAM." They contain an exact copy of
                 // addresses C000-DFFF, until the last 512 bytes of the map.
                 let index = address & 0x1FFF;
 
                 self.wram[index as usize]
             }
+            0xFE00...0xFE9F => unimplemented!(),
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
 
