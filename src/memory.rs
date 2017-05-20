@@ -90,16 +90,43 @@ impl Mmu {
         let lo: u16 = self.read_byte(address).into();
         let hi: u16 = self.read_byte(address + 1).into();
 
-        lo + hi << 8
+        lo + (hi << 8)
     }
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
-        // Register to unmap BIOS
-        if address == 0xFF50 && byte != 0 {
-            self.unmap_bios();
+        match address {
+            0x0000...0x7FFF => {
+                // BIOS and ROM are read-only.
+                return;
+            }
+            0x8000...0x9FFF => unimplemented!(),
+            0xA000...0xBFFF => {
+                let index = address & 0x1FFF;
+                self.eram[index as usize] = byte;
+            }
+            0xC000...0xFDFF => {
+                let index = address & 0x1FFF;
+                self.wram[index as usize] = byte;
+            }
+            0xFE00...0xFE9F => unimplemented!(),
+            0xFF00...0xFF7F => {
+                // I/O Registers
+                match address {
+                    0xFF50 if address != 0 => self.unmap_bios(),
+                    _ => unimplemented!(),
+                }
+            }
+            0xFF80...0xFFFF => {
+                let index = address & 0x7F;
+                self.zram[index as usize] = byte;
+            }
+            _ => unreachable!(),
         }
+    }
 
-        unimplemented!();
+    pub fn write_word(&mut self, address: u16, word: u16) {
+        self.write_byte(address, (word & 0xFF) as u8);
+        self.write_byte(address + 1, (word >> 8) as u8);
     }
 
     fn unmap_bios(&mut self) {
@@ -121,6 +148,9 @@ mod tests {
 
         mmu.bios[0xFF] = 2;
         assert_eq!(mmu.read_byte(0x00FF), 2);
+
+        mmu.write_byte(0xFF50, 1);
+        assert!(!mmu.in_bios);
     }
 
     #[test]
@@ -173,5 +203,18 @@ mod tests {
 
         mmu.zram[0x7F] = 2;
         assert_eq!(mmu.read_byte(0xFFFF), 2);
+    }
+
+    #[test]
+    fn words() {
+        let mut mmu = Mmu::new();
+
+        mmu.wram[0] = 0xAB;
+        mmu.wram[1] = 0xCD;
+        assert_eq!(mmu.read_word(0xC000), 0xCDAB);
+
+        mmu.write_word(0xFF80, 0xABCD);
+        assert_eq!(mmu.zram[0], 0xCD);
+        assert_eq!(mmu.zram[1], 0xAB);
     }
 }
