@@ -2,10 +2,14 @@
 //!
 //! Contains an implementation of a memory manager unit.
 
+use errors::*;
+
+const BIOS_SIZE: usize = 0x00FF;
+
 /// The memory manager unit.
 pub struct Mmu {
     /// BIOS memory.
-    bios: [u8; 0x00FF],
+    bios: [u8; BIOS_SIZE],
 
     /// ROM banks 0 and 1.
     rom: [u8; 0x4000],
@@ -17,10 +21,20 @@ pub struct Mmu {
 impl Mmu {
     pub fn new() -> Self {
         Mmu {
-            bios: [0; 0x00FF],
+            bios: [0; BIOS_SIZE],
             rom: [0; 0x4000],
             in_bios: true,
         }
+    }
+
+    pub fn load_bios(&mut self, bios: &[u8]) -> Result<()> {
+        if bios.len() != BIOS_SIZE {
+            bail!(ErrorKind::InvalidBios(format!("must be exactly {} bytes", BIOS_SIZE)));
+        }
+
+        self.bios.copy_from_slice(bios);
+
+        Ok(())
     }
 
     pub fn reset(&mut self) {
