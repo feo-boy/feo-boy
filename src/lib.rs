@@ -5,3 +5,4 @@ extern crate error_chain;
 
 pub mod errors;
 pub mod memory;
+pub mod cpu;
