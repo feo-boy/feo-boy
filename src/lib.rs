@@ -2,6 +2,8 @@
 
 #[macro_use]
 extern crate error_chain;
+#[macro_use]
+extern crate log;
 
 pub mod cpu;
 pub mod errors;
@@ -34,5 +36,9 @@ impl Emulator {
         self.mmu.load_bios(&buf)?;
 
         Ok(())
+    }
+
+    pub fn dump_memory(&self) -> String {
+        self.mmu.to_string()
     }
 }

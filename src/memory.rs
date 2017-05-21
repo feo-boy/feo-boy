@@ -3,7 +3,7 @@
 //! Contains an implementation of a memory manager unit.
 
 use std::default::Default;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 
 use errors::*;
 
@@ -65,7 +65,8 @@ impl Mmu {
             0x0000...0x00FF if self.in_bios => self.bios[address as usize],
             0x0000...0x7FFF => self.rom[address as usize],
             0x8000...0x9FFF => {
-                unimplemented!();
+                error!("read unimplemented memory: VRAM");
+                0x00
             }
             0xA000...0xBFFF => {
                 let index = address & 0x1FFF;
@@ -79,7 +80,14 @@ impl Mmu {
 
                 self.wram[index as usize]
             }
-            0xFE00...0xFE9F => unimplemented!(),
+            0xFE00...0xFE9F => {
+                error!("read unimplemented memory: OAM");
+                0x00
+            }
+            0xFEA0...0xFF7F => {
+                error!("read unimplemented memory: I/O registers");
+                0x00
+            }
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
 
@@ -132,6 +140,13 @@ impl Mmu {
         self.write_byte(address + 1, (word >> 8) as u8);
     }
 
+    pub fn iter<'a>(&'a self) -> MemoryIterator<'a> {
+        MemoryIterator {
+            pos: Some(0),
+            mmu: self,
+        }
+    }
+
     fn unmap_bios(&mut self) {
         self.in_bios = false;
     }
@@ -162,9 +177,58 @@ impl Default for Mmu {
     }
 }
 
+impl Display for Mmu {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut address = 0;
+
+        let mut iter = self.iter().peekable();
+        while iter.peek().is_some() {
+            write!(f, "{:04x}", address)?;
+
+            for _ in 0..16 {
+                address += 1;
+                let byte = iter.next().expect("expected memory to be a multiple of 16");
+                write!(f, " {:02x}", byte)?;
+            }
+
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub struct MemoryIterator<'a> {
+    pos: Option<u16>,
+    mmu: &'a Mmu,
+}
+
+impl<'a> Iterator for MemoryIterator<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.pos {
+            Some(0xFFFF) => {
+                self.pos = None;
+                Some(self.mmu.read_byte(0xFFFF))
+            }
+            Some(pos) => {
+                self.pos = Some(pos + 1);
+                Some(self.mmu.read_byte(pos))
+            }
+            None => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Mmu;
+
+    #[test]
+    fn dump() {
+        Mmu::new().to_string();
+    }
 
     #[test]
     fn bios() {

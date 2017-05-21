@@ -5,3 +5,4 @@ authors = ["Andy Russell <arussell123@gmail.com>"]
 
 [dependencies]
 error-chain = "0.10"
+log = "0.3"
