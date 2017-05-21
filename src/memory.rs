@@ -56,6 +56,14 @@ impl Mmu {
         Ok(())
     }
 
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        for (address, byte) in rom.iter().enumerate() {
+            self.rom[address as usize] = *byte;
+        }
+
+        Ok(())
+    }
+
     pub fn reset(&mut self) {
         self.in_bios = true;
     }

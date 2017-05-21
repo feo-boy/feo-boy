@@ -13,7 +13,7 @@ use clap::{App, Arg};
 use feo_boy::Emulator;
 use feo_boy::errors::*;
 
-fn run<P>(bios: Option<P>) -> Result<()>
+fn run<P>(rom: P, bios: Option<P>) -> Result<()>
     where P: AsRef<Path>
 {
     let mut emulator = Emulator::new();
@@ -23,6 +23,8 @@ fn run<P>(bios: Option<P>) -> Result<()>
             .load_bios(bios)
             .chain_err(|| "could not load BIOS")?;
     }
+
+    emulator.load_rom(rom).chain_err(|| "could not load ROM")?;
 
     println!("{}", &emulator.dump_memory());
 
@@ -34,6 +36,9 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
+        .arg(Arg::with_name("rom")
+                 .required(true)
+                 .help("a file containing a ROM to load into the emulator"))
         .arg(Arg::with_name("bios-file")
                  .long("bios")
                  .takes_value(true)
@@ -41,8 +46,9 @@ fn main() {
         .get_matches();
 
     let bios = matches.value_of("bios-file");
+    let rom = matches.value_of("rom").unwrap();
 
-    if let Err(ref e) = run(bios) {
+    if let Err(ref e) = run(rom, bios) {
         let stderr = &mut io::stderr();
         let errmsg = "Error writing to stderr";
 

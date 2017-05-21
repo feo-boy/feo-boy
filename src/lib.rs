@@ -38,6 +38,19 @@ impl Emulator {
         Ok(())
     }
 
+    pub fn load_rom<P>(&mut self, path: P) -> Result<()>
+        where P: AsRef<Path>
+    {
+        let mut file = File::open(path)?;
+
+        let mut buf = vec![];
+        file.read_to_end(&mut buf)?;
+
+        self.mmu.load_rom(&buf)?;
+
+        Ok(())
+    }
+
     pub fn dump_memory(&self) -> String {
         self.mmu.to_string()
     }
