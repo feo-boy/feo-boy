@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Andy Russell <arussell123@gmail.com>"]
 
 [dependencies]
+clap = "2"
 error-chain = "0.10"
 log = "0.3"
