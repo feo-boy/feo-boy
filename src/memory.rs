@@ -4,7 +4,6 @@
 
 use std::default::Default;
 use std::fmt::{self, Debug, Formatter};
-use std::result::Result as StdResult;
 
 use errors::*;
 

@@ -3,6 +3,36 @@
 #[macro_use]
 extern crate error_chain;
 
+pub mod cpu;
 pub mod errors;
 pub mod memory;
-pub mod cpu;
+
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
+use errors::*;
+use memory::Mmu;
+
+pub struct Emulator {
+    mmu: Mmu,
+}
+
+impl Emulator {
+    pub fn new() -> Self {
+        Emulator { mmu: Mmu::new() }
+    }
+
+    pub fn load_bios<P>(&mut self, path: P) -> Result<()>
+        where P: AsRef<Path>
+    {
+        let mut file = File::open(path)?;
+
+        let mut buf = vec![];
+        file.read_to_end(&mut buf)?;
+
+        self.mmu.load_bios(&buf)?;
+
+        Ok(())
+    }
+}
