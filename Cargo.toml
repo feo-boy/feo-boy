@@ -1,7 +1,11 @@
 [package]
 name = "feo-boy"
 version = "0.1.0"
-authors = ["Andy Russell <arussell123@gmail.com>"]
+authors = [
+    "Andy Russell <arussell123@gmail.com>",
+    "Andrew Fishberg <fishberg.github@gmail.com>",
+    "Max Comstock <maxibillion6@gmail.com>",
+]
 
 [dependencies]
 clap = "2"
