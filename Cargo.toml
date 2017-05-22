@@ -7,6 +7,11 @@ authors = [
     "Max Comstock <maxibillion6@gmail.com>",
 ]
 
+[[bin]]
+doc = false
+name = "feo-boy"
+path = "src/bin/feo-boy.rs"
+
 [dependencies]
 clap = "2"
 error-chain = "0.10"
