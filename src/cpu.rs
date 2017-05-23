@@ -4,6 +4,8 @@
 
 use std::default::Default;
 
+use memory::Mmu;
+
 /// The registers.
 #[derive(Debug, Default)]
 pub struct Registers {
@@ -55,4 +57,39 @@ impl Registers {
         self.l = value as u8;
         self.h = (value >> 8) as u8;
     }
+}
+
+/// The clock.
+#[derive(Debug, Default)]
+pub struct Clock {
+    /// Machine cycle state. One machine cycle = 4 clock cycles.
+    pub m: u32,
+    /// Clock cycle state.
+    pub t: u32,
+}
+
+impl Clock {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn reset(&mut self) {
+        self.m = 0;
+        self.t = 0;
+    }
+}
+
+/// The CPU.
+#[derive(Debug, Default)]
+pub struct Cpu {
+    /// Registers
+    pub r: Registers,
+    /// Program counter
+    pub pc: u16,
+    /// Stack pointer
+    pub sp: u16,
+    /// The clock corresponding to the last instruction cycle.
+    pub clock: Clock,
+    /// Memory unit
+    pub mmu: Mmu,
 }
