@@ -24,6 +24,11 @@ pub struct Registers {
 
     pub h: u8,
     pub l: u8,
+
+    /// Program counter
+    pub pc: u16,
+    /// Stack pointer
+    pub sp: u16,
 }
 
 impl Registers {
@@ -80,16 +85,22 @@ impl Clock {
 }
 
 /// The CPU.
-#[derive(Debug, Default)]
-pub struct Cpu {
+#[derive(Debug)]
+pub struct Cpu<'a> {
     /// Registers
     pub r: Registers,
-    /// Program counter
-    pub pc: u16,
-    /// Stack pointer
-    pub sp: u16,
     /// The clock corresponding to the last instruction cycle.
     pub clock: Clock,
     /// Memory unit
-    pub mmu: Mmu,
+    pub mmu: &'a Mmu,
+}
+
+impl<'a> Cpu<'a> {
+    pub fn new(mmu: &Mmu) -> Cpu {
+        Cpu {
+            r: Registers::new(),
+            clock: Clock::new(),
+            mmu: mmu,
+        }
+    }
 }
