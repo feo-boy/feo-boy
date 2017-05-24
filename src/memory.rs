@@ -5,6 +5,8 @@
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
 
+use byteorder::{LittleEndian, ByteOrder};
+
 use errors::*;
 
 const BIOS_SIZE: usize = 0x0100;
@@ -106,10 +108,7 @@ impl Mmu {
     }
 
     pub fn read_word(&self, address: u16) -> u16 {
-        let lo: u16 = self.read_byte(address).into();
-        let hi: u16 = self.read_byte(address + 1).into();
-
-        lo + (hi << 8)
+        LittleEndian::read_u16(&[self.read_byte(address), self.read_byte(address + 1)])
     }
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
@@ -144,8 +143,12 @@ impl Mmu {
     }
 
     pub fn write_word(&mut self, address: u16, word: u16) {
-        self.write_byte(address, (word & 0xFF) as u8);
-        self.write_byte(address + 1, (word >> 8) as u8);
+        let mut bytes = [0u8; 2];
+
+        LittleEndian::write_u16(&mut bytes, word);
+
+        self.write_byte(address, bytes[0]);
+        self.write_byte(address + 1, bytes[1]);
     }
 
     pub fn iter<'a>(&'a self) -> MemoryIterator<'a> {

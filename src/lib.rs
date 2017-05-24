@@ -5,6 +5,8 @@ extern crate error_chain;
 #[macro_use]
 extern crate log;
 
+extern crate byteorder;
+
 pub mod cpu;
 pub mod errors;
 pub mod memory;
