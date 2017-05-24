@@ -4,8 +4,10 @@
 
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::Range;
 
 use byteorder::{LittleEndian, ByteOrder};
+use itertools::Itertools;
 
 use errors::*;
 
@@ -153,7 +155,7 @@ impl Mmu {
 
     pub fn iter<'a>(&'a self) -> MemoryIterator<'a> {
         MemoryIterator {
-            pos: Some(0),
+            address_iter: 0x00..0x10000,
             mmu: self,
         }
     }
@@ -190,19 +192,20 @@ impl Default for Mmu {
 
 impl Display for Mmu {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        const LINE_LENGTH: usize = 16;
+
         let mut address = 0;
 
-        let mut iter = self.iter().peekable();
-        while iter.peek().is_some() {
+        for chunk in &self.iter().chunks(LINE_LENGTH) {
             write!(f, "{:04x}", address)?;
 
-            for _ in 0..16 {
-                address += 1;
-                let byte = iter.next().expect("expected memory to be a multiple of 16");
+            for byte in chunk {
                 write!(f, " {:02x}", byte)?;
             }
 
             writeln!(f)?;
+
+            address += LINE_LENGTH;
         }
 
         Ok(())
@@ -210,25 +213,17 @@ impl Display for Mmu {
 }
 
 pub struct MemoryIterator<'a> {
-    pos: Option<u16>,
     mmu: &'a Mmu,
+    address_iter: Range<u32>,
 }
 
 impl<'a> Iterator for MemoryIterator<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.pos {
-            Some(0xFFFF) => {
-                self.pos = None;
-                Some(self.mmu.read_byte(0xFFFF))
-            }
-            Some(pos) => {
-                self.pos = Some(pos + 1);
-                Some(self.mmu.read_byte(pos))
-            }
-            None => None,
-        }
+        self.address_iter
+            .next()
+            .map(|addr| self.mmu.read_byte(addr as u16))
     }
 }
 

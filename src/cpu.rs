@@ -27,6 +27,7 @@ pub struct Registers {
 
     /// Program counter
     pub pc: u16,
+
     /// Stack pointer
     pub sp: u16,
 }

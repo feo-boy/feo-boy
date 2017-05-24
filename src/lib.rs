@@ -6,6 +6,7 @@ extern crate error_chain;
 extern crate log;
 
 extern crate byteorder;
+extern crate itertools;
 
 pub mod cpu;
 pub mod errors;
