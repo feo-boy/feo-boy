@@ -4,7 +4,9 @@
 
 mod instructions;
 
+use std::cell::RefCell;
 use std::default::Default;
+use std::rc::Rc;
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -92,7 +94,7 @@ impl Clock {
 
 /// The CPU.
 #[derive(Debug)]
-pub struct Cpu<'a> {
+pub struct Cpu {
     /// Registers
     pub reg: Registers,
 
@@ -100,14 +102,14 @@ pub struct Cpu<'a> {
     pub clock: Clock,
 
     /// Memory unit
-    pub mmu: &'a Mmu,
+    mmu: Rc<RefCell<Mmu>>,
 
     /// The operands for the current instruction.
     operands: [u8; 2],
 }
 
-impl<'a> Cpu<'a> {
-    pub fn new(mmu: &Mmu) -> Cpu {
+impl Cpu {
+    pub fn new(mmu: Rc<RefCell<Mmu>>) -> Cpu {
         Cpu {
             reg: Registers::new(),
             clock: Clock::new(),
@@ -117,13 +119,13 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn step(&mut self) {
-        let byte = self.mmu.read_byte(self.reg.pc);
+        let byte = self.mmu.borrow().read_byte(self.reg.pc);
         self.reg.pc += 1;
 
         let instruction = instructions::fetch(byte);
 
         for i in 0..instruction.operands {
-            self.operands[i as usize] = self.mmu.read_byte(self.reg.pc);
+            self.operands[i as usize] = self.mmu.borrow().read_byte(self.reg.pc);
             self.reg.pc += 1;
         }
 

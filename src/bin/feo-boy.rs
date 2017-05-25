@@ -3,6 +3,8 @@ extern crate feo_boy;
 #[macro_use]
 extern crate clap;
 
+extern crate env_logger;
+
 use std::io::prelude::*;
 use std::io;
 use std::path::Path;
@@ -26,12 +28,14 @@ fn run<P>(rom: P, bios: Option<P>) -> Result<()>
 
     emulator.load_rom(rom).chain_err(|| "could not load ROM")?;
 
-    println!("{}", &emulator.dump_memory());
-
-    Ok(())
+    loop {
+        emulator.step();
+    }
 }
 
 fn main() {
+    env_logger::init().unwrap();
+
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())

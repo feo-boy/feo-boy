@@ -14,20 +14,27 @@ pub mod cpu;
 pub mod errors;
 pub mod memory;
 
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::rc::Rc;
 
 use errors::*;
 use memory::Mmu;
+use cpu::Cpu;
 
 pub struct Emulator {
-    mmu: Mmu,
+    cpu: Cpu,
+    mmu: Rc<RefCell<Mmu>>,
 }
 
 impl Emulator {
     pub fn new() -> Self {
-        Emulator { mmu: Mmu::new() }
+        let mmu = Rc::new(RefCell::new(Mmu::new()));
+        let cpu = Cpu::new(Rc::clone(&mmu));
+
+        Emulator { mmu: mmu, cpu: cpu }
     }
 
     pub fn load_bios<P>(&mut self, path: P) -> Result<()>
@@ -38,7 +45,7 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.load_bios(&buf)?;
+        self.mmu.borrow_mut().load_bios(&buf)?;
 
         Ok(())
     }
@@ -51,12 +58,16 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.load_rom(&buf)?;
+        self.mmu.borrow_mut().load_rom(&buf)?;
 
         Ok(())
     }
 
     pub fn dump_memory(&self) -> String {
-        self.mmu.to_string()
+        self.mmu.borrow().to_string()
+    }
+
+    pub fn step(&mut self) {
+        self.cpu.step()
     }
 }
