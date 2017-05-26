@@ -6,6 +6,7 @@ mod instructions;
 
 use std::cell::RefCell;
 use std::default::Default;
+use std::fmt;
 use std::rc::Rc;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -18,9 +19,6 @@ use self::instructions::Instruction;
 pub struct Registers {
     /// Accumulator
     pub a: u8,
-
-    /// Flags
-    pub f: u8,
 
     // General registers
     pub b: u8,
@@ -161,5 +159,23 @@ impl Cpu {
             }
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
+    }
+}
+
+impl fmt::Display for Cpu {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "A {:#04x}", self.reg.a)?;
+        writeln!(f, "B {:#04x}  {:#04x} C", self.reg.b, self.reg.c)?;
+        writeln!(f, "D {:#04x}  {:#04x} E", self.reg.d, self.reg.e)?;
+        writeln!(f, "H {:#04x}  {:#04x} L", self.reg.h, self.reg.l)?;
+        writeln!(f)?;
+        writeln!(f, "SP {:#06x}", self.reg.sp)?;
+        writeln!(f, "PC {:#06x}", self.reg.pc)?;
+        writeln!(f)?;
+        writeln!(f, "  ZNHC")?;
+        writeln!(f, "F {:08b}", self.flags)?;
+
+
+        Ok(())
     }
 }

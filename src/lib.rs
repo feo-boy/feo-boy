@@ -69,6 +69,10 @@ impl Emulator {
         self.mmu.borrow().to_string()
     }
 
+    pub fn dump_state(&self) -> String {
+        self.cpu.to_string()
+    }
+
     pub fn step(&mut self) {
         self.cpu.step()
     }

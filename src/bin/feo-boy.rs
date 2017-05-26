@@ -40,16 +40,18 @@ fn run(config: Config) -> Result<()> {
 
     loop {
         if config.debug {
-            print!("feo debug [sdq?]: ");
+            print!("feo debug [sdcq?]: ");
             io::stdout().flush()?;
 
             if let Some(answer) = stdin.next() {
                 match answer?.as_str() {
                     "s" => emulator.step(),
                     "d" => println!("{}", emulator.dump_memory()),
+                    "c" => println!("{}", emulator.dump_state()),
                     "q" => break,
                     "?" => {
                         println!("d: dump memory");
+                        println!("c: cpu state");
                         println!("s: step emulator");
                         println!("q: quit");
                     }
