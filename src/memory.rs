@@ -192,15 +192,17 @@ impl Default for Mmu {
 
 impl Display for Mmu {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        const LINE_LENGTH: usize = 16;
+        const LINE_LENGTH: usize = 32;
 
         let mut address = 0;
 
         for chunk in &self.iter().chunks(LINE_LENGTH) {
-            write!(f, "{:04x}", address)?;
+            for (i, byte) in chunk.enumerate() {
+                if i == 0 || i == LINE_LENGTH / 2 {
+                    write!(f, "{:04x} ", address + i)?;
+                }
 
-            for byte in chunk {
-                write!(f, " {:02x}", byte)?;
+                write!(f, "{:02x} ", byte)?;
             }
 
             writeln!(f)?;
