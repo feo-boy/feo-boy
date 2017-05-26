@@ -14,6 +14,24 @@ use byteorder::{ByteOrder, LittleEndian};
 use memory::Mmu;
 use self::instructions::Instruction;
 
+bitflags! {
+    /// CPU status flags.
+    #[derive(Default)]
+    struct Flags: u8 {
+        /// Set if the value of the computation is zero.
+        const ZERO          = 0b10000000;
+
+        /// Set if the last operation was a subtraction.
+        const SUBTRACT      = 0b01000000;
+
+        /// Set if there was a carry from bit 3 to bit 4.
+        const HALF_CARRY    = 0b00100000;
+
+        /// Set if the result did not fit in the register.
+        const CARRY         = 0b00010000;
+    }
+}
+
 /// The registers.
 #[derive(Debug, Default)]
 pub struct Registers {
@@ -38,33 +56,6 @@ pub struct Registers {
 
     /// Stack pointer
     sp: u16,
-}
-
-impl fmt::Display for Registers {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "A {:#04x}", self.a)?;
-        writeln!(f, "B {:#04x}  {:#04x} C", self.b, self.c)?;
-        writeln!(f, "D {:#04x}  {:#04x} E", self.d, self.e)?;
-        writeln!(f, "H {:#04x}  {:#04x} L", self.h, self.l)?;
-        writeln!(f)?;
-        writeln!(f, "SP {:#06x}", self.sp)?;
-        writeln!(f, "PC {:#06x}", self.pc)?;
-        writeln!(f)?;
-        writeln!(f, "  ZNHC")?;
-        writeln!(f, "F {:08b}", self.f)?;
-
-        Ok(())
-    }
-}
-
-bitflags! {
-    #[derive(Default)]
-    struct Flags: u8 {
-        const ZERO          = 0b10000000;
-        const SUBTRACT      = 0b01000000;
-        const HALFCARRY     = 0b00100000;
-        const CARRY         = 0b00010000;
-    }
 }
 
 impl Registers {
@@ -97,6 +88,23 @@ impl Registers {
     pub fn write_hl(&mut self, value: u16) {
         self.l = value as u8;
         self.h = (value >> 8) as u8;
+    }
+}
+
+impl fmt::Display for Registers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "A {:#04x}", self.a)?;
+        writeln!(f, "B {:#04x}  {:#04x} C", self.b, self.c)?;
+        writeln!(f, "D {:#04x}  {:#04x} E", self.d, self.e)?;
+        writeln!(f, "H {:#04x}  {:#04x} L", self.h, self.l)?;
+        writeln!(f)?;
+        writeln!(f, "SP {:#06x}", self.sp)?;
+        writeln!(f, "PC {:#06x}", self.pc)?;
+        writeln!(f)?;
+        writeln!(f, "  ZNHC")?;
+        writeln!(f, "F {:08b}", self.f)?;
+
+        Ok(())
     }
 }
 
@@ -173,7 +181,7 @@ impl Cpu {
             // XOR A
             0xaf => {
                 self.reg.a = 0;
-                self.reg.f.remove(ZERO);
+                self.reg.f.insert(ZERO);
             }
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
