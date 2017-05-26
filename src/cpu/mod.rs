@@ -18,26 +18,47 @@ use self::instructions::Instruction;
 #[derive(Debug, Default)]
 pub struct Registers {
     /// Accumulator
-    pub a: u8,
+    a: u8,
+
+    /// Status flags
+    f: Flags,
 
     // General registers
-    pub b: u8,
-    pub c: u8,
+    b: u8,
+    c: u8,
 
-    pub d: u8,
-    pub e: u8,
+    d: u8,
+    e: u8,
 
-    pub h: u8,
-    pub l: u8,
+    h: u8,
+    l: u8,
 
     /// Program counter
-    pub pc: u16,
+    pc: u16,
 
     /// Stack pointer
-    pub sp: u16,
+    sp: u16,
+}
+
+impl fmt::Display for Registers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "A {:#04x}", self.a)?;
+        writeln!(f, "B {:#04x}  {:#04x} C", self.b, self.c)?;
+        writeln!(f, "D {:#04x}  {:#04x} E", self.d, self.e)?;
+        writeln!(f, "H {:#04x}  {:#04x} L", self.h, self.l)?;
+        writeln!(f)?;
+        writeln!(f, "SP {:#06x}", self.sp)?;
+        writeln!(f, "PC {:#06x}", self.pc)?;
+        writeln!(f)?;
+        writeln!(f, "  ZNHC")?;
+        writeln!(f, "F {:08b}", self.f)?;
+
+        Ok(())
+    }
 }
 
 bitflags! {
+    #[derive(Default)]
     struct Flags: u8 {
         const ZERO          = 0b10000000;
         const SUBTRACT      = 0b01000000;
@@ -103,12 +124,10 @@ impl Clock {
 #[derive(Debug)]
 pub struct Cpu {
     /// Registers
-    pub reg: Registers,
-
-    flags: Flags,
+    reg: Registers,
 
     /// The clock corresponding to the last instruction cycle.
-    pub clock: Clock,
+    clock: Clock,
 
     /// Memory unit
     mmu: Rc<RefCell<Mmu>>,
@@ -121,7 +140,6 @@ impl Cpu {
     pub fn new(mmu: Rc<RefCell<Mmu>>) -> Cpu {
         Cpu {
             reg: Registers::new(),
-            flags: Flags::empty(),
             clock: Clock::new(),
             mmu: mmu,
             operands: Default::default(),
@@ -155,7 +173,7 @@ impl Cpu {
             // XOR A
             0xaf => {
                 self.reg.a = 0;
-                self.flags.remove(ZERO);
+                self.reg.f.remove(ZERO);
             }
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
@@ -164,18 +182,6 @@ impl Cpu {
 
 impl fmt::Display for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "A {:#04x}", self.reg.a)?;
-        writeln!(f, "B {:#04x}  {:#04x} C", self.reg.b, self.reg.c)?;
-        writeln!(f, "D {:#04x}  {:#04x} E", self.reg.d, self.reg.e)?;
-        writeln!(f, "H {:#04x}  {:#04x} L", self.reg.h, self.reg.l)?;
-        writeln!(f)?;
-        writeln!(f, "SP {:#06x}", self.reg.sp)?;
-        writeln!(f, "PC {:#06x}", self.reg.pc)?;
-        writeln!(f)?;
-        writeln!(f, "  ZNHC")?;
-        writeln!(f, "F {:08b}", self.flags)?;
-
-
-        Ok(())
+        write!(f, "{}", self.reg.to_string())
     }
 }
