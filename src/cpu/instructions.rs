@@ -43,8 +43,9 @@ lazy_static! {
     /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
     // FIXME: This should be `[Instruction; 0x100]` once all instructions are implemented.
     static ref INSTRUCTIONS: Vec<Option<Instruction>> = instructions! {
-        // byte     description      operands        cycles
-        0x00,       "NOP",           0,              1;
-        0x31,       "LD SP,d16",     2,              12;
+        // byte     description     operands        cycles
+        0x00,       "NOP",          0,              1;
+        0x31,       "LD SP,d16",    2,              12;
+        0xaf,       "XOR A",        0,              4;
     };
 }

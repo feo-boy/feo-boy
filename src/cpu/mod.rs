@@ -39,6 +39,15 @@ pub struct Registers {
     pub sp: u16,
 }
 
+bitflags! {
+    struct Flags: u8 {
+        const ZERO          = 0b10000000;
+        const SUBTRACT      = 0b01000000;
+        const HALFCARRY     = 0b00100000;
+        const CARRY         = 0b00010000;
+    }
+}
+
 impl Registers {
     pub fn new() -> Self {
         Default::default()
@@ -98,6 +107,8 @@ pub struct Cpu {
     /// Registers
     pub reg: Registers,
 
+    flags: Flags,
+
     /// The clock corresponding to the last instruction cycle.
     pub clock: Clock,
 
@@ -112,6 +123,7 @@ impl Cpu {
     pub fn new(mmu: Rc<RefCell<Mmu>>) -> Cpu {
         Cpu {
             reg: Registers::new(),
+            flags: Flags::empty(),
             clock: Clock::new(),
             mmu: mmu,
             operands: Default::default(),
@@ -141,6 +153,12 @@ impl Cpu {
 
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(&self.operands),
+
+            // XOR A
+            0xaf => {
+                self.reg.a = 0;
+                self.flags.remove(ZERO);
+            }
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
     }
