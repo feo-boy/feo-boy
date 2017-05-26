@@ -9,10 +9,7 @@ use std::default::Default;
 use std::fmt;
 use std::rc::Rc;
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use memory::Mmu;
-use self::instructions::Instruction;
 
 bitflags! {
     /// CPU status flags.
@@ -154,39 +151,11 @@ impl Cpu {
         }
     }
 
+    /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        let byte = self.mmu.borrow().read_byte(self.reg.pc);
-        self.reg.pc += 1;
+        let instruction = self.fetch();
 
-        let instruction = instructions::fetch(byte);
-
-        for i in 0..instruction.operands {
-            self.operands[i as usize] = self.mmu.borrow().read_byte(self.reg.pc);
-            self.reg.pc += 1;
-        }
-
-        self.execute(instruction);
-    }
-
-    fn execute(&mut self, instruction: &Instruction) {
-        debug!("executing {:?}", instruction);
-
-        match instruction.byte {
-            // NOP
-            0x00 => (),
-
-            // LD SP,d16
-            0x31 => self.reg.sp = LittleEndian::read_u16(&self.operands),
-
-            // XOR A
-            0xaf => {
-                // Effectively sets A to 0 and sets the Zero flag.
-                self.reg.a ^= self.reg.a;
-                self.reg.f = Flags::empty();
-                self.reg.f.set(ZERO, self.reg.a == 0);
-            }
-            _ => panic!("unimplemented instruction: {:?}", instruction),
-        }
+        self.execute(&instruction);
     }
 }
 
