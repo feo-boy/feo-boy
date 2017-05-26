@@ -77,7 +77,7 @@ impl Mmu {
             0x0000...0x00FF if self.in_bios => self.bios[address as usize],
             0x0000...0x7FFF => self.rom[address as usize],
             0x8000...0x9FFF => {
-                error!("read unimplemented memory: VRAM");
+                warn!("read unimplemented memory: VRAM");
                 0x00
             }
             0xA000...0xBFFF => {
@@ -93,11 +93,11 @@ impl Mmu {
                 self.wram[index as usize]
             }
             0xFE00...0xFE9F => {
-                error!("read unimplemented memory: OAM");
+                warn!("read unimplemented memory: OAM");
                 0x00
             }
             0xFEA0...0xFF7F => {
-                error!("read unimplemented memory: I/O registers");
+                warn!("read unimplemented memory: I/O registers");
                 0x00
             }
             0xFF80...0xFFFF => {

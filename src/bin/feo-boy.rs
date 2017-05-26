@@ -7,7 +7,7 @@ extern crate env_logger;
 
 use std::io::prelude::*;
 use std::io;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 
 use clap::{App, Arg};
@@ -15,22 +15,53 @@ use clap::{App, Arg};
 use feo_boy::Emulator;
 use feo_boy::errors::*;
 
-fn run<P>(rom: P, bios: Option<P>) -> Result<()>
-    where P: AsRef<Path>
-{
+#[derive(Debug, Clone)]
+struct Config {
+    rom: PathBuf,
+    bios: Option<PathBuf>,
+    debug: bool,
+}
+
+fn run(config: Config) -> Result<()> {
     let mut emulator = Emulator::new();
 
-    if let Some(bios) = bios {
+    if let Some(bios) = config.bios {
         emulator
             .load_bios(bios)
             .chain_err(|| "could not load BIOS")?;
     }
 
-    emulator.load_rom(rom).chain_err(|| "could not load ROM")?;
+    emulator
+        .load_rom(config.rom)
+        .chain_err(|| "could not load ROM")?;
+
+    let stdin = io::stdin();
+    let mut stdin = stdin.lock().lines();
 
     loop {
-        emulator.step();
+        if config.debug {
+            print!("feo debug [sdq?]: ");
+            io::stdout().flush()?;
+
+            if let Some(answer) = stdin.next() {
+                match answer?.as_str() {
+                    "s" => emulator.step(),
+                    "d" => println!("{}", emulator.dump_memory()),
+                    "q" => break,
+                    "?" => {
+                        println!("d: dump memory");
+                        println!("s: step emulator");
+                        println!("q: quit");
+                    }
+                    _ => println!("unknown command"),
+                }
+            }
+        } else {
+            emulator.step();
+        }
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -47,12 +78,22 @@ fn main() {
                  .long("bios")
                  .takes_value(true)
                  .help("a file containing a binary dump of the Game Boy BIOS"))
+        .arg(Arg::with_name("debug")
+                 .long("debug")
+                 .short("d")
+                 .help("Enable debug mode"))
         .get_matches();
 
-    let bios = matches.value_of("bios-file");
+    let bios = matches.value_of("bios-file").map(PathBuf::from);
     let rom = matches.value_of("rom").unwrap();
 
-    if let Err(ref e) = run(rom, bios) {
+    let config = Config {
+        bios: bios,
+        rom: PathBuf::from(rom),
+        debug: matches.is_present("debug"),
+    };
+
+    if let Err(ref e) = run(config) {
         let stderr = &mut io::stderr();
         let errmsg = "Error writing to stderr";
 
@@ -63,7 +104,8 @@ fn main() {
         }
 
         if let Some(backtrace) = e.backtrace() {
-            writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
+            writeln!(stderr, "backtrace: {:?}", backtrace)
+                .expect(errmsg);
         }
 
         process::exit(1);
