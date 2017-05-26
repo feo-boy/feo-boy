@@ -180,8 +180,10 @@ impl Cpu {
 
             // XOR A
             0xaf => {
-                self.reg.a = 0;
-                self.reg.f.insert(ZERO);
+                // Effectively sets A to 0 and sets the Zero flag.
+                self.reg.a ^= self.reg.a;
+                self.reg.f = Flags::empty();
+                self.reg.f.set(ZERO, self.reg.a == 0);
             }
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
