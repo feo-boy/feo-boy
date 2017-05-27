@@ -29,7 +29,7 @@ pub struct Mmu {
     /// Working RAM.
     wram: [u8; 0x2000],
 
-    /// Zero-page RAM.
+    /// Zero-Page RAM.
     ///
     /// High speed.
     zram: [u8; 0x0080],
@@ -74,17 +74,26 @@ impl Mmu {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
+            // BIOS
             0x0000...0x00FF if self.in_bios => self.bios[address as usize],
+
+            // BIOS and ROM Banks
             0x0000...0x7FFF => self.rom[address as usize],
+
+            // Graphics RAM
             0x8000...0x9FFF => {
                 warn!("read unimplemented memory: VRAM");
                 0x00
             }
+
+            // Cartridge (External) RAM
             0xA000...0xBFFF => {
                 let index = address & 0x1FFF;
 
                 self.eram[index as usize]
             }
+
+            // Working RAM
             0xC000...0xFDFF => {
                 // Addresses E000-FDFF are known as "shadow RAM." They contain an exact copy of
                 // addresses C000-DFFF, until the last 512 bytes of the map.
@@ -92,19 +101,27 @@ impl Mmu {
 
                 self.wram[index as usize]
             }
+
+            // Graphics Sprite Information
             0xFE00...0xFE9F => {
                 warn!("read unimplemented memory: OAM");
                 0x00
             }
+
+            // 
             0xFEA0...0xFF7F => {
                 warn!("read unimplemented memory: I/O registers");
                 0x00
             }
+
+            // Zero-Page RAM
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
 
                 self.zram[index as usize]
             }
+
+            // Bad Memory Address
             _ => unreachable!(),
         }
     }
@@ -115,20 +132,31 @@ impl Mmu {
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
+            // BIOS and ROM Banks
             0x0000...0x7FFF => {
                 // BIOS and ROM are read-only.
                 return;
             }
+
+            // Graphics RAM
             0x8000...0x9FFF => unimplemented!(),
+
+            // Cartridge (External) RAM
             0xA000...0xBFFF => {
                 let index = address & 0x1FFF;
                 self.eram[index as usize] = byte;
             }
+
+            // Working RAM
             0xC000...0xFDFF => {
                 let index = address & 0x1FFF;
                 self.wram[index as usize] = byte;
             }
+
+            // Graphics Sprite Information
             0xFE00...0xFE9F => unimplemented!(),
+
+            // Memory-Mapped I/O
             0xFF00...0xFF7F => {
                 // I/O Registers
                 match address {
@@ -136,10 +164,14 @@ impl Mmu {
                     _ => unimplemented!(),
                 }
             }
+
+            // Zeroid-Page RAM
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
                 self.zram[index as usize] = byte;
             }
+
+            // Bad Memory Address
             _ => unreachable!(),
         }
     }
