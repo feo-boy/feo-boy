@@ -86,6 +86,11 @@ impl Registers {
         self.l = value as u8;
         self.h = (value >> 8) as u8;
     }
+
+    pub fn dec_hl(&mut self) {
+        let x = self.read_hl() - 1;
+        self.write_hl(x);
+    }
 }
 
 impl fmt::Display for Registers {

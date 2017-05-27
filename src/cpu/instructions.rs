@@ -89,13 +89,19 @@ impl super::Cpu {
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(instruction.operands()),
 
+            // LD (HL-),A
+            0x32 => {
+                self.mmu.borrow_mut().write_byte(self.reg.read_hl(), self.reg.a);
+                self.reg.dec_hl();
+            },
+
             // XOR A
             0xaf => {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
                 self.reg.a ^= self.reg.a;
                 self.reg.f = Flags::empty();
                 self.reg.f.set(ZERO, self.reg.a == 0);
-            }
+            },
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
@@ -116,6 +122,7 @@ lazy_static! {
         0x00,       "NOP",          0,              1;
         0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
+        0x32,       "LD (HL-),A",   0,              8;
         0xaf,       "XOR A",        0,              4;
     };
 }
