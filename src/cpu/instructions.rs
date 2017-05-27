@@ -13,7 +13,11 @@ pub struct Instruction {
     /// A short, human readable representation of the instruction in Z80 assembly syntax.
     pub description: &'static str,
 
-    /// The number of cycles it takes to execute this instruction.
+    /// The number of clock cycles it takes to execute this instruction.
+    ///
+    /// Note that this is measured in clock cycles, not machine cycles. While Nintendo's official
+    /// documentation records the timings in machine cycles, most online documentation uses clock
+    /// cycles. Four clock cycles is equivalent to a single machine cycle.
     pub cycles: u8,
 
     /// An array containing the operand(s) for the instruction.
@@ -119,7 +123,7 @@ lazy_static! {
     // FIXME: This should be `[Instruction; 0x100]` once all instructions are implemented.
     static ref INSTRUCTIONS: Vec<Option<Instruction>> = instructions! {
         // byte     description     operands        cycles
-        0x00,       "NOP",          0,              1;
+        0x00,       "NOP",          0,              4;
         0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
         0x32,       "LD (HL-),A",   0,              8;
