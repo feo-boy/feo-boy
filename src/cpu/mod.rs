@@ -60,6 +60,7 @@ impl Registers {
         Default::default()
     }
 
+    // read pair registers
     pub fn read_bc(&self) -> u16 {
         self.c as u16 + ((self.b as u16) << 8)
     }
@@ -72,6 +73,7 @@ impl Registers {
         self.l as u16 + ((self.h as u16) << 8)
     }
 
+    // write pair registers
     pub fn write_bc(&mut self, value: u16) {
         self.c = value as u8;
         self.b = (value >> 8) as u8;
@@ -85,6 +87,33 @@ impl Registers {
     pub fn write_hl(&mut self, value: u16) {
         self.l = value as u8;
         self.h = (value >> 8) as u8;
+    }
+
+    // inc pair registers
+    pub fn inc_bc(&mut self) {
+        let x = self.read_bc() + 1;
+        self.write_bc(x);
+    }
+
+    pub fn inc_de(&mut self) {
+        let x = self.read_de() + 1;
+        self.write_de(x);
+    }
+
+    pub fn inc_hl(&mut self) {
+        let x = self.read_hl() + 1;
+        self.write_hl(x);
+    }
+
+    // dec pair registers
+    pub fn dec_bc(&mut self) {
+        let x = self.read_bc() - 1;
+        self.write_bc(x);
+    }
+
+    pub fn dec_de(&mut self) {
+        let x = self.read_de() - 1;
+        self.write_de(x);
     }
 
     pub fn dec_hl(&mut self) {
