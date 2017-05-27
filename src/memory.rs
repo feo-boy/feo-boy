@@ -139,7 +139,7 @@ impl Mmu {
             }
 
             // Graphics RAM
-            0x8000...0x9FFF => unimplemented!(),
+            0x8000...0x9FFF => warn!("read unimplemented memory: VRAM"),
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
