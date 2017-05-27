@@ -83,6 +83,9 @@ impl super::Cpu {
             // NOP
             0x00 => (),
 
+            // LD HL,d16
+            0x21 => self.reg.write_hl(LittleEndian::read_u16(instruction.operands())),
+
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(instruction.operands()),
 
@@ -93,6 +96,7 @@ impl super::Cpu {
                 self.reg.f = Flags::empty();
                 self.reg.f.set(ZERO, self.reg.a == 0);
             }
+
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
@@ -110,6 +114,7 @@ lazy_static! {
     static ref INSTRUCTIONS: Vec<Option<Instruction>> = instructions! {
         // byte     description     operands        cycles
         0x00,       "NOP",          0,              1;
+        0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
         0xaf,       "XOR A",        0,              4;
     };
