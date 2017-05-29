@@ -29,6 +29,12 @@ pub struct Mmu {
     /// Working RAM.
     wram: [u8; 0x2000],
 
+    /// Video RAM.
+    vram: [u8; 0x2000],
+
+    /// Object attribute memory (OAM).
+    oam: [u8; 0xA0],
+
     /// Zero-Page RAM.
     ///
     /// High speed.
@@ -45,6 +51,8 @@ impl Mmu {
             rom: [0; 0x8000],
             eram: [0; 0x2000],
             wram: [0; 0x2000],
+            vram: [0; 0x2000],
+            oam: [0; 0xA0],
             zram: [0; 0x0080],
             in_bios: true,
         }
@@ -82,8 +90,8 @@ impl Mmu {
 
             // Graphics RAM
             0x8000...0x9FFF => {
-                warn!("read unimplemented memory: VRAM");
-                0x00
+                let index = address & 0x1FFF;
+                self.vram[index as usize]
             }
 
             // Cartridge (External) RAM
@@ -102,15 +110,15 @@ impl Mmu {
                 self.wram[index as usize]
             }
 
-            // Graphics Sprite Information
+            // OAM
             0xFE00...0xFE9F => {
-                warn!("read unimplemented memory: OAM");
-                0x00
+                let index = address & 0xFF;
+                self.oam[index as usize]
             }
 
-            // 
+            // I/O Registers
             0xFEA0...0xFF7F => {
-                warn!("read unimplemented memory: I/O registers");
+                error!("read unimplemented memory: I/O registers");
                 0x00
             }
 
@@ -139,7 +147,10 @@ impl Mmu {
             }
 
             // Graphics RAM
-            0x8000...0x9FFF => warn!("read unimplemented memory: VRAM"),
+            0x8000...0x9FFF => {
+                let index = address & 0x1FFF;
+                self.vram[index as usize] = byte;
+            }
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
@@ -154,7 +165,10 @@ impl Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => unimplemented!(),
+            0xFE00...0xFE9F => {
+                let index = address & 0xFF;
+                self.oam[index as usize] = byte;
+            }
 
             // Memory-Mapped I/O
             0xFF00...0xFF7F => {
@@ -165,7 +179,7 @@ impl Mmu {
                 }
             }
 
-            // Zeroid-Page RAM
+            // Zero-Page RAM
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
                 self.zram[index as usize] = byte;
@@ -199,11 +213,13 @@ impl Mmu {
 
 impl Debug for Mmu {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let bios = self.bios[..].fmt(f);
-        let rom = self.rom[..].fmt(f);
-        let eram = self.eram[..].fmt(f);
-        let wram = self.wram[..].fmt(f);
-        let zram = self.zram[..].fmt(f);
+        let bios: &[u8] = &self.bios;
+        let rom: &[u8] = &self.rom;
+        let eram: &[u8] = &self.eram;
+        let wram: &[u8] = &self.wram;
+        let vram: &[u8] = &self.vram;
+        let oam: &[u8] = &self.oam;
+        let zram: &[u8] = &self.zram;
 
         f.debug_struct("Mmu")
             .field("in_bios", &self.in_bios)
@@ -211,6 +227,8 @@ impl Debug for Mmu {
             .field("rom", &rom)
             .field("eram", &eram)
             .field("wram", &wram)
+            .field("vram", &vram)
+            .field("oam", &oam)
             .field("zram", &zram)
             .finish()
     }
@@ -301,6 +319,17 @@ mod tests {
     }
 
     #[test]
+    fn vram() {
+        let mut mmu = Mmu::new();
+
+        mmu.vram[0] = 1;
+        assert_eq!(mmu.read_byte(0x8000), 1);
+
+        mmu.vram[0x1FFF] = 2;
+        assert_eq!(mmu.read_byte(0x9FFF), 2);
+    }
+
+    #[test]
     fn eram() {
         let mut mmu = Mmu::new();
 
@@ -324,6 +353,17 @@ mod tests {
 
         mmu.wram[0x1FFF - 512] = 3;
         assert_eq!(mmu.read_byte(0xFDFF), 3);
+    }
+
+    #[test]
+    fn oam() {
+        let mut mmu = Mmu::new();
+
+        mmu.oam[0] = 1;
+        assert_eq!(mmu.read_byte(0xFE00), 1);
+
+        mmu.oam[0x9F] = 2;
+        assert_eq!(mmu.read_byte(0xFE9F), 2);
     }
 
     #[test]
