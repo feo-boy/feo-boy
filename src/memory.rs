@@ -116,8 +116,11 @@ impl Mmu {
                 self.oam[index as usize]
             }
 
+            // Reserved, unused
+            0xFEA0...0xFEFF => 0x00,
+
             // I/O Registers
-            0xFEA0...0xFF7F => {
+            0xFF00...0xFF7F => {
                 error!("read unimplemented memory: I/O registers");
                 0x00
             }
@@ -129,7 +132,6 @@ impl Mmu {
                 self.zram[index as usize]
             }
 
-            // Bad Memory Address
             _ => unreachable!(),
         }
     }
@@ -170,6 +172,9 @@ impl Mmu {
                 self.oam[index as usize] = byte;
             }
 
+            // Reserved, unused
+            0xFEA0...0xFEFF => (),
+
             // Memory-Mapped I/O
             0xFF00...0xFF7F => {
                 // I/O Registers
@@ -185,7 +190,6 @@ impl Mmu {
                 self.zram[index as usize] = byte;
             }
 
-            // Bad Memory Address
             _ => unreachable!(),
         }
     }
