@@ -42,6 +42,9 @@ pub struct Mmu {
 
     /// True if the BIOS is currently mapped into memory.
     in_bios: bool,
+
+    /// The entire ROM contained on the inserted cartridge.
+    cartridge_rom: Vec<u8>,
 }
 
 impl Mmu {
@@ -55,6 +58,7 @@ impl Mmu {
             oam: [0; 0xA0],
             zram: [0; 0x0080],
             in_bios: true,
+            cartridge_rom: Vec::default(),
         }
     }
 
@@ -69,9 +73,10 @@ impl Mmu {
     }
 
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
-        for (address, byte) in rom.iter().enumerate() {
-            self.rom[address as usize] = *byte;
-        }
+        self.cartridge_rom = rom.to_vec();
+
+        let initial_banks = &self.cartridge_rom[..self.rom.len()];
+        self.rom.copy_from_slice(initial_banks);
 
         Ok(())
     }
@@ -144,8 +149,9 @@ impl Mmu {
         match address {
             // BIOS and ROM Banks
             0x0000...0x7FFF => {
-                // BIOS and ROM are read-only.
-                return;
+                // While BIOS and ROM are read-only, if the cartridge has a memory bank controller,
+                // writes to this region will trigger a bank switch.
+                unimplemented!()
             }
 
             // Graphics RAM
