@@ -5,8 +5,9 @@
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Range;
+use std::num::Wrapping;
 
-use byteorder::{LittleEndian, ByteOrder};
+use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use itertools::Itertools;
 
 use errors::*;
@@ -72,11 +73,134 @@ impl Mmu {
         Ok(())
     }
 
+    /// Loads the ROM into memory.
+    ///
+    /// This function also parses and logs information contained in the [cartridge header].
+    ///
+    /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        info!("loading ROM");
+
         self.cartridge_rom = rom.to_vec();
 
         let initial_banks = &self.cartridge_rom[..self.rom.len()];
         self.rom.copy_from_slice(initial_banks);
+
+        info!("title: {}",
+              &rom[0x134..0x144]
+                   .iter()
+                   .map(|&c| c as char)
+                   .collect::<String>());
+
+        let cartridge_type = match rom[0x147] {
+            0x00 => "ROM ONLY",
+            0x01 => "MBC1",
+            0x02 => "MBC1+RAM",
+            0x03 => "MBC1+RAM+BATTERY",
+            0x05 => "MBC2",
+            0x06 => "MBC2+BATTERY",
+            0x08 => "ROM+RAM",
+            0x09 => "ROM+RAM+BATTERY",
+            0x0B => "MMM01",
+            0x0C => "MMM01+RAM",
+            0x0D => "MMM01+RAM+BATTERY",
+            0x0F => "MBC3+TIMER+BATTERY",
+            0x10 => "MBC3+TIMER+RAM+BATTERY",
+            0x11 => "MBC3",
+            0x12 => "MBC3+RAM",
+            0x13 => "MBC3+RAM+BATTERY",
+            0x19 => "MBC5",
+            0x1A => "MBC5+RAM",
+            0x1B => "MBC4+RAM+BATTERY",
+            0x1C => "MBC5+RUMBLE",
+            0x1D => "MBC5+RUMBLE+RAM",
+            0x1E => "MBC5+RUMBLE+RAM+BATTERY",
+            0x20 => "MBC6",
+            0x22 => "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
+            0xFC => "POCKET CAMERA",
+            0xFD => "BANDAI TAMAS",
+            0xFE => "HuC3",
+            0xFF => "HuC1+RAM+BATTERY",
+            _ => "unknown",
+        };
+        info!("cartridge type: {}", cartridge_type);
+
+        let num_banks = match rom[0x148] {
+            0x00 => Some(0),
+            0x01...0x08 => Some(2 << rom[0x148]),
+            0x52 => Some(72),
+            0x53 => Some(80),
+            0x54 => Some(96),
+            _ => None,
+        };
+        let bank_info = num_banks
+            .map(|n| if n == 0 {
+                     String::from("no banking")
+                 } else {
+                     format!("{} banks", n)
+                 })
+            .unwrap_or_else(|| String::from("no bank information"));
+        info!("ROM size: {}KB ({})", 32 << rom[0x148], bank_info);
+
+        let eram_size = match rom[0x149] {
+            0x00 => Some(0),
+            0x01 => Some(2),
+            0x02 => Some(8),
+            0x03 => Some(32),
+            0x04 => Some(128),
+            0x05 => Some(64),
+            _ => None,
+        };
+        let eram_info = eram_size
+            .map(|n| if n == 0 {
+                     String::from("none")
+                 } else {
+                     format!("{}KB", n)
+                 })
+            .unwrap_or_else(|| String::from("no information"));
+        info!("external RAM size: {}", eram_info);
+
+        info!("region: {}",
+              if rom[0x14A] == 0 {
+                  "Japanese"
+              } else {
+                  "Non-Japanese "
+              });
+
+        let header_sum = {
+            let mut x = Wrapping(0u8);
+            for byte in rom[0x134..0x14D].iter() {
+                x = x - Wrapping(*byte) - Wrapping(1u8);
+            }
+
+            x.0
+        };
+        let header_checksum = rom[0x14D];
+        if header_sum != header_checksum {
+            let msg = format!("header checksum {:#02} is not equal to sum {:#02}",
+                              header_checksum,
+                              header_sum);
+            bail!(ErrorKind::InvalidCartridge(msg))
+        }
+        info!("header checksum OK");
+
+        let global_sum: Wrapping<u16> = rom.iter()
+            .enumerate()
+            .flat_map(|(i, byte)| match i {
+                          0x14E | 0x14F => None,
+                          _ => Some(Wrapping(*byte as u16)),
+                      })
+            .sum();
+        let global_checksum = BigEndian::read_u16(&rom[0x14E..0x150]);
+        if global_sum.0 == global_checksum {
+            info!("global checksum OK");
+        } else {
+            info!("global checksum FAILED: {:#04x} (sum) != {:#04x} (checksum)",
+                  global_sum,
+                  global_checksum);
+        }
+
+        info!("completed loading ROM");
 
         Ok(())
     }

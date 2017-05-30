@@ -12,5 +12,9 @@ error_chain! {
             description("invalid BIOS")
             display("invalid BIOS: {}", reason)
         }
+        InvalidCartridge(reason: String) {
+            description("invalid cartridge ROM")
+            display("invalid cartridge ROM: {}", reason)
+        }
     }
 }
