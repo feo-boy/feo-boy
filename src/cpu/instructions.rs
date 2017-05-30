@@ -85,10 +85,8 @@ impl super::Cpu {
     pub fn fetch_instr(&mut self, table: &[Option<Instruction>]) -> Instruction {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
-        let in_cb = match table[0] {
-            Some(x) => &x.description != &"NOP",
-            _ => true,
-        }; // TODO remove after all opcodes done
+        // TODO remove after all opcodes done
+        let in_cb = table[0].map(|x| x.description != "NOP").unwrap_or_default();
 
         let mut instruction = table[byte as usize]
             .expect(&format!("could not find data for instruction {:#0x} -- is 0xcb {}",
