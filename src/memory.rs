@@ -96,9 +96,9 @@ impl Mmu {
 
         info!("title: {}",
               &rom[0x134..0x144]
-                   .iter()
-                   .map(|&c| c as char)
-                   .collect::<String>());
+                  .iter()
+                  .map(|&c| c as char)
+                  .collect::<String>());
 
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
