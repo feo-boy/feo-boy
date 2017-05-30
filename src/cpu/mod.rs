@@ -265,15 +265,8 @@ impl Cpu {
 
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        let instruction = self.fetch_instr();
-
-        if instruction.byte == 0xcb {
-            self.reg.pc += 1;
-            let instruction_cb = self.fetch_cb();
-            self.execute_cb(&instruction_cb);
-        } else {
-            self.execute(&instruction);
-        }
+        let instruction = self.fetch();
+        self.execute(&instruction);
     }
 
     pub fn push(&mut self, value: u16) {

@@ -78,12 +78,22 @@ macro_rules! instructions {
 
 impl super::Cpu {
     /// Decodes the next instruction.
-    pub fn fetch(&self, instr_vec: Vec<Option<Instruction>>) -> Instruction {
+    pub fn fetch(&mut self) -> Instruction {
+        self.fetch_instr(&INSTRUCTIONS)
+    }
+
+    pub fn fetch_instr(&mut self, table: &[Option<Instruction>]) -> Instruction {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
-        let mut instruction =
-            instr_vec[byte as usize]
-                .expect(&format!("could not find data for instruction {:#0x}", byte)); // TODO make panic for 0xcb different
+        let in_cb = match table[0] {
+            Some(x) => &x.description != &"NOP",
+            _ => true,
+        }; // TODO remove after all opcodes done
+
+        let mut instruction = table[byte as usize]
+            .expect(&format!("could not find data for instruction {:#0x} -- is 0xcb {}",
+                            byte,
+                            in_cb)); // TODO remove after all opcodes done
 
         for i in 0..instruction.num_operands {
             let operand = self.mmu.borrow().read_byte(self.reg.pc + 1 + i as u16);
@@ -91,15 +101,9 @@ impl super::Cpu {
             instruction.operand_bytes[i as usize] = operand;
         }
 
+        self.reg.pc += 1 + instruction.num_operands as u16;
+
         instruction
-    }
-
-    pub fn fetch_instr(&self) -> Instruction {
-        self.fetch(INSTRUCTIONS.to_vec())
-    }
-
-    pub fn fetch_cb(&self) -> Instruction {
-        self.fetch(INSTRUCTIONS_CB.to_vec())
     }
 
     /// Executes an instruction.
@@ -282,7 +286,10 @@ impl super::Cpu {
             }
 
             // PREFIX CB
-            0xcb => (),
+            0xcb => {
+                let instruction_cb = self.fetch_instr(&INSTRUCTIONS_CB);
+                self.execute_cb(&instruction_cb);
+            }
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
@@ -298,10 +305,12 @@ impl super::Cpu {
     pub fn execute_cb(&mut self, instruction: &Instruction) {
         debug!("executing 0xcb{:?}", instruction);
 
-        println!("hello");
-
         match instruction.byte {
-            0x7c => (),
+            0x7c => {
+                self.reg.f.set(ZERO, self.reg.h & (1 << 7) != 0);
+                self.reg.f.set(SUBTRACT, false);
+                self.reg.f.set(HALF_CARRY, true);
+            }
 
             _ => panic!("unimplemented instruction: 0xcb{:?}", instruction),
         }
@@ -357,7 +366,7 @@ lazy_static! {
     static ref INSTRUCTIONS_CB: Vec<Option<Instruction>> = instructions! {
         // byte     description     operands        cycles
         //0x00,       "RLC B",        1,              8;
-        0x7c,       "BIT 7,H",      1,              8;
+        0x7c,       "BIT 7,H",      0,              8;
     };
 }
 
