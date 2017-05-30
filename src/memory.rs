@@ -1,6 +1,6 @@
 //! Functionality related to memory.
 //!
-//! Contains an implementation of a memory manager unit.
+//! Contains the implementation of the memory manager unit (MMU).
 
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -49,6 +49,9 @@ pub struct Mmu {
 }
 
 impl Mmu {
+    /// Creates a new memory manager unit.
+    ///
+    /// The initial contents of the memory are unspecified.
     pub fn new() -> Self {
         Mmu {
             bios: [0; BIOS_SIZE],
@@ -63,6 +66,9 @@ impl Mmu {
         }
     }
 
+    /// Loads a byte slice containing the BIOS into memory.
+    ///
+    /// Returns an error if the slice is not the correct length.
     pub fn load_bios(&mut self, bios: &[u8]) -> Result<()> {
         if bios.len() != BIOS_SIZE {
             bail!(ErrorKind::InvalidBios(format!("must be exactly {} bytes", BIOS_SIZE)));
@@ -73,9 +79,11 @@ impl Mmu {
         Ok(())
     }
 
-    /// Loads the ROM into memory.
+    /// Loads a byte slice containing the cartridge ROM into memory.
     ///
     /// This function also parses and logs information contained in the [cartridge header].
+    ///
+    /// Returns an error if the header checksum is invalid.
     ///
     /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
@@ -205,16 +213,22 @@ impl Mmu {
         Ok(())
     }
 
+    /// Resets the MMU to its initial state.
+    ///
+    /// This includes:
+    ///
+    /// - Remapping the BIOS into 0x0000-0x00FF.
     pub fn reset(&mut self) {
         self.in_bios = true;
     }
 
+    /// Returns the byte at a given memory address.
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
             0x0000...0x00FF if self.in_bios => self.bios[address as usize],
 
-            // BIOS and ROM Banks
+            // ROM Banks
             0x0000...0x7FFF => self.rom[address as usize],
 
             // Graphics RAM
@@ -265,10 +279,12 @@ impl Mmu {
         }
     }
 
+    /// Returns the word at a given memory address, read in little-endian order.
     pub fn read_word(&self, address: u16) -> u16 {
         LittleEndian::read_u16(&[self.read_byte(address), self.read_byte(address + 1)])
     }
 
+    /// Writes a byte to a given memory address.
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             // BIOS and ROM Banks
@@ -324,6 +340,7 @@ impl Mmu {
         }
     }
 
+    /// Writes a word to a given memory address in little-endian order.
     pub fn write_word(&mut self, address: u16, word: u16) {
         let mut bytes = [0u8; 2];
 
@@ -333,7 +350,8 @@ impl Mmu {
         self.write_byte(address + 1, bytes[1]);
     }
 
-    pub fn iter<'a>(&'a self) -> MemoryIterator<'a> {
+    /// Create an iterator over the entire memory space.
+    pub fn iter(&self) -> MemoryIterator {
         MemoryIterator {
             address_iter: 0x00..0x10000,
             mmu: self,
@@ -398,6 +416,9 @@ impl Display for Mmu {
     }
 }
 
+/// An iterator over the MMU's memory.
+///
+/// Returns each byte in little-endian order.
 pub struct MemoryIterator<'a> {
     mmu: &'a Mmu,
     address_iter: Range<u32>,
