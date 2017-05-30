@@ -13,6 +13,7 @@ extern crate byteorder;
 extern crate itertools;
 
 pub mod cpu;
+pub mod graphics;
 pub mod errors;
 pub mod memory;
 
@@ -22,21 +23,28 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::rc::Rc;
 
-use errors::*;
-use memory::Mmu;
 use cpu::Cpu;
+use errors::*;
+use graphics::Gpu;
+use memory::Mmu;
 
 pub struct Emulator {
-    cpu: Cpu,
+    cpu: Rc<RefCell<Cpu>>,
     mmu: Rc<RefCell<Mmu>>,
+    gpu: Gpu,
 }
 
 impl Emulator {
     pub fn new() -> Self {
         let mmu = Rc::new(RefCell::new(Mmu::new()));
-        let cpu = Cpu::new(Rc::clone(&mmu));
+        let cpu = Rc::new(RefCell::new(Cpu::new(Rc::clone(&mmu))));
+        let gpu = Gpu::new(Rc::clone(&mmu), Rc::clone(&cpu));
 
-        Emulator { mmu: mmu, cpu: cpu }
+        Emulator {
+            mmu: mmu,
+            cpu: cpu,
+            gpu: gpu,
+        }
     }
 
     pub fn load_bios<P>(&mut self, path: P) -> Result<()>
@@ -70,10 +78,10 @@ impl Emulator {
     }
 
     pub fn dump_state(&self) -> String {
-        self.cpu.to_string()
+        self.cpu.borrow_mut().to_string()
     }
 
     pub fn step(&mut self) {
-        self.cpu.step()
+        self.cpu.borrow_mut().step()
     }
 }
