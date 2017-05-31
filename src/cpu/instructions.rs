@@ -1,5 +1,7 @@
 //! CPU instruction definition.
 
+use std::ops::SubAssign;
+
 use byteorder::{ByteOrder, LittleEndian};
 
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
@@ -105,8 +107,7 @@ impl super::Cpu {
 
             // LD HL,d16
             0x21 => {
-                self.reg
-                    .write_hl(LittleEndian::read_u16(instruction.operands()))
+                self.reg.hl_mut().write(LittleEndian::read_u16(instruction.operands()))
             }
 
             // LD SP,d16
@@ -116,8 +117,8 @@ impl super::Cpu {
             0x32 => {
                 self.mmu
                     .borrow_mut()
-                    .write_byte(self.reg.read_hl(), self.reg.a);
-                self.reg.dec_hl();
+                    .write_byte(self.reg.hl(), self.reg.a);
+                self.reg.hl_mut().sub_assign(1);
             }
 
             // XOR A

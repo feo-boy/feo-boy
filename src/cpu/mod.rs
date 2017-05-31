@@ -7,14 +7,18 @@ mod instructions;
 use std::cell::RefCell;
 use std::default::Default;
 use std::fmt;
+use std::num::Wrapping;
+use std::ops::{AddAssign, SubAssign};
 use std::rc::Rc;
+
+use byteorder::{BigEndian, ByteOrder};
 
 use memory::Mmu;
 
 bitflags! {
     /// CPU status flags.
     #[derive(Default)]
-    struct Flags: u8 {
+    pub struct Flags: u8 {
         /// Set if the value of the computation is zero.
         const ZERO          = 0b10000000;
 
@@ -29,30 +33,133 @@ bitflags! {
     }
 }
 
+/// Two mutable registers treated as a pair (`BC`, `DE`, `HL`).
+///
+/// Addition and subtraction may be performed on each pair.
+#[derive(Debug)]
+pub struct RegisterPairMut<'a> {
+    hi: &'a mut u8,
+    lo: &'a mut u8,
+}
+
+impl<'a> RegisterPairMut<'a> {
+    /// Returns the register pair as a word.
+    pub fn as_word(&self) -> u16 {
+        BigEndian::read_u16(&[*self.hi, *self.lo])
+    }
+
+    /// Write a word to the register pair.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use feo_boy::cpu::Registers;
+    ///
+    /// let mut registers = Registers::new();
+    ///
+    /// registers.bc_mut().write(0xABCD);
+    ///
+    /// assert_eq!(registers.bc(), 0xABCD);
+    /// assert_eq!(registers.b, 0xAB);
+    /// assert_eq!(registers.c, 0xCD);
+    /// ```
+    pub fn write(&mut self, value: u16) {
+        let mut bytes = [0u8; 2];
+        BigEndian::write_u16(&mut bytes, value);
+
+        *self.hi = bytes[0];
+        *self.lo = bytes[1];
+    }
+}
+
+impl<'a> AddAssign<u16> for RegisterPairMut<'a> {
+    fn add_assign(&mut self, rhs: u16) {
+        let pair = Wrapping(BigEndian::read_u16(&[*self.hi, *self.lo])) + Wrapping(rhs);
+
+        self.write(pair.0)
+    }
+}
+
+impl<'a> SubAssign<u16> for RegisterPairMut<'a> {
+    fn sub_assign(&mut self, rhs: u16) {
+        let pair = Wrapping(BigEndian::read_u16(&[*self.hi, *self.lo])) - Wrapping(rhs);
+
+        self.write(pair.0)
+    }
+}
+
 /// The registers.
+///
+/// # Examples
+///
+/// Registers are often operated on in pairs. For convenience, assigning addition and subtraction
+/// may be performed on each pair.
+///
+/// ```
+/// use feo_boy::cpu::Registers;
+///
+/// let mut registers = Registers::new();
+/// {
+///     let mut de = registers.de_mut();
+///     de += 1;
+/// }
+///
+/// assert_eq!(registers.de(), 0x0001);
+/// assert_eq!(registers.d, 0x00);
+/// assert_eq!(registers.e, 0x01);
+/// ```
+///
+/// ```
+/// use feo_boy::cpu::Registers;
+///
+/// let mut registers = Registers::new();
+/// {
+///     let mut hl = registers.hl_mut();
+///     hl.write(0xFFFF);
+///     hl -= 0xF;
+/// }
+///
+/// assert_eq!(registers.hl(), 0xFFF0);
+/// assert_eq!(registers.h, 0xFF);
+/// assert_eq!(registers.l, 0xF0);
+/// ```
+///
+/// To avoid saving the pair to a local variable, you may use the `AddAssign` and `SubAssign`
+/// traits directly instead of the operator.
+///
+/// ```
+/// use std::ops::{AddAssign, SubAssign};
+/// use feo_boy::cpu::Registers;
+///
+/// let mut registers = Registers::new();
+///
+/// registers.bc_mut().add_assign(0xFF);
+///
+/// assert_eq!(registers.bc(), 0x00FF);
+/// ```
 #[derive(Debug, Default)]
 pub struct Registers {
     /// Accumulator
-    a: u8,
+    pub a: u8,
 
     /// Status flags
-    f: Flags,
+    pub f: Flags,
 
     // General registers
-    b: u8,
-    c: u8,
+    pub b: u8,
+    pub c: u8,
 
-    d: u8,
-    e: u8,
+    pub d: u8,
+    pub e: u8,
 
-    h: u8,
-    l: u8,
+    pub h: u8,
+    pub l: u8,
 
     /// Program counter
-    pc: u16,
+    pub pc: u16,
 
     /// Stack pointer
-    sp: u16,
+    pub sp: u16,
 }
 
 impl Registers {
@@ -60,65 +167,28 @@ impl Registers {
         Default::default()
     }
 
-    // read pair registers
-    pub fn read_bc(&self) -> u16 {
-        self.c as u16 + ((self.b as u16) << 8)
+    pub fn bc(&self) -> u16 {
+        BigEndian::read_u16(&[self.b, self.c])
     }
 
-    pub fn read_de(&self) -> u16 {
-        self.e as u16 + ((self.d as u16) << 8)
+    pub fn bc_mut(&mut self) -> RegisterPairMut {
+        RegisterPairMut { hi: &mut self.b, lo: &mut self.c }
     }
 
-    pub fn read_hl(&self) -> u16 {
-        self.l as u16 + ((self.h as u16) << 8)
+    pub fn de(&self) -> u16 {
+        BigEndian::read_u16(&[self.d, self.e])
     }
 
-    // write pair registers
-    pub fn write_bc(&mut self, value: u16) {
-        self.c = value as u8;
-        self.b = (value >> 8) as u8;
+    pub fn de_mut(&mut self) -> RegisterPairMut {
+        RegisterPairMut { hi: &mut self.d, lo: &mut self.e }
     }
 
-    pub fn write_de(&mut self, value: u16) {
-        self.e = value as u8;
-        self.d = (value >> 8) as u8;
+    pub fn hl(&self) -> u16 {
+        BigEndian::read_u16(&[self.h, self.l])
     }
 
-    pub fn write_hl(&mut self, value: u16) {
-        self.l = value as u8;
-        self.h = (value >> 8) as u8;
-    }
-
-    // inc pair registers
-    pub fn inc_bc(&mut self) {
-        let x = self.read_bc() + 1;
-        self.write_bc(x);
-    }
-
-    pub fn inc_de(&mut self) {
-        let x = self.read_de() + 1;
-        self.write_de(x);
-    }
-
-    pub fn inc_hl(&mut self) {
-        let x = self.read_hl() + 1;
-        self.write_hl(x);
-    }
-
-    // dec pair registers
-    pub fn dec_bc(&mut self) {
-        let x = self.read_bc() - 1;
-        self.write_bc(x);
-    }
-
-    pub fn dec_de(&mut self) {
-        let x = self.read_de() - 1;
-        self.write_de(x);
-    }
-
-    pub fn dec_hl(&mut self) {
-        let x = self.read_hl() - 1;
-        self.write_hl(x);
+    pub fn hl_mut(&mut self) -> RegisterPairMut {
+        RegisterPairMut { hi: &mut self.h, lo: &mut self.l }
     }
 }
 
@@ -196,5 +266,31 @@ impl Cpu {
 impl fmt::Display for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.reg.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::SubAssign;
+    use super::Registers;
+
+    #[test]
+    fn wrap_pair() {
+        let mut registers = Registers::default();
+
+        registers.hl_mut().sub_assign(1);
+
+        assert_eq!(registers.h, 0xFF);
+        assert_eq!(registers.l, 0xFF);
+    }
+
+    #[test]
+    fn conversion_equals_immutable() {
+        let mut registers = Registers::default();
+
+        registers.hl_mut().write(0xBEEF);
+
+        assert_eq!(0xBEEF, registers.hl_mut().as_word());
+        assert_eq!(registers.hl_mut().as_word(), registers.hl());
     }
 }
