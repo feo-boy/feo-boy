@@ -1,5 +1,7 @@
 # feo-boy
 
+[![Build Status](https://travis-ci.org/afishberg/feo-boy.svg?branch=master)](https://travis-ci.org/afishberg/feo-boy)
+
 An emulator for the Nintendo Game Boy (DMG) written in Rust.
 
 ```sh
