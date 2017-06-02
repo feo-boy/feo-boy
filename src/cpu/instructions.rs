@@ -105,6 +105,19 @@ impl super::Cpu {
             // NOP
             0x00 => (),
 
+            // JR NZ,r8
+            0x20 => {
+                if !self.reg.f.contains(ZERO) {
+                    let jump = instruction.operands()[0] as i8;
+                    let pc = self.reg.pc as i16;
+
+                    self.reg.pc = (pc + jump as i16) as u16;
+
+                    // FIXME: Need to add four clock cycles to this instruction
+                    // in this case.
+                }
+            }
+
             // LD HL,d16
             0x21 => {
                 self.reg.hl_mut().write(LittleEndian::read_u16(instruction.operands()))
@@ -146,6 +159,7 @@ lazy_static! {
     static ref INSTRUCTIONS: Vec<Option<Instruction>> = instructions! {
         // byte     description     operands        cycles
         0x00,       "NOP",          0,              4;
+        0x20,       "JR NZ,r8",     1,              8;
         0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
         0x32,       "LD (HL-),A",   0,              8;
@@ -173,5 +187,29 @@ mod tests {
         let byte = 0xFF;
 
         byte.has_bit_set(8);
+    }
+
+    #[test]
+    fn jr_nz() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        use memory::Mmu;
+        use cpu::Cpu;
+
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        let mut instruction = super::INSTRUCTIONS[0x20].unwrap();
+
+        // Move forward 10
+        instruction.operand_bytes = [0x0a, 0];
+        cpu.execute(&instruction);
+        assert!(cpu.reg.pc == 12);
+
+        // Move backward 10
+        instruction.operand_bytes = [!0x0a + 1, 0];
+        cpu.execute(&instruction);
+        assert!(cpu.reg.pc == 4);
     }
 }
