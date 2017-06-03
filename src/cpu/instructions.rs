@@ -166,6 +166,14 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // LD (C),A
+            // LD ($FF00+C),A
+            0xe2 => {
+                self.mmu
+                    .borrow_mut()
+                    .write_byte(0xFF00 + self.reg.c as u16, self.reg.a);
+            }
+
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
@@ -229,6 +237,42 @@ impl super::Cpu {
                 return;
             }
 
+            // XOR B
+            0xa8 => {
+                let b = self.reg.b;
+                self.xor(b)
+            }
+
+            // XOR C
+            0xa9 => {
+                let c = self.reg.c;
+                self.xor(c);
+            }
+
+            // XOR D
+            0xaa => {
+                let d = self.reg.d;
+                self.xor(d);
+            }
+
+            // XOR E
+            0xab => {
+                let e = self.reg.e;
+                self.xor(e);
+            }
+
+            // XOR H
+            0xac => {
+                let h = self.reg.h;
+                self.xor(h);
+            }
+
+            // XOR L
+            0xad => {
+                let l = self.reg.l;
+                self.xor(l);
+            }
+
             // LD C,d8
             0x0e => {
                 self.reg.c = instruction.operands()[0];
@@ -249,12 +293,20 @@ impl super::Cpu {
                 self.reg.a = instruction.operands()[0];
             }
 
+            // XOR (HL)
+            0xae => {
+                let byte = self.mmu.borrow().read_byte(self.reg.hl());
+                self.xor(byte);
+            }
+
+            // XOR d8
+            0xee => self.xor(instruction.operands()[0]),
+
             // XOR A
             0xaf => {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
-                self.reg.a ^= self.reg.a;
-                self.reg.f = Flags::empty();
-                self.reg.f.set(ZERO, self.reg.a == 0);
+                let a = self.reg.a;
+                self.xor(a);
             }
 
             // RST 08H
@@ -292,6 +344,13 @@ impl super::Cpu {
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
         self.reg.pc += 1 + instruction.operands().len() as u16;
+    }
+
+    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
+    fn xor(&mut self, rhs: u8) {
+        self.reg.a ^= rhs;
+        self.reg.f = Flags::empty();
+        self.reg.f.set(ZERO, self.reg.a == 0);
     }
 
     fn rst(&mut self, addr: u16) {
@@ -335,6 +394,7 @@ lazy_static! {
         0xe1,       "POP HL",       0,              12;
         0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
+        0xe2,       "LD (C),A",     1,              8; // Alternatively LD ($rFF00+C),A
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -346,11 +406,19 @@ lazy_static! {
         0xd7,       "RST 10H",      0,              16;
         0xe7,       "RST 20H",      0,              16;
         0xf7,       "RST 30H",      0,              16;
+        0xa8,       "XOR B",        0,              4;
+        0xa9,       "XOR C",        0,              4;
+        0xaa,       "XOR D",        0,              4;
+        0xab,       "XOR E",        0,              4;
         0xcb,       "PREFIX CB",    0,              4;
+        0xac,       "XOR H",        0,              4;
+        0xad,       "XOR L",        0,              4;
         0x0e,       "LD C,d8",      1,              8;
         0x1e,       "LD E,d8",      1,              8;
         0x2e,       "LD L,d8",      1,              8;
         0x3e,       "LD A,d8",      1,              8;
+        0xae,       "XOR (HL)",     0,              8;
+        0xee,       "XOR d8",       1,              8;
         0xaf,       "XOR A",        0,              4;
         0xcf,       "RST 08H",      0,              16;
         0xdf,       "RST 18H",      0,              16;
@@ -408,12 +476,6 @@ mod tests {
 
     #[test]
     fn jr_nz() {
-        use std::cell::RefCell;
-        use std::rc::Rc;
-
-        use memory::Mmu;
-        use cpu::Cpu;
-
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
@@ -428,5 +490,16 @@ mod tests {
         instruction.operand_bytes = [!0x0a + 1, 0];
         cpu.execute(&instruction);
         assert!(cpu.reg.pc == 4);
+    }
+
+    #[test]
+    fn ld_addr_c_a() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        let mut instruction = INSTRUCTIONS[0xe2].unwrap();
+
+        cpu.reg.c = 0x11;
+        cpu.reg.a = 0xab;
     }
 }
