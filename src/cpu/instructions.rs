@@ -158,6 +158,14 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // LD (C),A
+            // LD ($FF00+C),A
+            0xe2 => {
+                self.mmu
+                    .borrow_mut()
+                    .write_byte(0xFF00 + self.reg.c as u16, self.reg.a);
+            }
+
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
@@ -355,6 +363,7 @@ lazy_static! {
         0xe1,       "POP HL",       0,              12;
         0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
+        0xe2,       "LD (C),A",     1,              8; // Alternatively LD ($rFF00+C),A
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -426,12 +435,6 @@ mod tests {
 
     #[test]
     fn jr_nz() {
-        use std::cell::RefCell;
-        use std::rc::Rc;
-
-        use memory::Mmu;
-        use cpu::Cpu;
-
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
@@ -446,5 +449,16 @@ mod tests {
         instruction.operand_bytes = [!0x0a + 1, 0];
         cpu.execute(&instruction);
         assert!(cpu.reg.pc == 4);
+    }
+
+    #[test]
+    fn ld_addr_c_a() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        let mut instruction = INSTRUCTIONS[0xe2].unwrap();
+
+        cpu.reg.c = 0x11;
+        cpu.reg.a = 0xab;
     }
 }
