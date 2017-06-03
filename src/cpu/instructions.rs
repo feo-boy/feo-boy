@@ -158,6 +158,45 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // PUSH BC
+            0xc5 => {
+                let bc = self.reg.bc();
+                self.push(bc);
+            }
+
+            // PUSH DE
+            0xd5 => {
+                let de = self.reg.de();
+                self.push(de);
+            }
+
+            // PUSH HL
+            0xe5 => {
+                let hl = self.reg.hl();
+                self.push(hl);
+            }
+
+            // PUSH AF
+            0xf5 => {
+                let af = self.reg.af();
+                self.push(af);
+            }
+
+            // LD B,d8
+            0x06 => {
+                self.reg.b = instruction.operands()[0];
+            }
+
+            // LD D,d8
+            0x16 => {
+                self.reg.d = instruction.operands()[0];
+            }
+
+            // LD H,d8
+            0x26 => {
+                self.reg.h = instruction.operands()[0];
+            }
+
             // RST 00H
             0xc7 => {
                 self.rst(0x0000);
@@ -182,36 +221,32 @@ impl super::Cpu {
                 return;
             }
 
+            // LD C,d8
+            0x0e => {
+                self.reg.c = instruction.operands()[0];
+            }
+
+            // LD E,d8
+            0x1e => {
+                self.reg.e = instruction.operands()[0];
+            }
+
+            // LD L,d8
+            0x2e => {
+                self.reg.l = instruction.operands()[0];
+            }
+
+            // LD A,d8
+            0x3e => {
+                self.reg.a = instruction.operands()[0];
+            }
+
             // XOR A
             0xaf => {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
                 self.reg.a ^= self.reg.a;
                 self.reg.f = Flags::empty();
                 self.reg.f.set(ZERO, self.reg.a == 0);
-            }
-
-            // PUSH BC
-            0xc5 => {
-                let bc = self.reg.bc();
-                self.push(bc);
-            }
-
-            // PUSH DE
-            0xd5 => {
-                let de = self.reg.de();
-                self.push(de);
-            }
-
-            // PUSH HL
-            0xe5 => {
-                let hl = self.reg.hl();
-                self.push(hl);
-            }
-
-            // PUSH AF
-            0xf5 => {
-                let af = self.reg.af();
-                self.push(af);
             }
 
             // RST 08H
@@ -273,10 +308,17 @@ lazy_static! {
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
         0xf5,       "PUSH AF",      0,              16;
+        0x06,       "LD B,d8",      1,              8;
+        0x16,       "LD D,d8",      1,              8;
+        0x26,       "LD H,d8",      1,              8;
         0xc7,       "RST 00H",      0,              16;
         0xd7,       "RST 10H",      0,              16;
         0xe7,       "RST 20H",      0,              16;
         0xf7,       "RST 30H",      0,              16;
+        0x0e,       "LD C,d8",      1,              8;
+        0x1e,       "LD E,d8",      1,              8;
+        0x2e,       "LD L,d8",      1,              8;
+        0x3e,       "LD A,d8",      1,              8;
         0xaf,       "XOR A",        0,              4;
         0xcf,       "RST 08H",      0,              16;
         0xdf,       "RST 18H",      0,              16;
