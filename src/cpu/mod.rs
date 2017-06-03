@@ -261,6 +261,17 @@ impl Cpu {
 
         self.execute(&instruction);
     }
+
+    pub fn push(&mut self, value: u16) {
+        self.mmu.borrow_mut().write_word(self.reg.sp, value);
+        self.reg.sp -= 2;
+    }
+
+    pub fn pop(&mut self) -> u16 {
+        let value = self.mmu.borrow().read_word(self.reg.sp);
+        self.reg.sp += 2;
+        value
+    }
 }
 
 impl fmt::Display for Cpu {

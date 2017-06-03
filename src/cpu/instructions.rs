@@ -134,6 +134,30 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // RST 00H
+            0xc7 => {
+                self.rst(0x0000);
+                return;
+            }
+
+            // RST 10H
+            0xd7 => {
+                self.rst(0x0010);
+                return;
+            }
+
+            // RST 20H
+            0xe7 => {
+                self.rst(0x0020);
+                return;
+            }
+
+            // RST 30H
+            0xf7 => {
+                self.rst(0x0030);
+                return;
+            }
+
             // XOR A
             0xaf => {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
@@ -142,10 +166,40 @@ impl super::Cpu {
                 self.reg.f.set(ZERO, self.reg.a == 0);
             }
 
+            // RST 08H
+            0xcf => {
+                self.rst(0x0008);
+                return;
+            }
+
+            // RST 18H
+            0xdf => {
+                self.rst(0x0018);
+                return;
+            }
+
+            // RST 28H
+            0xef => {
+                self.rst(0x0028);
+                return;
+            }
+
+            // RST 38H
+            0xff => {
+                self.rst(0x0038);
+                return;
+            }
+
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
         self.reg.pc += 1 + instruction.operands().len() as u16;
+    }
+
+    fn rst(&mut self, addr: u16) {
+        let new_pc = self.reg.pc + 3;
+        self.push(new_pc);
+        self.reg.pc = addr;
     }
 }
 
@@ -163,18 +217,32 @@ lazy_static! {
         0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
         0x32,       "LD (HL-),A",   0,              8;
+        0xc7,       "RST 00H",      0,              16;
+        0xd7,       "RST 10H",      0,              16;
+        0xe7,       "RST 20H",      0,              16;
+        0xf7,       "RST 30H",      0,              16;
         0xaf,       "XOR A",        0,              4;
+        0xcf,       "RST 08H",      0,              16;
+        0xdf,       "RST 18H",      0,              16;
+        0xef,       "RST 28H",      0,              16;
+        0xff,       "RST 38H",      0,              16;
     };
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use cpu::Cpu;
+    use memory::Mmu;
+
+    use super::ByteExt;
+    use super::INSTRUCTIONS;
+
     #[test]
     fn has_bit_set() {
-        use super::ByteExt;
-
         let byte = 0x80;
-
         assert!(byte.has_bit_set(7));
         assert!(!byte.has_bit_set(0));
     }
@@ -182,11 +250,21 @@ mod tests {
     #[test]
     #[should_panic(expected = "bit 8 is out of range for u8")]
     fn bit_out_of_range() {
-        use super::ByteExt;
+        0xFF.has_bit_set(8);
+    }
 
-        let byte = 0xFF;
+    #[test]
+    fn rst() {
+        let mmu = Rc::new(RefCell::new(Mmu::default()));
+        let mut cpu = Cpu::new(Rc::clone(&mmu));
 
-        byte.has_bit_set(8);
+        cpu.reg.sp = 0xFFF0;
+        cpu.reg.pc = 0xAB;
+
+        cpu.execute(&INSTRUCTIONS[0xFF].unwrap());
+
+        assert_eq!(mmu.borrow().read_word(0xFFF0), 0xAB + 3);
+        assert_eq!(cpu.reg.pc, 0x38);
     }
 
     #[test]
