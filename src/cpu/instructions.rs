@@ -359,14 +359,20 @@ impl super::Cpu {
         self.reg.pc = addr;
     }
 
+    fn cb_bit(&mut self, n: u8, reg: u8) {
+        self.reg.f.set(ZERO, reg.has_bit_set(n));
+        self.reg.f.remove(SUBTRACT);
+        self.reg.f.insert(HALF_CARRY);
+    }
+
     pub fn execute_cb(&mut self, instruction: &Instruction) {
         debug!("executing 0xcb{:?}", instruction);
 
         match instruction.byte {
+            // BIT 7,H
             0x7c => {
-                self.reg.f.set(ZERO, self.reg.h.has_bit_set(7));
-                self.reg.f.remove(SUBTRACT);
-                self.reg.f.insert(HALF_CARRY);
+                let reg = self.reg.h;
+                self.cb_bit(7, reg);
             }
 
             _ => panic!("unimplemented instruction: 0xcb{:?}", instruction),
