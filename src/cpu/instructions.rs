@@ -126,6 +126,30 @@ impl super::Cpu {
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(instruction.operands()),
 
+            // POP BC
+            0xc1 => {
+                let bc = self.pop();
+                self.reg.bc_mut().write(bc);
+            }
+
+            // POP DE
+            0xd1 => {
+                let de = self.pop();
+                self.reg.de_mut().write(de);
+            }
+
+            // POP HL
+            0xe1 => {
+                let hl = self.pop();
+                self.reg.hl_mut().write(hl);
+            }
+
+            // POP AF
+            0xf1 => {
+                let af = self.pop();
+                self.reg.af_mut().write(af);
+            }
+
             // LD (HL-),A
             0x32 => {
                 self.mmu
@@ -164,6 +188,30 @@ impl super::Cpu {
                 self.reg.a ^= self.reg.a;
                 self.reg.f = Flags::empty();
                 self.reg.f.set(ZERO, self.reg.a == 0);
+            }
+
+            // PUSH BC
+            0xc5 => {
+                let bc = self.reg.bc();
+                self.push(bc);
+            }
+
+            // PUSH DE
+            0xd5 => {
+                let de = self.reg.de();
+                self.push(de);
+            }
+
+            // PUSH HL
+            0xe5 => {
+                let hl = self.reg.hl();
+                self.push(hl);
+            }
+
+            // PUSH AF
+            0xf5 => {
+                let af = self.reg.af();
+                self.push(af);
             }
 
             // RST 08H
@@ -216,7 +264,15 @@ lazy_static! {
         0x20,       "JR NZ,r8",     1,              8;
         0x21,       "LD HL,d16",    2,              12;
         0x31,       "LD SP,d16",    2,              12;
+        0xc1,       "POP BC",       0,              12;
+        0xd1,       "POP DC",       0,              12;
+        0xe1,       "POP HL",       0,              12;
+        0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
+        0xc5,       "PUSH BC",      0,              16;
+        0xd5,       "PUSH DE",      0,              16;
+        0xe5,       "PUSH HL",      0,              16;
+        0xf5,       "PUSH AF",      0,              16;
         0xc7,       "RST 00H",      0,              16;
         0xd7,       "RST 10H",      0,              16;
         0xe7,       "RST 20H",      0,              16;

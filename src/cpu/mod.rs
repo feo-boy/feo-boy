@@ -167,6 +167,14 @@ impl Registers {
         Default::default()
     }
 
+    pub fn af(&self) -> u16 {
+        BigEndian::read_u16(&[self.a, self.f.bits])
+    }
+
+    pub fn af_mut(&mut self) -> RegisterPairMut {
+        RegisterPairMut { hi: &mut self.a, lo: &mut self.f.bits }
+    }
+
     pub fn bc(&self) -> u16 {
         BigEndian::read_u16(&[self.b, self.c])
     }
