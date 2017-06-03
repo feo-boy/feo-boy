@@ -305,9 +305,9 @@ impl super::Cpu {
 
         match instruction.byte {
             0x7c => {
-                self.reg.f.set(ZERO, self.reg.h & (1 << 7) != 0);
-                self.reg.f.set(SUBTRACT, false);
-                self.reg.f.set(HALF_CARRY, true);
+                self.reg.f.set(ZERO, self.reg.h.has_bit_set(7));
+                self.reg.f.remove(SUBTRACT);
+                self.reg.f.insert(HALF_CARRY);
             }
 
             _ => panic!("unimplemented instruction: 0xcb{:?}", instruction),
