@@ -99,8 +99,6 @@ impl super::Cpu {
             instruction.operand_bytes[i as usize] = operand;
         }
 
-        self.reg.pc += 1 + instruction.num_operands as u16;
-
         instruction
     }
 
@@ -285,8 +283,10 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
+                self.reg.pc += 1 + instruction.operands().len() as u16;
                 let instruction_cb = self.fetch_instr(&INSTRUCTIONS_CB);
                 self.execute_cb(&instruction_cb);
+                return;
             }
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
