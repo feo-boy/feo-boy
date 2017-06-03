@@ -78,12 +78,20 @@ macro_rules! instructions {
 
 impl super::Cpu {
     /// Decodes the next instruction.
-    pub fn fetch(&self) -> Instruction {
+    pub fn fetch(&mut self) -> Instruction {
+        self.fetch_instr(&INSTRUCTIONS)
+    }
+
+    pub fn fetch_instr(&mut self, table: &[Option<Instruction>]) -> Instruction {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
-        let mut instruction =
-            INSTRUCTIONS[byte as usize]
-                .expect(&format!("could not find data for instruction {:#0x}", byte));
+        // TODO remove after all opcodes done
+        let in_cb = table[0].map(|x| x.description != "NOP").unwrap_or_default();
+
+        let mut instruction = table[byte as usize]
+            .expect(&format!("could not find data for instruction {:#0x} -- is 0xcb {}",
+                            byte,
+                            in_cb)); // TODO remove after all opcodes done
 
         for i in 0..instruction.num_operands {
             let operand = self.mmu.borrow().read_byte(self.reg.pc + 1 + i as u16);
@@ -120,7 +128,9 @@ impl super::Cpu {
 
             // LD HL,d16
             0x21 => {
-                self.reg.hl_mut().write(LittleEndian::read_u16(instruction.operands()))
+                self.reg
+                    .hl_mut()
+                    .write(LittleEndian::read_u16(instruction.operands()))
             }
 
             // LD SP,d16
@@ -152,9 +162,7 @@ impl super::Cpu {
 
             // LD (HL-),A
             0x32 => {
-                self.mmu
-                    .borrow_mut()
-                    .write_byte(self.reg.hl(), self.reg.a);
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a);
                 self.reg.hl_mut().sub_assign(1);
             }
 
@@ -325,9 +333,16 @@ impl super::Cpu {
                 return;
             }
 
+            // PREFIX CB
+            0xcb => {
+                self.reg.pc += 1 + instruction.operands().len() as u16;
+                let instruction_cb = self.fetch_instr(&INSTRUCTIONS_CB);
+                self.execute_cb(&instruction_cb);
+                return;
+            }
+
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
-
         self.reg.pc += 1 + instruction.operands().len() as u16;
     }
 
@@ -342,6 +357,28 @@ impl super::Cpu {
         let new_pc = self.reg.pc + 3;
         self.push(new_pc);
         self.reg.pc = addr;
+    }
+
+    fn cb_bit(&mut self, n: u8, reg: u8) {
+        self.reg.f.set(ZERO, reg.has_bit_set(n));
+        self.reg.f.remove(SUBTRACT);
+        self.reg.f.insert(HALF_CARRY);
+    }
+
+    pub fn execute_cb(&mut self, instruction: &Instruction) {
+        debug!("executing 0xcb{:?}", instruction);
+
+        match instruction.byte {
+            // BIT 7,H
+            0x7c => {
+                let reg = self.reg.h;
+                self.cb_bit(7, reg);
+            }
+
+            _ => panic!("unimplemented instruction: 0xcb{:?}", instruction),
+        }
+
+        self.reg.pc += 1 + instruction.operands().len() as u16;
     }
 }
 
@@ -379,6 +416,7 @@ lazy_static! {
         0xa9,       "XOR C",        0,              4;
         0xaa,       "XOR D",        0,              4;
         0xab,       "XOR E",        0,              4;
+        0xcb,       "PREFIX CB",    0,              4;
         0xac,       "XOR H",        0,              4;
         0xad,       "XOR L",        0,              4;
         0x0e,       "LD C,d8",      1,              8;
@@ -392,6 +430,15 @@ lazy_static! {
         0xdf,       "RST 18H",      0,              16;
         0xef,       "RST 28H",      0,              16;
         0xff,       "RST 38H",      0,              16;
+    };
+
+}
+
+lazy_static! {
+    static ref INSTRUCTIONS_CB: Vec<Option<Instruction>> = instructions! {
+        // byte     description     operands        cycles
+        //0x00,       "RLC B",        1,              8;
+        0x7c,       "BIT 7,H",      0,              8;
     };
 }
 

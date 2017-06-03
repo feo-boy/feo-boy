@@ -266,7 +266,6 @@ impl Cpu {
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
         let instruction = self.fetch();
-
         self.execute(&instruction);
     }
 
