@@ -326,7 +326,7 @@ impl Mmu {
                 // I/O Registers
                 match address {
                     0xFF50 if address != 0 => self.unmap_bios(),
-                    _ => unimplemented!(),
+                    _ => error!("write to unimplemented I/O register {:#02x}", address),
                 }
             }
 
