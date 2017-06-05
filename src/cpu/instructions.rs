@@ -363,7 +363,7 @@ lazy_static! {
         0xe1,       "POP HL",       0,              12;
         0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
-        0xe2,       "LD (C),A",     1,              8; // Alternatively LD ($rFF00+C),A
+        0xe2,       "LD (C),A",     1,              8; // AKA LD ($rFF00+C),A
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -438,17 +438,17 @@ mod tests {
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
-        let mut instruction = super::INSTRUCTIONS[0x20].unwrap();
+        let mut instruction = INSTRUCTIONS[0x20].unwrap();
 
         // Move forward 10
         instruction.operand_bytes = [0x0a, 0];
         cpu.execute(&instruction);
-        assert!(cpu.reg.pc == 12);
+        assert_eq!(cpu.reg.pc, 12);
 
         // Move backward 10
         instruction.operand_bytes = [!0x0a + 1, 0];
         cpu.execute(&instruction);
-        assert!(cpu.reg.pc == 4);
+        assert_eq!(cpu.reg.pc, 4);
     }
 
     #[test]
@@ -456,9 +456,14 @@ mod tests {
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
-        let mut instruction = INSTRUCTIONS[0xe2].unwrap();
+        let instruction = INSTRUCTIONS[0xe2].unwrap();
 
         cpu.reg.c = 0x11;
         cpu.reg.a = 0xab;
+
+        cpu.execute(&instruction);
+        // FIXME: We can't actually test this until the I/O memory
+        // is implemented.
+        // assert_eq!(cpu.mmu.borrow().read_byte(0xFF11), 0xab);
     }
 }
