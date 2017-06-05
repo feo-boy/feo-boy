@@ -11,6 +11,7 @@ extern crate lazy_static;
 
 extern crate byteorder;
 extern crate itertools;
+extern crate smallvec;
 
 pub mod cpu;
 pub mod graphics;

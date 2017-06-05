@@ -3,12 +3,13 @@
 use std::ops::SubAssign;
 
 use byteorder::{ByteOrder, LittleEndian};
+use smallvec::SmallVec;
 
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 
-/// A single instruction to be executed by the CPU.
-#[derive(Debug, Copy, Clone)]
-pub struct Instruction {
+/// A definition of a single instruction.
+#[derive(Debug, Clone)]
+struct InstructionDef {
     /// The byte that identifies this instruction.
     pub byte: u8,
 
@@ -22,20 +23,23 @@ pub struct Instruction {
     /// cycles. Four clock cycles is equivalent to a single machine cycle.
     pub cycles: u8,
 
-    /// An array containing the operand(s) for the instruction.
-    ///
-    /// Prefer using the `operands()` method over this field, as this array may contain nonsense
-    /// data for instructions that use fewer than two operands.
-    operand_bytes: [u8; 2],
-
     /// The number of operands that this instruction uses.
-    num_operands: u8,
+    pub num_operands: u8,
+}
+
+/// A single instruction to be executed by the CPU.
+#[derive(Debug, Clone)]
+pub struct Instruction {
+    def: &'static InstructionDef,
+
+    /// Vector containing the operands of the instruction. May be empty.
+    operands: SmallVec<[u8; 2]>,
 }
 
 impl Instruction {
     /// Returns a slice containing the operand(s) of the instruction in little-endian order.
     pub fn operands(&self) -> &[u8] {
-        &self.operand_bytes[..self.num_operands as usize]
+        &self.operands
     }
 }
 
@@ -62,11 +66,10 @@ macro_rules! instructions {
             let mut instructions = vec![None; 0x100];
 
             $(
-                instructions[$byte] = Some(Instruction {
+                instructions[$byte] = Some(InstructionDef {
                     byte: $byte,
                     description: $description,
                     cycles: $cycles,
-                    operand_bytes: Default::default(),
                     num_operands: $num_operands,
                 });
             )*
@@ -81,27 +84,32 @@ impl super::Cpu {
     pub fn fetch(&self) -> Instruction {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
-        let mut instruction =
-            INSTRUCTIONS[byte as usize]
-                .expect(&format!("could not find data for instruction {:#0x}", byte));
+        let def = INSTRUCTIONS[byte as usize]
+            .as_ref()
+            .expect(&format!("could not find data for instruction {:#0x}", byte));
 
-        for i in 0..instruction.num_operands {
-            let operand = self.mmu.borrow().read_byte(self.reg.pc + 1 + i as u16);
+        let operands = (0..def.num_operands)
+            .map(|i| self.mmu.borrow().read_byte(self.reg.pc + 1 + i as u16))
+            .collect();
 
-            instruction.operand_bytes[i as usize] = operand;
+        Instruction {
+            def: def,
+            operands: operands,
         }
-
-        instruction
     }
 
     /// Executes an instruction.
     ///
     /// All necessary side effects are performed, including updating the program counter and flag
     /// registers.
-    pub fn execute(&mut self, instruction: &Instruction) {
+    pub fn execute(&mut self, instruction: Instruction) {
         debug!("executing {:?}", instruction);
 
-        match instruction.byte {
+        // Check that we have exactly as many operands as the instruction requires.
+        debug_assert_eq!(instruction.def.num_operands as usize,
+                         instruction.operands().len());
+
+        match instruction.def.byte {
             // NOP
             0x00 => (),
 
@@ -352,7 +360,7 @@ lazy_static! {
     ///
     /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
     // FIXME: This should be `[Instruction; 0x100]` once all instructions are implemented.
-    static ref INSTRUCTIONS: Vec<Option<Instruction>> = instructions! {
+    static ref INSTRUCTIONS: Vec<Option<InstructionDef>> = instructions! {
         // byte     description     operands        cycles
         0x00,       "NOP",          0,              4;
         0x20,       "JR NZ,r8",     1,              8;
@@ -363,7 +371,7 @@ lazy_static! {
         0xe1,       "POP HL",       0,              12;
         0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
-        0xe2,       "LD (C),A",     1,              8; // AKA LD ($rFF00+C),A
+        0xe2,       "LD (C),A",     0,              8; // AKA LD ($rFF00+C),A
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -400,11 +408,12 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    use smallvec::SmallVec;
+
     use cpu::Cpu;
     use memory::Mmu;
 
-    use super::ByteExt;
-    use super::INSTRUCTIONS;
+    use super::{INSTRUCTIONS, Instruction, ByteExt};
 
     #[test]
     fn has_bit_set() {
@@ -420,6 +429,20 @@ mod tests {
     }
 
     #[test]
+    fn fetch_nop() {
+        let mmu = Rc::new(RefCell::new(Mmu::default()));
+        let cpu = Cpu::new(Rc::clone(&mmu));
+
+        // FIXME: This test works because the MMU will be empty initially (that is, full of NOPs).
+        // However, this is fragile.
+        let nop = cpu.fetch();
+
+        assert_eq!(nop.def.byte, 0x00);
+        assert_eq!(nop.def.num_operands, 0);
+        assert_eq!(nop.operands().len(), 0);
+    }
+
+    #[test]
     fn rst() {
         let mmu = Rc::new(RefCell::new(Mmu::default()));
         let mut cpu = Cpu::new(Rc::clone(&mmu));
@@ -427,7 +450,11 @@ mod tests {
         cpu.reg.sp = 0xFFF0;
         cpu.reg.pc = 0xAB;
 
-        cpu.execute(&INSTRUCTIONS[0xFF].unwrap());
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xff].as_ref().unwrap(),
+            operands: Default::default(),
+        };
+        cpu.execute(instruction);
 
         assert_eq!(mmu.borrow().read_word(0xFFF0), 0xAB + 3);
         assert_eq!(cpu.reg.pc, 0x38);
@@ -438,16 +465,20 @@ mod tests {
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
-        let mut instruction = INSTRUCTIONS[0x20].unwrap();
-
         // Move forward 10
-        instruction.operand_bytes = [0x0a, 0];
-        cpu.execute(&instruction);
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0x0a]),
+        };
+        cpu.execute(instruction);
         assert_eq!(cpu.reg.pc, 12);
 
         // Move backward 10
-        instruction.operand_bytes = [!0x0a + 1, 0];
-        cpu.execute(&instruction);
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[!0x0a + 1]),
+        };
+        cpu.execute(instruction);
         assert_eq!(cpu.reg.pc, 4);
     }
 
@@ -456,12 +487,14 @@ mod tests {
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
-        let instruction = INSTRUCTIONS[0xe2].unwrap();
-
         cpu.reg.c = 0x11;
         cpu.reg.a = 0xab;
 
-        cpu.execute(&instruction);
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xe2].as_ref().unwrap(),
+            operands: Default::default(),
+        };
+        cpu.execute(instruction);
         // FIXME: We can't actually test this until the I/O memory
         // is implemented.
         // assert_eq!(cpu.mmu.borrow().read_byte(0xFF11), 0xab);

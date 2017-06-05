@@ -279,7 +279,7 @@ impl Cpu {
     pub fn step(&mut self) {
         let instruction = self.fetch();
 
-        self.execute(&instruction);
+        self.execute(instruction);
     }
 
     pub fn push(&mut self, value: u16) {
