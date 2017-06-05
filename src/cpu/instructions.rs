@@ -36,13 +36,6 @@ pub struct Instruction {
     operands: SmallVec<[u8; 2]>,
 }
 
-impl Instruction {
-    /// Returns a slice containing the operand(s) of the instruction in little-endian order.
-    pub fn operands(&self) -> &[u8] {
-        &self.operands
-    }
-}
-
 /// Provides additional functionality for bit manipulation.
 trait ByteExt {
     /// Returns whether the byte has its nth bit set.
@@ -107,7 +100,7 @@ impl super::Cpu {
 
         // Check that we have exactly as many operands as the instruction requires.
         debug_assert_eq!(instruction.def.num_operands as usize,
-                         instruction.operands().len());
+                         instruction.operands.len());
 
         match instruction.def.byte {
             // NOP
@@ -116,7 +109,7 @@ impl super::Cpu {
             // JR NZ,r8
             0x20 => {
                 if !self.reg.f.contains(ZERO) {
-                    let jump = instruction.operands()[0] as i8;
+                    let jump = instruction.operands[0] as i8;
                     let pc = self.reg.pc as i16;
 
                     self.reg.pc = (pc + jump as i16) as u16;
@@ -130,11 +123,11 @@ impl super::Cpu {
             0x21 => {
                 self.reg
                     .hl_mut()
-                    .write(LittleEndian::read_u16(instruction.operands()))
+                    .write(LittleEndian::read_u16(&instruction.operands))
             }
 
             // LD SP,d16
-            0x31 => self.reg.sp = LittleEndian::read_u16(instruction.operands()),
+            0x31 => self.reg.sp = LittleEndian::read_u16(&instruction.operands),
 
             // POP BC
             0xc1 => {
@@ -199,19 +192,13 @@ impl super::Cpu {
             }
 
             // LD B,d8
-            0x06 => {
-                self.reg.b = instruction.operands()[0];
-            }
+            0x06 => self.reg.b = instruction.operands[0],
 
             // LD D,d8
-            0x16 => {
-                self.reg.d = instruction.operands()[0];
-            }
+            0x16 => self.reg.d = instruction.operands[0],
 
             // LD H,d8
-            0x26 => {
-                self.reg.h = instruction.operands()[0];
-            }
+            0x26 => self.reg.h = instruction.operands[0],
 
             // RST 00H
             0xc7 => {
@@ -284,24 +271,16 @@ impl super::Cpu {
             }
 
             // LD C,d8
-            0x0e => {
-                self.reg.c = instruction.operands()[0];
-            }
+            0x0e => self.reg.c = instruction.operands[0],
 
             // LD E,d8
-            0x1e => {
-                self.reg.e = instruction.operands()[0];
-            }
+            0x1e => self.reg.e = instruction.operands[0],
 
             // LD L,d8
-            0x2e => {
-                self.reg.l = instruction.operands()[0];
-            }
+            0x2e => self.reg.l = instruction.operands[0],
 
             // LD A,d8
-            0x3e => {
-                self.reg.a = instruction.operands()[0];
-            }
+            0x3e => self.reg.a = instruction.operands[0],
 
             // XOR (HL)
             0xae => {
@@ -310,10 +289,10 @@ impl super::Cpu {
             }
 
             // XOR d8
-            0xee => self.xor(instruction.operands()[0]),
+            0xee => self.xor(instruction.operands[0]),
 
             // CP d8
-            0xfe => self.cp(instruction.operands()[0]),
+            0xfe => self.cp(instruction.operands[0]),
 
             // XOR A
             0xaf => {
@@ -349,7 +328,7 @@ impl super::Cpu {
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
-        self.reg.pc += 1 + instruction.operands().len() as u16;
+        self.reg.pc += 1 + instruction.operands.len() as u16;
     }
 
     /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
@@ -477,7 +456,7 @@ mod tests {
 
         assert_eq!(nop.def.byte, 0x00);
         assert_eq!(nop.def.num_operands, 0);
-        assert_eq!(nop.operands().len(), 0);
+        assert_eq!(nop.operands.len(), 0);
     }
 
     #[test]
