@@ -106,8 +106,7 @@ fn main() {
         }
 
         if let Some(backtrace) = e.backtrace() {
-            writeln!(stderr, "backtrace: {:?}", backtrace)
-                .expect(errmsg);
+            writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
         }
 
         process::exit(1);

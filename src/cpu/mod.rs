@@ -172,7 +172,10 @@ impl Registers {
     }
 
     pub fn af_mut(&mut self) -> RegisterPairMut {
-        RegisterPairMut { hi: &mut self.a, lo: &mut self.f.bits }
+        RegisterPairMut {
+            hi: &mut self.a,
+            lo: &mut self.f.bits,
+        }
     }
 
     pub fn bc(&self) -> u16 {
@@ -180,7 +183,10 @@ impl Registers {
     }
 
     pub fn bc_mut(&mut self) -> RegisterPairMut {
-        RegisterPairMut { hi: &mut self.b, lo: &mut self.c }
+        RegisterPairMut {
+            hi: &mut self.b,
+            lo: &mut self.c,
+        }
     }
 
     pub fn de(&self) -> u16 {
@@ -188,7 +194,10 @@ impl Registers {
     }
 
     pub fn de_mut(&mut self) -> RegisterPairMut {
-        RegisterPairMut { hi: &mut self.d, lo: &mut self.e }
+        RegisterPairMut {
+            hi: &mut self.d,
+            lo: &mut self.e,
+        }
     }
 
     pub fn hl(&self) -> u16 {
@@ -196,7 +205,10 @@ impl Registers {
     }
 
     pub fn hl_mut(&mut self) -> RegisterPairMut {
-        RegisterPairMut { hi: &mut self.h, lo: &mut self.l }
+        RegisterPairMut {
+            hi: &mut self.h,
+            lo: &mut self.l,
+        }
     }
 }
 
