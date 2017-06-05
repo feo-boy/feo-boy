@@ -261,6 +261,16 @@ impl super::Cpu {
                 self.xor(e);
             }
 
+            // INC C
+            0x0c => {
+                let old_c = self.reg.c;
+                self.reg.c += 1;
+
+                self.reg.f.set(ZERO, self.reg.c == 0);
+                self.reg.f.remove(SUBTRACT);
+                self.reg.f.set(HALF_CARRY, is_half_carry(old_c, 1));
+            }
+
             // XOR H
             0xac => {
                 let h = self.reg.h;
@@ -301,6 +311,9 @@ impl super::Cpu {
 
             // XOR d8
             0xee => self.xor(instruction.operands()[0]),
+
+            // CP d8
+            0xfe => self.cp(instruction.operands()[0]),
 
             // XOR A
             0xaf => {
@@ -351,6 +364,23 @@ impl super::Cpu {
         self.push(new_pc);
         self.reg.pc = addr;
     }
+
+    /// Compares a byte with the accumulator.
+    ///
+    /// Performs a subtraction with the accumulator without actually setting the accumulator to the
+    /// new value. Only the flags are set.
+    fn cp(&mut self, rhs: u8) {
+        let a = self.reg.a;
+
+        self.reg.f.set(ZERO, a == rhs);
+        self.reg.f.set(CARRY, a < rhs);
+    }
+}
+
+/// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
+/// nibble to the high nibble).
+fn is_half_carry(a: u8, b: u8) -> bool {
+    (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10
 }
 
 lazy_static! {
@@ -387,6 +417,7 @@ lazy_static! {
         0xa9,       "XOR C",        0,              4;
         0xaa,       "XOR D",        0,              4;
         0xab,       "XOR E",        0,              4;
+        0x0c,       "INC C",        0,              4;
         0xac,       "XOR H",        0,              4;
         0xad,       "XOR L",        0,              4;
         0x0e,       "LD C,d8",      1,              8;
@@ -395,6 +426,7 @@ lazy_static! {
         0x3e,       "LD A,d8",      1,              8;
         0xae,       "XOR (HL)",     0,              8;
         0xee,       "XOR d8",       1,              8;
+        0xfe,       "CP d8",        1,              8;
         0xaf,       "XOR A",        0,              4;
         0xcf,       "RST 08H",      0,              16;
         0xdf,       "RST 18H",      0,              16;
@@ -426,6 +458,12 @@ mod tests {
     #[should_panic(expected = "bit 8 is out of range for u8")]
     fn bit_out_of_range() {
         0xFF.has_bit_set(8);
+    }
+
+    #[test]
+    fn half_carry() {
+        assert!(super::is_half_carry(0x0f, 0x01));
+        assert!(!super::is_half_carry(0x37, 0x44));
     }
 
     #[test]
