@@ -1,8 +1,10 @@
 //! CPU instruction definition.
 
+use std::fmt::{self, Display};
 use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, LittleEndian};
+use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
@@ -34,6 +36,30 @@ pub struct Instruction {
 
     /// Vector containing the operands of the instruction. May be empty.
     operands: SmallVec<[u8; 2]>,
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        lazy_static! {
+            static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8").unwrap();
+        }
+
+        let instruction = if let Some(mat) = DATA_RE.find(self.def.description) {
+            let replacement = match mat.as_str() {
+                "d8" | "a8" | "r8" => format!("${:#02x}", &self.operands[0]),
+                "d16" | "a16" => format!("${:#04x}", LittleEndian::read_u16(&self.operands)),
+                _ => unreachable!(),
+            };
+
+            DATA_RE
+                .replace_all(self.def.description, NoExpand(replacement.as_str()))
+                .to_string()
+        } else {
+            self.def.description.to_string()
+        };
+
+        write!(f, "{}", instruction)
+    }
 }
 
 /// Provides additional functionality for bit manipulation.
@@ -96,7 +122,8 @@ impl super::Cpu {
     /// All necessary side effects are performed, including updating the program counter and flag
     /// registers.
     pub fn execute(&mut self, instruction: Instruction) {
-        debug!("executing {:?}", instruction);
+        debug!("executing {:<20}", instruction.to_string());
+        trace!("{:?}", instruction);
 
         // Check that we have exactly as many operands as the instruction requires.
         debug_assert_eq!(instruction.def.num_operands as usize,
@@ -496,6 +523,30 @@ mod tests {
     fn half_carry() {
         assert!(super::is_half_carry(0x0f, 0x01));
         assert!(!super::is_half_carry(0x37, 0x44));
+    }
+
+    #[test]
+    fn instruction_display() {
+        let nop = Instruction {
+            def: INSTRUCTIONS[0x00].as_ref().unwrap(),
+            operands: Default::default(),
+        };
+
+        assert_eq!(&nop.to_string(), "NOP");
+
+        let jr_nz_r8 = Instruction {
+            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0xfe]),
+        };
+
+        assert_eq!(&jr_nz_r8.to_string(), "JR NZ,$0xfe");
+
+        let ld_hl_d16 = Instruction {
+            def: INSTRUCTIONS[0x21].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0xef, 0xbe]),
+        };
+
+        assert_eq!(&ld_hl_d16.to_string(), "LD HL,$0xbeef");
     }
 
     #[test]
