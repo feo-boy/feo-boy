@@ -1,6 +1,6 @@
 //! CPU instruction definition.
 
-use std::ops::SubAssign;
+use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, LittleEndian};
 use smallvec::SmallVec;
@@ -167,6 +167,34 @@ impl super::Cpu {
                     .write_byte(0xFF00 + self.reg.c as u16, self.reg.a);
             }
 
+            // INC BC
+            0x03 => self.reg.bc_mut().add_assign(1),
+
+            // INC DE
+            0x13 => self.reg.de_mut().add_assign(1),
+
+            // INC HL
+            0x23 => self.reg.hl_mut().add_assign(1),
+
+            // INC SP
+            0x33 => self.reg.sp.add_assign(1),
+
+            // INC B
+            0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
+
+            // INC D
+            0x14 => Self::inc(&mut self.reg.d, &mut self.reg.f),
+
+            // INC H
+            0x24 => Self::inc(&mut self.reg.h, &mut self.reg.f),
+
+            // INC (HL)
+            0x34 => {
+                let mut byte = self.mmu.borrow().read_byte(self.reg.hl());
+                Self::inc(&mut byte, &mut self.reg.f);
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
+            }
+
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
@@ -249,14 +277,16 @@ impl super::Cpu {
             }
 
             // INC C
-            0x0c => {
-                let old_c = self.reg.c;
-                self.reg.c += 1;
+            0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
 
-                self.reg.f.set(ZERO, self.reg.c == 0);
-                self.reg.f.remove(SUBTRACT);
-                self.reg.f.set(HALF_CARRY, is_half_carry(old_c, 1));
-            }
+            // INC E
+            0x1c => Self::inc(&mut self.reg.e, &mut self.reg.f),
+
+            // INC L
+            0x2c => Self::inc(&mut self.reg.l, &mut self.reg.f),
+
+            // INC A
+            0x3c => Self::inc(&mut self.reg.a, &mut self.reg.f),
 
             // XOR H
             0xac => {
@@ -338,6 +368,8 @@ impl super::Cpu {
         self.reg.f.set(ZERO, self.reg.a == 0);
     }
 
+    /// Pushes the program counter (plus 3) onto the stack, then sets the program counter to a
+    /// specific value.
     fn rst(&mut self, addr: u16) {
         let new_pc = self.reg.pc + 3;
         self.push(new_pc);
@@ -353,6 +385,16 @@ impl super::Cpu {
 
         self.reg.f.set(ZERO, a == rhs);
         self.reg.f.set(CARRY, a < rhs);
+    }
+
+    /// Increments a byte by 1 and sets the flags appropriately.
+    fn inc(byte: &mut u8, flags: &mut Flags) {
+        flags.set(HALF_CARRY, is_half_carry(*byte, 1));
+
+        *byte += 1;
+
+        flags.set(ZERO, *byte == 0);
+        flags.remove(SUBTRACT);
     }
 }
 
@@ -381,6 +423,14 @@ lazy_static! {
         0xf1,       "POP AF",       0,              12;
         0x32,       "LD (HL-),A",   0,              8;
         0xe2,       "LD (C),A",     0,              8; // AKA LD ($rFF00+C),A
+        0x03,       "INC BC",       0,              8;
+        0x13,       "INC DE",       0,              8;
+        0x23,       "INC HL",       0,              8;
+        0x33,       "INC SP",       0,              8;
+        0x04,       "INC B",        0,              4;
+        0x14,       "INC D",        0,              4;
+        0x24,       "INC H",        0,              4;
+        0x34,       "INC (HL)",     0,              12;
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -397,6 +447,9 @@ lazy_static! {
         0xaa,       "XOR D",        0,              4;
         0xab,       "XOR E",        0,              4;
         0x0c,       "INC C",        0,              4;
+        0x1c,       "INC E",        0,              4;
+        0x2c,       "INC L",        0,              4;
+        0x3c,       "INC A",        0,              4;
         0xac,       "XOR H",        0,              4;
         0xad,       "XOR L",        0,              4;
         0x0e,       "LD C,d8",      1,              8;
