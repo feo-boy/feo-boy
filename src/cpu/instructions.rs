@@ -222,6 +222,22 @@ impl super::Cpu {
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
             }
 
+            // DEC B
+            0x05 => Self::dec(&mut self.reg.b, &mut self.reg.f),
+
+            // DEC D
+            0x15 => Self::dec(&mut self.reg.d, &mut self.reg.f),
+
+            // DEC H
+            0x25 => Self::dec(&mut self.reg.h, &mut self.reg.f),
+
+            // DEC (HL)
+            0x35 => {
+                let mut byte = self.mmu.borrow().read_byte(self.reg.hl());
+                Self::dec(&mut byte, &mut self.reg.f);
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
+            }
+
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
@@ -297,6 +313,18 @@ impl super::Cpu {
                 self.xor(d);
             }
 
+            // DEC BC
+            0x0b => self.reg.bc_mut().sub_assign(1),
+
+            // DEC DE
+            0x1b => self.reg.de_mut().sub_assign(1),
+
+            // DEC HL
+            0x2b => self.reg.hl_mut().sub_assign(1),
+
+            // DEC SP
+            0x3b => self.reg.sp -= 1,
+
             // XOR E
             0xab => {
                 let e = self.reg.e;
@@ -320,6 +348,18 @@ impl super::Cpu {
                 let h = self.reg.h;
                 self.xor(h);
             }
+
+            // DEC C
+            0x0d => Self::dec(&mut self.reg.c, &mut self.reg.f),
+
+            // DEC E
+            0x1d => Self::dec(&mut self.reg.e, &mut self.reg.f),
+
+            // DEC L
+            0x2d => Self::dec(&mut self.reg.l, &mut self.reg.f),
+
+            // DEC A
+            0x3d => Self::dec(&mut self.reg.a, &mut self.reg.f),
 
             // XOR L
             0xad => {
@@ -416,19 +456,35 @@ impl super::Cpu {
 
     /// Increments a byte by 1 and sets the flags appropriately.
     fn inc(byte: &mut u8, flags: &mut Flags) {
-        flags.set(HALF_CARRY, is_half_carry(*byte, 1));
+        flags.set(HALF_CARRY, is_half_carry_add(*byte, 1));
 
         *byte += 1;
 
         flags.set(ZERO, *byte == 0);
         flags.remove(SUBTRACT);
     }
+
+    /// Decrements a byte by 1 and sets the flags appropriately.
+    fn dec(byte: &mut u8, flags: &mut Flags) {
+        flags.set(HALF_CARRY, is_half_carry_sub(*byte, 1));
+
+        *byte -= 1;
+
+        flags.set(ZERO, *byte == 0);
+        flags.insert(SUBTRACT);
+    }
 }
 
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
 /// nibble to the high nibble).
-fn is_half_carry(a: u8, b: u8) -> bool {
-    (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10
+fn is_half_carry_add(a: u8, b: u8) -> bool {
+    (((a & 0xf).wrapping_add(b & 0xf)) & 0x10) == 0x10
+}
+
+/// Returns `true` if the subtraction of two bytes would require a half carry (a carry from the low
+/// nibble to the high nibble).
+fn is_half_carry_sub(a: u8, b: u8) -> bool {
+    (((a & 0xf).wrapping_sub(b & 0xf)) & 0x10) == 0x10
 }
 
 lazy_static! {
@@ -458,6 +514,10 @@ lazy_static! {
         0x14,       "INC D",        0,              4;
         0x24,       "INC H",        0,              4;
         0x34,       "INC (HL)",     0,              12;
+        0x05,       "DEC B",        0,              4;
+        0x15,       "DEC D",        0,              4;
+        0x25,       "DEC H",        0,              4;
+        0x35,       "DEC (HL)",     0,              12;
         0xc5,       "PUSH BC",      0,              16;
         0xd5,       "PUSH DE",      0,              16;
         0xe5,       "PUSH HL",      0,              16;
@@ -472,12 +532,20 @@ lazy_static! {
         0xa8,       "XOR B",        0,              4;
         0xa9,       "XOR C",        0,              4;
         0xaa,       "XOR D",        0,              4;
+        0x0b,       "DEC BC",       0,              8;
+        0x1b,       "DEC DE",       0,              8;
+        0x2b,       "DEC HL",       0,              8;
+        0x3b,       "DEC SP",       0,              8;
         0xab,       "XOR E",        0,              4;
         0x0c,       "INC C",        0,              4;
         0x1c,       "INC E",        0,              4;
         0x2c,       "INC L",        0,              4;
         0x3c,       "INC A",        0,              4;
         0xac,       "XOR H",        0,              4;
+        0x0d,       "DEC C",        0,              4;
+        0x1d,       "DEC E",        0,              4;
+        0x2d,       "DEC L",        0,              4;
+        0x3d,       "DEC A",        0,              4;
         0xad,       "XOR L",        0,              4;
         0x0e,       "LD C,d8",      1,              8;
         0x1e,       "LD E,d8",      1,              8;
@@ -521,8 +589,11 @@ mod tests {
 
     #[test]
     fn half_carry() {
-        assert!(super::is_half_carry(0x0f, 0x01));
-        assert!(!super::is_half_carry(0x37, 0x44));
+        assert!(super::is_half_carry_add(0x0f, 0x01));
+        assert!(!super::is_half_carry_add(0x37, 0x44));
+
+        assert!(super::is_half_carry_sub(0xf0, 0x01));
+        assert!(!super::is_half_carry_sub(0xff, 0xf0));
     }
 
     #[test]
