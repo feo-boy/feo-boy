@@ -3,7 +3,7 @@ extern crate feo_boy;
 #[macro_use]
 extern crate clap;
 
-extern crate env_logger;
+extern crate pretty_env_logger;
 
 use std::io::prelude::*;
 use std::io;
@@ -67,7 +67,7 @@ fn run(config: Config) -> Result<()> {
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    pretty_env_logger::init().unwrap();
 
     let matches = App::new(crate_name!())
         .version(crate_version!())
