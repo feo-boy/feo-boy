@@ -331,6 +331,11 @@ impl super::Cpu {
                 self.xor(e);
             }
 
+            0xcb => {
+                error!("unimplemented prefix instruction");
+                self.reg.pc += 1;
+            }
+
             // INC C
             0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
 
@@ -537,6 +542,7 @@ lazy_static! {
         0x2b,       "DEC HL",       0,              8;
         0x3b,       "DEC SP",       0,              8;
         0xab,       "XOR E",        0,              4;
+        0xcb,       "PREFIX CB",    0,              0;
         0x0c,       "INC C",        0,              4;
         0x1c,       "INC E",        0,              4;
         0x2c,       "INC L",        0,              4;
