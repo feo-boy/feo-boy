@@ -35,6 +35,8 @@ fn run(config: Config) -> Result<()> {
         .load_rom(config.rom)
         .chain_err(|| "could not load ROM")?;
 
+    emulator.reset();
+
     let stdin = io::stdin();
     let mut stdin = stdin.lock().lines();
 
@@ -79,7 +81,8 @@ fn main() {
         .arg(Arg::with_name("bios-file")
                  .long("bios")
                  .takes_value(true)
-                 .help("a file containing a binary dump of the Game Boy BIOS"))
+                 .help("a file containing a binary dump of the Game Boy BIOS. If not supplied, \
+                       the emulator will begin executing the ROM as if the BIOS had succeeded"))
         .arg(Arg::with_name("debug")
                  .long("debug")
                  .short("d")

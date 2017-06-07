@@ -655,6 +655,8 @@ mod tests {
         let mmu = Mmu::default();
         let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
 
+        cpu.reg.pc = 0;
+
         // Move forward 10
         let instruction = Instruction {
             def: INSTRUCTIONS[0x20].as_ref().unwrap(),

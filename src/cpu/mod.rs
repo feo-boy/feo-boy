@@ -288,6 +288,16 @@ impl Cpu {
         self.reg.sp += 2;
         value
     }
+
+    /// Reset registers to their initial values.
+    pub fn reset(&mut self) {
+        // Skip the BIOS if we didn't load it.
+        self.reg.pc = if !self.mmu.borrow().has_bios() {
+            0x100
+        } else {
+            0x00
+        };
+    }
 }
 
 impl fmt::Display for Cpu {
@@ -298,8 +308,13 @@ impl fmt::Display for Cpu {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::ops::SubAssign;
-    use super::Registers;
+    use std::rc::Rc;
+
+    use memory::Mmu;
+
+    use super::{Cpu, Registers};
 
     #[test]
     fn wrap_pair() {
@@ -319,5 +334,23 @@ mod tests {
 
         assert_eq!(0xBEEF, registers.hl_mut().as_word());
         assert_eq!(registers.hl_mut().as_word(), registers.hl());
+    }
+
+    #[test]
+    fn skip_bios() {
+        let mmu = Rc::new(RefCell::new(Mmu::new()));
+        let mut cpu = Cpu::new(Rc::clone(&mmu));
+        cpu.reset();
+
+        assert_eq!(cpu.reg.pc, 0x100);
+
+        let mmu = Rc::new(RefCell::new(Mmu::new()));
+
+        let mut cpu = Cpu::new(Rc::clone(&mmu));
+        // Load dummy BIOS
+        mmu.borrow_mut().load_bios(&[0; 256]).unwrap();
+        cpu.reset();
+
+        assert_eq!(cpu.reg.pc, 0x00);
     }
 }

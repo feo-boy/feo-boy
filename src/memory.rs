@@ -41,7 +41,7 @@ impl Default for IoRegisters {
 /// The memory manager unit.
 pub struct Mmu {
     /// BIOS memory.
-    bios: [u8; BIOS_SIZE],
+    bios: Option<[u8; BIOS_SIZE]>,
 
     /// ROM banks 0 and 1.
     ///
@@ -78,7 +78,7 @@ impl Mmu {
     /// The initial contents of the memory are unspecified.
     pub fn new() -> Self {
         Mmu {
-            bios: [0; BIOS_SIZE],
+            bios: None,
             rom: [0; 0x8000],
             eram: [0; 0x2000],
             wram: [0; 0x2000],
@@ -98,7 +98,10 @@ impl Mmu {
             bail!(ErrorKind::InvalidBios(format!("must be exactly {} bytes", BIOS_SIZE)));
         }
 
-        self.bios.copy_from_slice(bios);
+        let mut bios_memory = [0; BIOS_SIZE];
+        bios_memory.copy_from_slice(bios);
+
+        self.bios = Some(bios_memory);
 
         Ok(())
     }
@@ -237,6 +240,11 @@ impl Mmu {
         Ok(())
     }
 
+    /// Returns `true` if the MMU has loaded the BIOS using `Mmu::load_bios`.
+    pub fn has_bios(&self) -> bool {
+        self.bios.is_some()
+    }
+
     /// Resets the MMU to its initial state, including all I/O registers.
     pub fn reset(&mut self) {
         self.io_reg = Default::default();
@@ -246,7 +254,9 @@ impl Mmu {
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
-            0x0000...0x00FF if self.io_reg.bios_mapped => self.bios[address as usize],
+            0x0000...0x00FF if self.io_reg.bios_mapped && self.has_bios() => {
+                self.bios.unwrap()[address as usize]
+            }
 
             // ROM Banks
             0x0000...0x7FFF => self.rom[address as usize],
@@ -399,7 +409,7 @@ impl Mmu {
 
 impl Debug for Mmu {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let bios: &[u8] = &self.bios;
+        let bios: Option<&[u8]> = self.bios.as_ref().map(|b| &b[..]);
         let rom: &[u8] = &self.rom;
         let eram: &[u8] = &self.eram;
         let wram: &[u8] = &self.wram;
@@ -483,10 +493,13 @@ mod tests {
         let mut mmu = Mmu::new();
         assert!(mmu.io_reg.bios_mapped);
 
-        mmu.bios[0] = 1;
+        let mut bios_memory = [0; super::BIOS_SIZE];
+        bios_memory[0] = 1;
+        bios_memory[0xFF] = 2;
+        mmu.bios = Some(bios_memory);
+
         assert_eq!(mmu.read_byte(0x0000), 1);
 
-        mmu.bios[0xFF] = 2;
         assert_eq!(mmu.read_byte(0x00FF), 2);
 
         mmu.write_byte(0xFF50, 1);

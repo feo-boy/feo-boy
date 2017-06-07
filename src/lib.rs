@@ -50,6 +50,12 @@ impl Emulator {
         }
     }
 
+    /// Reset all emulator components to their initial states.
+    pub fn reset(&mut self) {
+        self.mmu.borrow_mut().reset();
+        self.cpu.borrow_mut().reset();
+    }
+
     pub fn load_bios<P>(&mut self, path: P) -> Result<()>
         where P: AsRef<Path>
     {
