@@ -9,6 +9,11 @@ use smallvec::SmallVec;
 
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 
+lazy_static! {
+    /// Matches instruction descriptions that take operands.
+    static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8").unwrap();
+}
+
 /// A definition of a single instruction.
 #[derive(Debug, Clone)]
 struct InstructionDef {
@@ -40,10 +45,6 @@ pub struct Instruction {
 
 impl Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        lazy_static! {
-            static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8").unwrap();
-        }
-
         let instruction = if let Some(mat) = DATA_RE.find(self.def.description) {
             let replacement = match mat.as_str() {
                 "d8" | "a8" | "r8" => format!("${:#02x}", &self.operands[0]),
@@ -64,16 +65,24 @@ impl Display for Instruction {
 
 /// Macro to quickly define all CPU instructions for the Game Boy Z80 processor.
 macro_rules! instructions {
-    ( $( $byte:expr, $description:expr, $num_operands:expr, $cycles:expr ; )* ) => {
+    ( $( $byte:expr, $description:expr, $cycles:expr ; )* ) => {
         {
             let mut instructions = vec![None; 0x100];
 
             $(
+                let num_operands = DATA_RE.find($description).map(|mat| {
+                    match mat.as_str() {
+                        "d8" | "a8" | "r8" => 1,
+                        "d16" | "a16" => 2,
+                        _ => unreachable!(),
+                    }
+                }).unwrap_or_default();
+
                 instructions[$byte] = Some(InstructionDef {
                     byte: $byte,
                     description: $description,
                     cycles: $cycles,
-                    num_operands: $num_operands,
+                    num_operands: num_operands,
                 });
             )*
 
@@ -484,71 +493,71 @@ lazy_static! {
     /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
     // FIXME: This should be `[Instruction; 0x100]` once all instructions are implemented.
     static ref INSTRUCTIONS: Vec<Option<InstructionDef>> = instructions! {
-        // byte     description     operands        cycles
-        0x00,       "NOP",          0,              4;
-        0x20,       "JR NZ,r8",     1,              8;
-        0x21,       "LD HL,d16",    2,              12;
-        0x31,       "LD SP,d16",    2,              12;
-        0xc1,       "POP BC",       0,              12;
-        0xd1,       "POP DC",       0,              12;
-        0xe1,       "POP HL",       0,              12;
-        0xf1,       "POP AF",       0,              12;
-        0x32,       "LD (HL-),A",   0,              8;
-        0xe2,       "LD (C),A",     0,              8; // AKA LD ($rFF00+C),A
-        0x03,       "INC BC",       0,              8;
-        0x13,       "INC DE",       0,              8;
-        0x23,       "INC HL",       0,              8;
-        0x33,       "INC SP",       0,              8;
-        0x04,       "INC B",        0,              4;
-        0x14,       "INC D",        0,              4;
-        0x24,       "INC H",        0,              4;
-        0x34,       "INC (HL)",     0,              12;
-        0x05,       "DEC B",        0,              4;
-        0x15,       "DEC D",        0,              4;
-        0x25,       "DEC H",        0,              4;
-        0x35,       "DEC (HL)",     0,              12;
-        0xc5,       "PUSH BC",      0,              16;
-        0xd5,       "PUSH DE",      0,              16;
-        0xe5,       "PUSH HL",      0,              16;
-        0xf5,       "PUSH AF",      0,              16;
-        0x06,       "LD B,d8",      1,              8;
-        0x16,       "LD D,d8",      1,              8;
-        0x26,       "LD H,d8",      1,              8;
-        0xc7,       "RST 00H",      0,              16;
-        0xd7,       "RST 10H",      0,              16;
-        0xe7,       "RST 20H",      0,              16;
-        0xf7,       "RST 30H",      0,              16;
-        0xa8,       "XOR B",        0,              4;
-        0xa9,       "XOR C",        0,              4;
-        0xaa,       "XOR D",        0,              4;
-        0x0b,       "DEC BC",       0,              8;
-        0x1b,       "DEC DE",       0,              8;
-        0x2b,       "DEC HL",       0,              8;
-        0x3b,       "DEC SP",       0,              8;
-        0xab,       "XOR E",        0,              4;
-        0xcb,       "PREFIX CB",    0,              0;
-        0x0c,       "INC C",        0,              4;
-        0x1c,       "INC E",        0,              4;
-        0x2c,       "INC L",        0,              4;
-        0x3c,       "INC A",        0,              4;
-        0xac,       "XOR H",        0,              4;
-        0x0d,       "DEC C",        0,              4;
-        0x1d,       "DEC E",        0,              4;
-        0x2d,       "DEC L",        0,              4;
-        0x3d,       "DEC A",        0,              4;
-        0xad,       "XOR L",        0,              4;
-        0x0e,       "LD C,d8",      1,              8;
-        0x1e,       "LD E,d8",      1,              8;
-        0x2e,       "LD L,d8",      1,              8;
-        0x3e,       "LD A,d8",      1,              8;
-        0xae,       "XOR (HL)",     0,              8;
-        0xee,       "XOR d8",       1,              8;
-        0xfe,       "CP d8",        1,              8;
-        0xaf,       "XOR A",        0,              4;
-        0xcf,       "RST 08H",      0,              16;
-        0xdf,       "RST 18H",      0,              16;
-        0xef,       "RST 28H",      0,              16;
-        0xff,       "RST 38H",      0,              16;
+        // byte     description     cycles
+        0x00,       "NOP",          4;
+        0x20,       "JR NZ,r8",     8;
+        0x21,       "LD HL,d16",    12;
+        0x31,       "LD SP,d16",    12;
+        0xc1,       "POP BC",       12;
+        0xd1,       "POP DC",       12;
+        0xe1,       "POP HL",       12;
+        0xf1,       "POP AF",       12;
+        0x32,       "LD (HL-),A",   8;
+        0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
+        0x03,       "INC BC",       8;
+        0x13,       "INC DE",       8;
+        0x23,       "INC HL",       8;
+        0x33,       "INC SP",       8;
+        0x04,       "INC B",        4;
+        0x14,       "INC D",        4;
+        0x24,       "INC H",        4;
+        0x34,       "INC (HL)",     12;
+        0x05,       "DEC B",        4;
+        0x15,       "DEC D",        4;
+        0x25,       "DEC H",        4;
+        0x35,       "DEC (HL)",     12;
+        0xc5,       "PUSH BC",      16;
+        0xd5,       "PUSH DE",      16;
+        0xe5,       "PUSH HL",      16;
+        0xf5,       "PUSH AF",      16;
+        0x06,       "LD B,d8",      8;
+        0x16,       "LD D,d8",      8;
+        0x26,       "LD H,d8",      8;
+        0xc7,       "RST 00H",      16;
+        0xd7,       "RST 10H",      16;
+        0xe7,       "RST 20H",      16;
+        0xf7,       "RST 30H",      16;
+        0xa8,       "XOR B",        4;
+        0xa9,       "XOR C",        4;
+        0xaa,       "XOR D",        4;
+        0x0b,       "DEC BC",       8;
+        0x1b,       "DEC DE",       8;
+        0x2b,       "DEC HL",       8;
+        0x3b,       "DEC SP",       8;
+        0xab,       "XOR E",        4;
+        0xcb,       "PREFIX CB",    0;
+        0x0c,       "INC C",        4;
+        0x1c,       "INC E",        4;
+        0x2c,       "INC L",        4;
+        0x3c,       "INC A",        4;
+        0xac,       "XOR H",        4;
+        0x0d,       "DEC C",        4;
+        0x1d,       "DEC E",        4;
+        0x2d,       "DEC L",        4;
+        0x3d,       "DEC A",        4;
+        0xad,       "XOR L",        4;
+        0x0e,       "LD C,d8",      8;
+        0x1e,       "LD E,d8",      8;
+        0x2e,       "LD L,d8",      8;
+        0x3e,       "LD A,d8",      8;
+        0xae,       "XOR (HL)",     8;
+        0xee,       "XOR d8",       8;
+        0xfe,       "CP d8",        8;
+        0xaf,       "XOR A",        4;
+        0xcf,       "RST 08H",      16;
+        0xdf,       "RST 18H",      16;
+        0xef,       "RST 28H",      16;
+        0xff,       "RST 38H",      16;
     };
 }
 
