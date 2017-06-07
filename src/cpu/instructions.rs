@@ -139,6 +139,13 @@ impl super::Cpu {
                 }
             }
 
+            // LDH (a8),A
+            0xe0 => {
+                self.mmu
+                    .borrow_mut()
+                    .write_byte(0xff00u16 + &instruction.operands[0].into(), self.reg.a)
+            }
+
             // LD HL,d16
             0x21 => {
                 self.reg
@@ -263,6 +270,9 @@ impl super::Cpu {
 
             // LD H,d8
             0x26 => self.reg.h = instruction.operands[0],
+
+            // LD (HL),A
+            0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
 
             // RST 00H
             0xc7 => {
@@ -496,6 +506,7 @@ lazy_static! {
         // byte     description     cycles
         0x00,       "NOP",          4;
         0x20,       "JR NZ,r8",     8;
+        0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
         0x21,       "LD HL,d16",    12;
         0x31,       "LD SP,d16",    12;
         0xc1,       "POP BC",       12;
@@ -523,6 +534,7 @@ lazy_static! {
         0x06,       "LD B,d8",      8;
         0x16,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
+        0x77,       "LD (HL),A",    8;
         0xc7,       "RST 00H",      16;
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
