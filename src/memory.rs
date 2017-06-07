@@ -10,9 +10,33 @@ use std::num::Wrapping;
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use itertools::Itertools;
 
+use bytes::ByteExt;
 use errors::*;
 
 const BIOS_SIZE: usize = 0x0100;
+
+/// The I/O Registers.
+#[derive(Debug)]
+struct IoRegisters {
+    /// True if the BIOS is currently mapped into memory.
+    bios_mapped: bool,
+
+    /// True if the sound controller is enabled.
+    sound_enabled: bool,
+}
+
+impl Default for IoRegisters {
+    /// Resets the I/O registers to their initial state.
+    ///
+    /// - The BIOS is mapped.
+    /// - The sound controller is disabled.
+    fn default() -> Self {
+        IoRegisters {
+            bios_mapped: true,
+            sound_enabled: false,
+        }
+    }
+}
 
 /// The memory manager unit.
 pub struct Mmu {
@@ -41,8 +65,8 @@ pub struct Mmu {
     /// High speed.
     zram: [u8; 0x0080],
 
-    /// True if the BIOS is currently mapped into memory.
-    in_bios: bool,
+    /// The I/O registers.
+    io_reg: IoRegisters,
 
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Vec<u8>,
@@ -61,7 +85,7 @@ impl Mmu {
             vram: [0; 0x2000],
             oam: [0; 0xA0],
             zram: [0; 0x0080],
-            in_bios: true,
+            io_reg: IoRegisters::default(),
             cartridge_rom: Vec::default(),
         }
     }
@@ -213,20 +237,16 @@ impl Mmu {
         Ok(())
     }
 
-    /// Resets the MMU to its initial state.
-    ///
-    /// This includes:
-    ///
-    /// - Remapping the BIOS into 0x0000-0x00FF.
+    /// Resets the MMU to its initial state, including all I/O registers.
     pub fn reset(&mut self) {
-        self.in_bios = true;
+        self.io_reg = Default::default();
     }
 
     /// Returns the byte at a given memory address.
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
-            0x0000...0x00FF if self.in_bios => self.bios[address as usize],
+            0x0000...0x00FF if self.io_reg.bios_mapped => self.bios[address as usize],
 
             // ROM Banks
             0x0000...0x7FFF => self.rom[address as usize],
@@ -325,8 +345,21 @@ impl Mmu {
             0xFF00...0xFF7F => {
                 // I/O Registers
                 match address {
-                    0xFF50 if address != 0 => self.unmap_bios(),
-                    _ => error!("write to unimplemented I/O register {:#02x}", address),
+                    // Sound on/off
+                    0xFF26 => {
+                        // Only the high bit is writable.
+                        if byte.has_bit_set(7) {
+                            info!("enabling sound controller");
+                            self.io_reg.sound_enabled = true;
+                        }
+                    }
+                    // Unmap BIOS
+                    0xFF50 => {
+                        if self.io_reg.bios_mapped {
+                            self.unmap_bios()
+                        }
+                    }
+                    _ => warn!("write to unimplemented I/O register {:#02x}", address),
                 }
             }
 
@@ -359,7 +392,8 @@ impl Mmu {
     }
 
     fn unmap_bios(&mut self) {
-        self.in_bios = false;
+        info!("unmapping BIOS");
+        self.io_reg.bios_mapped = false;
     }
 }
 
@@ -374,7 +408,6 @@ impl Debug for Mmu {
         let zram: &[u8] = &self.zram;
 
         f.debug_struct("Mmu")
-            .field("in_bios", &self.in_bios)
             .field("bios", &bios)
             .field("rom", &rom)
             .field("eram", &eram)
@@ -382,6 +415,8 @@ impl Debug for Mmu {
             .field("vram", &vram)
             .field("oam", &oam)
             .field("zram", &zram)
+            .field("io_reg", &self.io_reg)
+            .field("cartridge_rom", &self.cartridge_rom)
             .finish()
     }
 }
@@ -446,7 +481,7 @@ mod tests {
     #[test]
     fn bios() {
         let mut mmu = Mmu::new();
-        assert!(mmu.in_bios);
+        assert!(mmu.io_reg.bios_mapped);
 
         mmu.bios[0] = 1;
         assert_eq!(mmu.read_byte(0x0000), 1);
@@ -455,7 +490,7 @@ mod tests {
         assert_eq!(mmu.read_byte(0x00FF), 2);
 
         mmu.write_byte(0xFF50, 1);
-        assert!(!mmu.in_bios);
+        assert!(!mmu.io_reg.bios_mapped);
     }
 
     #[test]

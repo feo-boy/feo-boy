@@ -14,9 +14,10 @@ extern crate itertools;
 extern crate regex;
 extern crate smallvec;
 
+pub mod bytes;
 pub mod cpu;
-pub mod graphics;
 pub mod errors;
+pub mod graphics;
 pub mod memory;
 
 use std::cell::RefCell;
