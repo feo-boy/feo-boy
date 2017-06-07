@@ -260,9 +260,6 @@ pub struct Cpu {
 
     /// Memory unit
     mmu: Rc<RefCell<Mmu>>,
-
-    /// The operands for the current instruction.
-    operands: [u8; 2],
 }
 
 impl Cpu {
@@ -271,7 +268,6 @@ impl Cpu {
             reg: Registers::new(),
             clock: Clock::new(),
             mmu: mmu,
-            operands: Default::default(),
         }
     }
 
