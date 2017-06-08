@@ -10,7 +10,7 @@ authors = [
 [[bin]]
 name = "feo-boy"
 doc = false
-path = "src/bin/feo-boy.rs"
+path = "src/main.rs"
 test = false
 
 [dependencies]
