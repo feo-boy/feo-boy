@@ -115,7 +115,7 @@ impl super::Cpu {
     /// All necessary side effects are performed, including updating the program counter and flag
     /// registers.
     pub fn execute(&mut self, instruction: Instruction) {
-        debug!("executing {:<20}", instruction.to_string());
+        debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
         // Check that we have exactly as many operands as the instruction requires.
