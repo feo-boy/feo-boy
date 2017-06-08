@@ -59,6 +59,8 @@ impl Emulator {
     pub fn load_bios<P>(&mut self, path: P) -> Result<()>
         where P: AsRef<Path>
     {
+        info!("loading BIOS from file '{}'", path.as_ref().display());
+
         let mut file = File::open(path)?;
 
         let mut buf = vec![];
@@ -66,18 +68,24 @@ impl Emulator {
 
         self.mmu.borrow_mut().load_bios(&buf)?;
 
+        info!("loaded BIOS successfully");
+
         Ok(())
     }
 
     pub fn load_rom<P>(&mut self, path: P) -> Result<()>
         where P: AsRef<Path>
     {
+        info!("loading ROM from file '{}'", path.as_ref().display());
+
         let mut file = File::open(path)?;
 
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
         self.mmu.borrow_mut().load_rom(&buf)?;
+
+        info!("loaded ROM successfully");
 
         Ok(())
     }

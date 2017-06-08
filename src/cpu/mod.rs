@@ -293,6 +293,7 @@ impl Cpu {
     pub fn reset(&mut self) {
         // Skip the BIOS if we didn't load it.
         self.reg.pc = if !self.mmu.borrow().has_bios() {
+            info!("skipping BIOS: none loaded");
             0x100
         } else {
             0x00

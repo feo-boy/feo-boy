@@ -114,8 +114,6 @@ impl Mmu {
     ///
     /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
-        info!("loading ROM");
-
         self.cartridge_rom = rom.to_vec();
 
         let initial_banks = &self.cartridge_rom[..self.rom.len()];
@@ -234,8 +232,6 @@ impl Mmu {
                   global_sum,
                   global_checksum);
         }
-
-        info!("completed loading ROM");
 
         Ok(())
     }
