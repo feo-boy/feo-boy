@@ -459,7 +459,7 @@ impl super::Cpu {
     fn inc(byte: &mut u8, flags: &mut Flags) {
         flags.set(HALF_CARRY, is_half_carry_add(*byte, 1));
 
-        *byte += 1;
+        *byte = byte.wrapping_add(1);
 
         flags.set(ZERO, *byte == 0);
         flags.remove(SUBTRACT);
@@ -469,7 +469,7 @@ impl super::Cpu {
     fn dec(byte: &mut u8, flags: &mut Flags) {
         flags.set(HALF_CARRY, is_half_carry_sub(*byte, 1));
 
-        *byte -= 1;
+        *byte = byte.wrapping_sub(1);
 
         flags.set(ZERO, *byte == 0);
         flags.insert(SUBTRACT);
