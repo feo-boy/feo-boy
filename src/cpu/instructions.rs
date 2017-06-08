@@ -206,6 +206,15 @@ impl super::Cpu {
             // INC SP
             0x33 => self.reg.sp.add_assign(1),
 
+            // JP NZ,a16
+            0xc3 => {
+                if !self.reg.f.contains(ZERO) {
+                    self.reg.pc = LittleEndian::read_u16(&instruction.operands);
+
+                    // FIXME: add 4 cycles in this case
+                }
+            }
+
             // INC B
             0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
 
@@ -519,6 +528,7 @@ lazy_static! {
         0x13,       "INC DE",       8;
         0x23,       "INC HL",       8;
         0x33,       "INC SP",       8;
+        0xc3,       "JP NZ,a16",    12;
         0x04,       "INC B",        4;
         0x14,       "INC D",        4;
         0x24,       "INC H",        4;
