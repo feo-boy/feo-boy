@@ -278,11 +278,17 @@ impl Cpu {
         self.execute(instruction);
     }
 
+    /// Push a value onto the stack.
+    ///
+    /// Uses the current value of `SP`, and decrements it.
     pub fn push(&mut self, value: u16) {
-        self.mmu.borrow_mut().write_word(self.reg.sp, value);
         self.reg.sp -= 2;
+        self.mmu.borrow_mut().write_word(self.reg.sp, value);
     }
 
+    /// Pop a value off the stack.
+    ///
+    /// Uses the current value of `SP`, and increments it.
     pub fn pop(&mut self) -> u16 {
         let value = self.mmu.borrow().read_word(self.reg.sp);
         self.reg.sp += 2;
@@ -353,5 +359,16 @@ mod tests {
         cpu.reset();
 
         assert_eq!(cpu.reg.pc, 0x00);
+    }
+
+    #[test]
+    fn push_pop() {
+        let mmu = Rc::new(RefCell::new(Mmu::default()));
+        let mut cpu = Cpu::new(Rc::clone(&mmu));
+
+        cpu.reg.sp = 0xFFF0;
+
+        cpu.push(0xcafe);
+        assert_eq!(cpu.pop(), 0xcafe);
     }
 }

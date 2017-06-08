@@ -122,6 +122,13 @@ impl super::Cpu {
         debug_assert_eq!(instruction.def.num_operands as usize,
                          instruction.operands.len());
 
+        // Increment the program counter (PC) *before* executing the instruction.
+        //
+        // This how the actual hardware handles the PC, as relative jumps and other PC-related
+        // instructions assume that PC is pointing at the *next* instruction.
+        self.reg.pc += 1 + instruction.operands.len() as u16;
+
+        // Execute the instruction.
         match instruction.def.byte {
             // NOP
             0x00 => (),
@@ -284,28 +291,16 @@ impl super::Cpu {
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
 
             // RST 00H
-            0xc7 => {
-                self.rst(0x0000);
-                return;
-            }
+            0xc7 => self.rst(0x0000),
 
             // RST 10H
-            0xd7 => {
-                self.rst(0x0010);
-                return;
-            }
+            0xd7 => self.rst(0x0010),
 
             // RST 20H
-            0xe7 => {
-                self.rst(0x0020);
-                return;
-            }
+            0xe7 => self.rst(0x0020),
 
             // RST 30H
-            0xf7 => {
-                self.rst(0x0030);
-                return;
-            }
+            0xf7 => self.rst(0x0030),
 
             // XOR B
             0xa8 => {
@@ -416,33 +411,19 @@ impl super::Cpu {
             }
 
             // RST 08H
-            0xcf => {
-                self.rst(0x0008);
-                return;
-            }
+            0xcf => self.rst(0x0008),
 
             // RST 18H
-            0xdf => {
-                self.rst(0x0018);
-                return;
-            }
+            0xdf => self.rst(0x0018),
 
             // RST 28H
-            0xef => {
-                self.rst(0x0028);
-                return;
-            }
+            0xef => self.rst(0x0028),
 
             // RST 38H
-            0xff => {
-                self.rst(0x0038);
-                return;
-            }
+            0xff => self.rst(0x0038),
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
-
-        self.reg.pc += 1 + instruction.operands.len() as u16;
     }
 
     /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
@@ -452,11 +433,14 @@ impl super::Cpu {
         self.reg.f.set(ZERO, self.reg.a == 0);
     }
 
-    /// Pushes the program counter (plus 3) onto the stack, then sets the program counter to a
-    /// specific value.
+    /// Pushes the current value of the program counter onto the stack, then jumps to a specific
+    /// address.
+    ///
+    /// The current value of the program counter is assumed to be the address of the next
+    /// instruction.
     fn rst(&mut self, addr: u16) {
-        let new_pc = self.reg.pc + 3;
-        self.push(new_pc);
+        let pc = self.reg.pc;
+        self.push(pc);
         self.reg.pc = addr;
     }
 
@@ -656,8 +640,8 @@ mod tests {
         };
         cpu.execute(instruction);
 
-        assert_eq!(mmu.borrow().read_word(0xFFF0), 0xAB + 3);
         assert_eq!(cpu.reg.pc, 0x38);
+        assert_eq!(cpu.pop(), 0xAB + 1);
     }
 
     #[test]
