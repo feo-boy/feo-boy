@@ -10,7 +10,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process;
 
-use clap::{App, Arg};
+use clap::{App, AppSettings, Arg};
 
 use feo_boy::Emulator;
 use feo_boy::errors::*;
@@ -72,13 +72,14 @@ fn main() {
     pretty_env_logger::init().unwrap();
 
     let matches = App::new(crate_name!())
+        .setting(AppSettings::ColoredHelp)
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
         .arg(Arg::with_name("rom")
                  .required(true)
                  .help("a file containing a ROM to load into the emulator"))
-        .arg(Arg::with_name("bios-file")
+        .arg(Arg::with_name("bios")
                  .long("bios")
                  .takes_value(true)
                  .help("a file containing a binary dump of the Game Boy BIOS. If not supplied, \
@@ -89,7 +90,7 @@ fn main() {
                  .help("Enable debug mode"))
         .get_matches();
 
-    let bios = matches.value_of("bios-file").map(PathBuf::from);
+    let bios = matches.value_of("bios").map(PathBuf::from);
     let rom = matches.value_of("rom").unwrap();
 
     let config = Config {
