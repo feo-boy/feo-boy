@@ -146,6 +146,12 @@ impl super::Cpu {
                 }
             }
 
+            // SUB B
+            0x90 => {
+                let b = self.reg.b;
+                self.sub(b);
+            }
+
             // LDH (a8),A
             0xe0 => {
                 self.mmu
@@ -162,6 +168,12 @@ impl super::Cpu {
 
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(&instruction.operands),
+
+            // SUB C
+            0x91 => {
+                let c = self.reg.c;
+                self.sub(c);
+            }
 
             // POP BC
             0xc1 => {
@@ -193,6 +205,12 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // SUB D
+            0x92 => {
+                let d = self.reg.d;
+                self.sub(d);
+            }
+
             // LD (C),A
             // LD ($FF00+C),A
             0xe2 => {
@@ -212,6 +230,12 @@ impl super::Cpu {
 
             // INC SP
             0x33 => self.reg.sp.add_assign(1),
+
+            // SUB E
+            0x93 => {
+                let e = self.reg.e;
+                self.sub(e);
+            }
 
             // JP NZ,a16
             0xc3 => {
@@ -238,6 +262,12 @@ impl super::Cpu {
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
             }
 
+            // SUB H
+            0x94 => {
+                let h = self.reg.h;
+                self.sub(h);
+            }
+
             // DEC B
             0x05 => Self::dec(&mut self.reg.b, &mut self.reg.f),
 
@@ -252,6 +282,12 @@ impl super::Cpu {
                 let mut byte = self.mmu.borrow().read_byte(self.reg.hl());
                 Self::dec(&mut byte, &mut self.reg.f);
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
+            }
+
+            // SUB L
+            0x95 => {
+                let l = self.reg.l;
+                self.sub(l);
             }
 
             // PUSH BC
@@ -287,8 +323,23 @@ impl super::Cpu {
             // LD H,d8
             0x26 => self.reg.h = instruction.operands[0],
 
+            // SUB (HL)
+            0x96 => {
+                let byte = self.mmu.borrow().read_byte(self.reg.hl());
+                self.sub(byte);
+            }
+
+            // SUB d8
+            0xd6 => self.sub(instruction.operands[0]),
+
             // LD (HL),A
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
+
+            // SUB A
+            0x97 => {
+                let a = self.reg.a;
+                self.sub(a);
+            }
 
             // RST 00H
             0xc7 => self.rst(0x0000),
@@ -449,10 +500,12 @@ impl super::Cpu {
     /// Performs a subtraction with the accumulator without actually setting the accumulator to the
     /// new value. Only the flags are set.
     fn cp(&mut self, rhs: u8) {
-        let a = self.reg.a;
+        let mut flags = &mut self.reg.f;
 
-        self.reg.f.set(ZERO, a == rhs);
-        self.reg.f.set(CARRY, a < rhs);
+        flags.set(ZERO, self.reg.a == rhs);
+        flags.insert(SUBTRACT);
+        flags.set(HALF_CARRY, is_half_carry_sub(self.reg.a, rhs));
+        flags.set(CARRY, is_carry_sub(self.reg.a, rhs));
     }
 
     /// Increments a byte by 1 and sets the flags appropriately.
@@ -474,6 +527,15 @@ impl super::Cpu {
         flags.set(ZERO, *byte == 0);
         flags.insert(SUBTRACT);
     }
+
+    /// Subtracts a byte from A and sets the flags appropriately.
+    fn sub(&mut self, rhs: u8) {
+        // Set the flags.
+        self.cp(rhs);
+
+        // Perform the subtraction.
+        self.reg.a = self.reg.a.wrapping_sub(rhs);
+    }
 }
 
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
@@ -482,10 +544,15 @@ fn is_half_carry_add(a: u8, b: u8) -> bool {
     (((a & 0xf).wrapping_add(b & 0xf)) & 0x10) == 0x10
 }
 
-/// Returns `true` if the subtraction of two bytes would require a half carry (a carry from the low
-/// nibble to the high nibble).
+/// Returns `true` if the subtraction of two bytes requires a carry from the most significant bit.
+fn is_carry_sub(a: u8, b: u8) -> bool {
+    b > a
+}
+
+/// Returns `true` if the subtraction of two bytes would require a half carry (a borrow from the
+/// high nibble to the low nibble).
 fn is_half_carry_sub(a: u8, b: u8) -> bool {
-    (((a & 0xf).wrapping_sub(b & 0xf)) & 0x10) == 0x10
+    (b & 0xf) > (a & 0xf)
 }
 
 lazy_static! {
@@ -499,28 +566,34 @@ lazy_static! {
         // byte     description     cycles
         0x00,       "NOP",          4;
         0x20,       "JR NZ,r8",     8;
+        0x90,       "SUB B",        4;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
         0x21,       "LD HL,d16",    12;
         0x31,       "LD SP,d16",    12;
+        0x91,       "SUB C",        4;
         0xc1,       "POP BC",       12;
         0xd1,       "POP DC",       12;
         0xe1,       "POP HL",       12;
         0xf1,       "POP AF",       12;
         0x32,       "LD (HL-),A",   8;
+        0x92,       "SUB D",        4;
         0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
         0x03,       "INC BC",       8;
         0x13,       "INC DE",       8;
         0x23,       "INC HL",       8;
         0x33,       "INC SP",       8;
+        0x93,       "SUB E",        4;
         0xc3,       "JP NZ,a16",    12;
         0x04,       "INC B",        4;
         0x14,       "INC D",        4;
         0x24,       "INC H",        4;
         0x34,       "INC (HL)",     12;
+        0x94,       "SUB H",        4;
         0x05,       "DEC B",        4;
         0x15,       "DEC D",        4;
         0x25,       "DEC H",        4;
         0x35,       "DEC (HL)",     12;
+        0x95,       "SUB L",        4;
         0xc5,       "PUSH BC",      16;
         0xd5,       "PUSH DE",      16;
         0xe5,       "PUSH HL",      16;
@@ -528,7 +601,10 @@ lazy_static! {
         0x06,       "LD B,d8",      8;
         0x16,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
+        0x96,       "SUB (HL)",     8;
+        0xd6,       "SUB d8",       8;
         0x77,       "LD (HL),A",    8;
+        0x97,       "SUB A",        4;
         0xc7,       "RST 00H",      16;
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
@@ -586,6 +662,12 @@ mod tests {
 
         assert!(super::is_half_carry_sub(0xf0, 0x01));
         assert!(!super::is_half_carry_sub(0xff, 0xf0));
+    }
+
+    #[test]
+    fn carry() {
+        assert!(super::is_carry_sub(0x00, 0x01));
+        assert!(!super::is_carry_sub(0xff, 0x0f));
     }
 
     #[test]
