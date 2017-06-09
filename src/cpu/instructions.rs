@@ -159,6 +159,20 @@ impl super::Cpu {
                     .write_byte(0xff00u16 + &instruction.operands[0].into(), self.reg.a)
             }
 
+            // LD BC,d16
+            0x01 => {
+                self.reg
+                    .bc_mut()
+                    .write(LittleEndian::read_u16(&instruction.operands))
+            }
+
+            // LD DE,d16
+            0x11 => {
+                self.reg
+                    .de_mut()
+                    .write(LittleEndian::read_u16(&instruction.operands))
+            }
+
             // LD HL,d16
             0x21 => {
                 self.reg
@@ -568,6 +582,8 @@ lazy_static! {
         0x20,       "JR NZ,r8",     8;
         0x90,       "SUB B",        4;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
+        0x01,       "LD BC,d16",    12;
+        0x11,       "LD DE,d16",    12;
         0x21,       "LD HL,d16",    12;
         0x31,       "LD SP,d16",    12;
         0x91,       "SUB C",        4;
