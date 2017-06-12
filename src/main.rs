@@ -74,7 +74,7 @@ fn run() -> Result<()> {
     let matches = App::new(crate_name!())
         .setting(AppSettings::ColoredHelp)
         .version(crate_version!())
-        .author(crate_authors!())
+        .author(crate_authors!("\n"))
         .about(crate_description!())
         .arg(Arg::with_name("rom").required(true).help(
             "a file containing a ROM to load into the emulator",
