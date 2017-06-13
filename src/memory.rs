@@ -301,7 +301,7 @@ impl Mmu {
                 self.zram[index as usize]
             }
 
-            _ => unreachable!(),
+            _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
 
@@ -375,7 +375,7 @@ impl Mmu {
                 self.zram[index as usize] = byte;
             }
 
-            _ => unreachable!(),
+            _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
 

@@ -49,7 +49,7 @@ impl Display for Instruction {
             let replacement = match mat.as_str() {
                 "d8" | "a8" | "r8" => format!("${:#02x}", &self.operands[0]),
                 "d16" | "a16" => format!("${:#04x}", LittleEndian::read_u16(&self.operands)),
-                _ => unreachable!(),
+                ty => unreachable!("unhandled data type: {}", ty),
             };
 
             DATA_RE
@@ -74,7 +74,7 @@ macro_rules! instructions {
                     match mat.as_str() {
                         "d8" | "a8" | "r8" => 1,
                         "d16" | "a16" => 2,
-                        _ => unreachable!(),
+                        ty => unreachable!("unhandled data type: {}", ty),
                     }
                 }).unwrap_or_default();
 
