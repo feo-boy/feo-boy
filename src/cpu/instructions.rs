@@ -152,6 +152,22 @@ impl super::Cpu {
                 self.sub(b);
             }
 
+            // RET NZ
+            0xc0 => {
+                if !self.reg.f.contains(ZERO) {
+                    // FIXME: add 12 cycles
+                    self.ret();
+                }
+            }
+
+            // RET NC
+            0xd0 => {
+                if !self.reg.f.contains(CARRY) {
+                    // FIXME: add 12 cycles
+                    self.ret();
+                }
+            }
+
             // LDH (a8),A
             0xe0 => {
                 self.mmu
@@ -285,32 +301,16 @@ impl super::Cpu {
             // CALL NZ,a16
             0xc4 => {
                 if !self.reg.f.contains(ZERO) {
-
-                    let mut address = [0u8; 2];
-                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
-
                     // FIXME: add 12 cycles in this case
+                    self.call(&instruction);
                 }
             }
 
             // CALL NC,a16
             0xd4 => {
                 if !self.reg.f.contains(CARRY) {
-
-                    let mut address = [0u8; 2];
-                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
-
                     // FIXME: add 12 cycles in this case
+                    self.call(&instruction);
                 }
             }
 
@@ -405,10 +405,37 @@ impl super::Cpu {
                 self.xor(b)
             }
 
+            // RET Z
+            0xc8 => {
+                if self.reg.f.contains(ZERO) {
+                    // FIXME: add 12 cycles
+                    self.ret();
+                }
+            }
+
+            // RET C
+            0xd8 => {
+                if self.reg.f.contains(CARRY) {
+                    // FIXME: add 12 cycles
+                    self.ret();
+                }
+            }
+
             // XOR C
             0xa9 => {
                 let c = self.reg.c;
                 self.xor(c);
+            }
+
+            // RET
+            0xc9 => {
+                self.ret();
+            }
+
+            // RETI
+            0xd9 => {
+                self.ret();
+                self.interrupts = true;
             }
 
             // XOR D
@@ -461,32 +488,16 @@ impl super::Cpu {
             // CALL Z,a16
             0xcc => {
                 if self.reg.f.contains(ZERO) {
-
-                    let mut address = [0u8, 2];
-                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
-
                     // FIXME: add 12 cycles in this case
+                    self.call(&instruction);
                 }
             }
 
             // CALL C,a16
             0xdc => {
                 if self.reg.f.contains(CARRY) {
-
-                    let mut address = [0u8, 2];
-                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-                    self.reg.sp.wrapping_sub(1);
-                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
-
                     // FIXME: add 12 cycles in this case
+                    self.call(&instruction);
                 }
             }
 
@@ -510,13 +521,7 @@ impl super::Cpu {
 
             // CALL a16
             0xcd => {
-                let mut address = [0u8, 2];
-                LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-                self.reg.sp.wrapping_sub(1);
-                self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-                self.reg.sp.wrapping_sub(1);
-                self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+                self.call(&instruction);
             }
 
             // LD C,d8
@@ -625,6 +630,29 @@ impl super::Cpu {
         // Perform the subtraction.
         self.reg.a = self.reg.a.wrapping_sub(rhs);
     }
+
+    /// Performs a CALL operation. Does not modify any flags.
+    fn call(&mut self, instruction: &Instruction) {
+        let mut address = [0u8; 2];
+        LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+        self.reg.sp.wrapping_sub(1);
+        self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+        self.reg.sp.wrapping_sub(1);
+        self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+    }
+
+    /// Performs a RET operation. Does not modify and flags.
+    fn ret(&mut self) {
+        let mut address = [0u8; 2];
+
+        address[1] = self.mmu.borrow().read_byte(self.reg.sp);
+        self.reg.sp.wrapping_add(1);
+        address[0] = self.mmu.borrow().read_byte(self.reg.sp);
+        self.reg.sp.wrapping_add(1);
+
+        self.reg.pc = LittleEndian::read_u16(&address);
+    }
 }
 
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
@@ -656,6 +684,8 @@ lazy_static! {
         0x00,       "NOP",          4;
         0x20,       "JR NZ,r8",     8;
         0x90,       "SUB B",        4;
+        0xc0,       "RET NZ",       8;
+        0xd0,       "RET NC",       8;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
         0x01,       "LD BC,d16",    12;
         0x11,       "LD DE,d16",    12;
@@ -703,7 +733,11 @@ lazy_static! {
         0xe7,       "RST 20H",      16;
         0xf7,       "RST 30H",      16;
         0xa8,       "XOR B",        4;
+        0xc8,       "RET Z",        8;
+        0xd8,       "RET C",        8;
         0xa9,       "XOR C",        4;
+        0xc9,       "RET",          16;
+        0xd9,       "RETI",         16;
         0xaa,       "XOR D",        4;
         0x0b,       "DEC BC",       8;
         0x1b,       "DEC DE",       8;

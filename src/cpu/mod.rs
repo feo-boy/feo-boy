@@ -258,6 +258,9 @@ pub struct Cpu {
     /// The clock corresponding to the last instruction cycle.
     clock: Clock,
 
+    /// True if interrupts are enabled.
+    interrupts: bool,
+
     /// Memory unit
     mmu: Rc<RefCell<Mmu>>,
 }
@@ -267,6 +270,7 @@ impl Cpu {
         Cpu {
             reg: Registers::new(),
             clock: Clock::new(),
+            interrupts: false,
             mmu: mmu,
         }
     }
