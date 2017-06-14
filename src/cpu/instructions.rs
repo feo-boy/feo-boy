@@ -149,7 +149,7 @@ impl super::Cpu {
             // SUB B
             0x90 => {
                 let b = self.reg.b;
-                self.sub(b);
+                self.reg.sub(b);
             }
 
             // RET NZ
@@ -202,7 +202,7 @@ impl super::Cpu {
             // SUB C
             0x91 => {
                 let c = self.reg.c;
-                self.sub(c);
+                self.reg.sub(c);
             }
 
             // POP BC
@@ -238,7 +238,7 @@ impl super::Cpu {
             // SUB D
             0x92 => {
                 let d = self.reg.d;
-                self.sub(d);
+                self.reg.sub(d);
             }
 
             // LD (C),A
@@ -264,7 +264,7 @@ impl super::Cpu {
             // SUB E
             0x93 => {
                 let e = self.reg.e;
-                self.sub(e);
+                self.reg.sub(e);
             }
 
             // JP NZ,a16
@@ -295,7 +295,7 @@ impl super::Cpu {
             // SUB H
             0x94 => {
                 let h = self.reg.h;
-                self.sub(h);
+                self.reg.sub(h);
             }
 
             // CALL NZ,a16
@@ -333,7 +333,7 @@ impl super::Cpu {
             // SUB L
             0x95 => {
                 let l = self.reg.l;
-                self.sub(l);
+                self.reg.sub(l);
             }
 
             // PUSH BC
@@ -372,11 +372,11 @@ impl super::Cpu {
             // SUB (HL)
             0x96 => {
                 let byte = self.mmu.borrow().read_byte(self.reg.hl());
-                self.sub(byte);
+                self.reg.sub(byte);
             }
 
             // SUB d8
-            0xd6 => self.sub(instruction.operands[0]),
+            0xd6 => self.reg.sub(instruction.operands[0]),
 
             // LD (HL),A
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
@@ -384,7 +384,7 @@ impl super::Cpu {
             // SUB A
             0x97 => {
                 let a = self.reg.a;
-                self.sub(a);
+                self.reg.sub(a);
             }
 
             // RST 00H
@@ -402,7 +402,7 @@ impl super::Cpu {
             // XOR B
             0xa8 => {
                 let b = self.reg.b;
-                self.xor(b)
+                self.reg.xor(b)
             }
 
             // RET Z
@@ -424,7 +424,7 @@ impl super::Cpu {
             // XOR C
             0xa9 => {
                 let c = self.reg.c;
-                self.xor(c);
+                self.reg.xor(c);
             }
 
             // RET
@@ -441,7 +441,7 @@ impl super::Cpu {
             // XOR D
             0xaa => {
                 let d = self.reg.d;
-                self.xor(d);
+                self.reg.xor(d);
             }
 
             // DEC BC
@@ -459,7 +459,7 @@ impl super::Cpu {
             // XOR E
             0xab => {
                 let e = self.reg.e;
-                self.xor(e);
+                self.reg.xor(e);
             }
 
             0xcb => {
@@ -482,7 +482,7 @@ impl super::Cpu {
             // XOR H
             0xac => {
                 let h = self.reg.h;
-                self.xor(h);
+                self.reg.xor(h);
             }
 
             // CALL Z,a16
@@ -516,7 +516,7 @@ impl super::Cpu {
             // XOR L
             0xad => {
                 let l = self.reg.l;
-                self.xor(l);
+                self.reg.xor(l);
             }
 
             // CALL a16
@@ -539,20 +539,20 @@ impl super::Cpu {
             // XOR (HL)
             0xae => {
                 let byte = self.mmu.borrow().read_byte(self.reg.hl());
-                self.xor(byte);
+                self.reg.xor(byte);
             }
 
             // XOR d8
-            0xee => self.xor(instruction.operands[0]),
+            0xee => self.reg.xor(instruction.operands[0]),
 
             // CP d8
-            0xfe => self.cp(instruction.operands[0]),
+            0xfe => self.reg.cp(instruction.operands[0]),
 
             // XOR A
             0xaf => {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
                 let a = self.reg.a;
-                self.xor(a);
+                self.reg.xor(a);
             }
 
             // RST 08H
@@ -571,13 +571,6 @@ impl super::Cpu {
         }
     }
 
-    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
-    fn xor(&mut self, rhs: u8) {
-        self.reg.a ^= rhs;
-        self.reg.f = Flags::empty();
-        self.reg.f.set(ZERO, self.reg.a == 0);
-    }
-
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
     /// address.
     ///
@@ -587,19 +580,6 @@ impl super::Cpu {
         let pc = self.reg.pc;
         self.push(pc);
         self.reg.pc = addr;
-    }
-
-    /// Compares a byte with the accumulator.
-    ///
-    /// Performs a subtraction with the accumulator without actually setting the accumulator to the
-    /// new value. Only the flags are set.
-    fn cp(&mut self, rhs: u8) {
-        let mut flags = &mut self.reg.f;
-
-        flags.set(ZERO, self.reg.a == rhs);
-        flags.insert(SUBTRACT);
-        flags.set(HALF_CARRY, is_half_carry_sub(self.reg.a, rhs));
-        flags.set(CARRY, is_carry_sub(self.reg.a, rhs));
     }
 
     /// Increments a byte by 1 and sets the flags appropriately.
@@ -622,15 +602,6 @@ impl super::Cpu {
         flags.insert(SUBTRACT);
     }
 
-    /// Subtracts a byte from A and sets the flags appropriately.
-    fn sub(&mut self, rhs: u8) {
-        // Set the flags.
-        self.cp(rhs);
-
-        // Perform the subtraction.
-        self.reg.a = self.reg.a.wrapping_sub(rhs);
-    }
-
     /// Performs a CALL operation. Does not modify any flags.
     fn call(&mut self, address: u16) {
         let pc = self.reg.pc;
@@ -641,6 +612,32 @@ impl super::Cpu {
     /// Performs a RET operation. Does not modify and flags.
     fn ret(&mut self) {
         self.reg.pc = self.pop();
+    }
+}
+
+impl super::Registers {
+    /// Compares a byte with the accumulator.
+    ///
+    /// Performs a subtraction with the accumulator without actually setting the accumulator to the
+    /// new value. Only the flags are set.
+    fn cp(&mut self, rhs: u8) {
+        self.f.set(ZERO, self.a == rhs);
+        self.f.insert(SUBTRACT);
+        self.f.set(HALF_CARRY, is_half_carry_sub(self.a, rhs));
+        self.f.set(CARRY, is_carry_sub(self.a, rhs));
+    }
+
+    /// Subtracts a byte from the accumulator and sets the flags appropriately.
+    fn sub(&mut self, rhs: u8) {
+        self.cp(rhs);
+        self.a = self.a.wrapping_sub(rhs);
+    }
+
+    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
+    fn xor(&mut self, rhs: u8) {
+        self.a ^= rhs;
+        self.f = Flags::empty();
+        self.f.set(ZERO, self.a == 0);
     }
 }
 
