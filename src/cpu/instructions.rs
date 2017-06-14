@@ -716,8 +716,8 @@ lazy_static! {
         0x2c,       "INC L",        4;
         0x3c,       "INC A",        4;
         0xac,       "XOR H",        4;
-        0xcc,       "CALL Z,A16",   12;
-        0xdc,       "CALL C,A16",   12;
+        0xcc,       "CALL Z,a16",   12;
+        0xdc,       "CALL C,a16",   12;
         0x0d,       "DEC C",        4;
         0x1d,       "DEC E",        4;
         0x2d,       "DEC L",        4;
