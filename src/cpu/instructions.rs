@@ -282,6 +282,38 @@ impl super::Cpu {
                 self.sub(h);
             }
 
+            // CALL NZ,a16
+            0xc4 => {
+                if !self.reg.f.contains(ZERO) {
+
+                    let mut address = [0u8; 2];
+                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+
+                    // FIXME: add 12 cycles in this case
+                }
+            }
+
+            // CALL NC,a16
+            0xd4 => {
+                if !self.reg.f.contains(CARRY) {
+
+                    let mut address = [0u8; 2];
+                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+
+                    // FIXME: add 12 cycles in this case
+                }
+            }
+
             // DEC B
             0x05 => Self::dec(&mut self.reg.b, &mut self.reg.f),
 
@@ -426,6 +458,38 @@ impl super::Cpu {
                 self.xor(h);
             }
 
+            // CALL Z,a16
+            0xcc => {
+                if self.reg.f.contains(ZERO) {
+
+                    let mut address = [0u8, 2];
+                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+
+                    // FIXME: add 12 cycles in this case
+                }
+            }
+
+            // CALL C,a16
+            0xdc => {
+                if self.reg.f.contains(CARRY) {
+
+                    let mut address = [0u8, 2];
+                    LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+                    self.reg.sp.wrapping_sub(1);
+                    self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+
+                    // FIXME: add 12 cycles in this case
+                }
+            }
+
             // DEC C
             0x0d => Self::dec(&mut self.reg.c, &mut self.reg.f),
 
@@ -442,6 +506,17 @@ impl super::Cpu {
             0xad => {
                 let l = self.reg.l;
                 self.xor(l);
+            }
+
+            // CALL a16
+            0xcd => {
+                let mut address = [0u8, 2];
+                LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
+
+                self.reg.sp.wrapping_sub(1);
+                self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
+                self.reg.sp.wrapping_sub(1);
+                self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
             }
 
             // LD C,d8
@@ -605,6 +680,8 @@ lazy_static! {
         0x24,       "INC H",        4;
         0x34,       "INC (HL)",     12;
         0x94,       "SUB H",        4;
+        0xc4,       "CALL NZ,a16",  12;
+        0xd4,       "CALL NC,a16",  12;
         0x05,       "DEC B",        4;
         0x15,       "DEC D",        4;
         0x25,       "DEC H",        4;
@@ -639,11 +716,14 @@ lazy_static! {
         0x2c,       "INC L",        4;
         0x3c,       "INC A",        4;
         0xac,       "XOR H",        4;
+        0xcc,       "CALL Z,A16",   12;
+        0xdc,       "CALL C,A16",   12;
         0x0d,       "DEC C",        4;
         0x1d,       "DEC E",        4;
         0x2d,       "DEC L",        4;
         0x3d,       "DEC A",        4;
         0xad,       "XOR L",        4;
+        0xcd,       "CALL a16",     24;
         0x0e,       "LD C,d8",      8;
         0x1e,       "LD E,d8",      8;
         0x2e,       "LD L,d8",      8;
