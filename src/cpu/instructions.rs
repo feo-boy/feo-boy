@@ -302,7 +302,7 @@ impl super::Cpu {
             0xc4 => {
                 if !self.reg.f.contains(ZERO) {
                     // FIXME: add 12 cycles in this case
-                    self.call(&instruction);
+                    self.call(LittleEndian::read_u16(&instruction.operands));
                 }
             }
 
@@ -310,7 +310,7 @@ impl super::Cpu {
             0xd4 => {
                 if !self.reg.f.contains(CARRY) {
                     // FIXME: add 12 cycles in this case
-                    self.call(&instruction);
+                    self.call(LittleEndian::read_u16(&instruction.operands));
                 }
             }
 
@@ -489,7 +489,7 @@ impl super::Cpu {
             0xcc => {
                 if self.reg.f.contains(ZERO) {
                     // FIXME: add 12 cycles in this case
-                    self.call(&instruction);
+                    self.call(LittleEndian::read_u16(&instruction.operands));
                 }
             }
 
@@ -497,7 +497,7 @@ impl super::Cpu {
             0xdc => {
                 if self.reg.f.contains(CARRY) {
                     // FIXME: add 12 cycles in this case
-                    self.call(&instruction);
+                    self.call(LittleEndian::read_u16(&instruction.operands));
                 }
             }
 
@@ -521,7 +521,7 @@ impl super::Cpu {
 
             // CALL a16
             0xcd => {
-                self.call(&instruction);
+                self.call(LittleEndian::read_u16(&instruction.operands));
             }
 
             // LD C,d8
@@ -632,26 +632,13 @@ impl super::Cpu {
     }
 
     /// Performs a CALL operation. Does not modify any flags.
-    fn call(&mut self, instruction: &Instruction) {
-        let mut address = [0u8; 2];
-        LittleEndian::write_u16(&mut address, LittleEndian::read_u16(&instruction.operands));
-
-        self.reg.sp.wrapping_sub(1);
-        self.mmu.borrow_mut().write_byte(self.reg.sp, address[0]);
-        self.reg.sp.wrapping_sub(1);
-        self.mmu.borrow_mut().write_byte(self.reg.sp, address[1]);
+    fn call(&mut self, address: u16) {
+        self.push(address);
     }
 
     /// Performs a RET operation. Does not modify and flags.
     fn ret(&mut self) {
-        let mut address = [0u8; 2];
-
-        address[1] = self.mmu.borrow().read_byte(self.reg.sp);
-        self.reg.sp.wrapping_add(1);
-        address[0] = self.mmu.borrow().read_byte(self.reg.sp);
-        self.reg.sp.wrapping_add(1);
-
-        self.reg.pc = LittleEndian::read_u16(&address);
+        self.reg.pc = self.pop();
     }
 }
 
