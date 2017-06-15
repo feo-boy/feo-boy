@@ -633,7 +633,9 @@ impl super::Cpu {
 
     /// Performs a CALL operation. Does not modify any flags.
     fn call(&mut self, address: u16) {
-        self.push(address);
+        let pc = self.reg.pc;
+        self.push(pc);
+        self.reg.pc = address;
     }
 
     /// Performs a RET operation. Does not modify and flags.
