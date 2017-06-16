@@ -2,44 +2,50 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
+use std::cell::RefCell;
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::ops::Range;
 use std::num::Wrapping;
+use std::ops::Range;
+use std::rc::Rc;
 
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use itertools::Itertools;
 
 use bytes::ByteExt;
 use errors::*;
+use graphics::Ppu;
 
 const BIOS_SIZE: usize = 0x0100;
 
-/// The I/O Registers.
-#[derive(Debug)]
-struct IoRegisters {
-    /// True if the BIOS is currently mapped into memory.
-    bios_mapped: bool,
+/// Operations for memory-like structs.
+pub trait Addressable {
+    /// Returns the byte at a given memory address.
+    fn read_byte(&self, address: u16) -> u8;
 
-    /// True if the sound controller is enabled.
-    sound_enabled: bool,
-}
+    /// Writes a byte to a given memory address.
+    fn write_byte(&mut self, address: u16, value: u8);
 
-impl Default for IoRegisters {
-    /// Resets the I/O registers to their initial state.
-    ///
-    /// - The BIOS is mapped.
-    /// - The sound controller is disabled.
-    fn default() -> Self {
-        IoRegisters {
-            bios_mapped: true,
-            sound_enabled: false,
-        }
+    /// Returns the word at a given memory address, read in little-endian order.
+    fn read_word(&self, address: u16) -> u16 {
+        LittleEndian::read_u16(&[self.read_byte(address), self.read_byte(address + 1)])
+    }
+
+    /// Writes a word to a given memory address in little-endian order.
+    fn write_word(&mut self, address: u16, word: u16) {
+        let mut bytes = [0u8; 2];
+
+        LittleEndian::write_u16(&mut bytes, word);
+
+        self.write_byte(address, bytes[0]);
+        self.write_byte(address + 1, bytes[1]);
     }
 }
 
-/// The memory manager unit.
-pub struct Mmu {
+/// Memory managed by the MMU.
+///
+/// VRAM and OAM are stored in the PPU.
+struct Memory {
     /// BIOS memory.
     bios: Option<[u8; BIOS_SIZE]>,
 
@@ -54,40 +60,69 @@ pub struct Mmu {
     /// Working RAM.
     wram: [u8; 0x2000],
 
-    /// Video RAM.
-    vram: [u8; 0x2000],
-
-    /// Object attribute memory (OAM).
-    oam: [u8; 0xA0],
-
     /// Zero-Page RAM.
     ///
     /// High speed.
     zram: [u8; 0x0080],
+}
 
-    /// The I/O registers.
-    io_reg: IoRegisters,
+impl Default for Memory {
+    fn default() -> Memory {
+        Memory {
+            bios: None,
+            rom: [0; 0x8000],
+            eram: [0; 0x2000],
+            wram: [0; 0x2000],
+            zram: [0; 0x0080],
+        }
+    }
+}
+
+impl Debug for Memory {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let bios: Option<&[u8]> = self.bios.as_ref().map(|b| &b[..]);
+        let rom: &[u8] = &self.rom;
+        let eram: &[u8] = &self.eram;
+        let wram: &[u8] = &self.wram;
+        let zram: &[u8] = &self.zram;
+
+        f.debug_struct("Memory")
+            .field("bios", &bios)
+            .field("rom", &rom)
+            .field("eram", &eram)
+            .field("wram", &wram)
+            .field("zram", &zram)
+            .finish()
+    }
+}
+
+/// The memory manager unit.
+#[derive(Debug)]
+pub struct Mmu {
+    /// ROM and RAM.
+    mem: Memory,
+
+    /// Whether the BIOS is mapped or not.
+    bios_mapped: bool,
 
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Vec<u8>,
+
+    /// A reference to the picture processing unit.
+    ///
+    /// Graphics memory reads and writes are forwarded to this unit, as well as any relevant
+    /// modifications of the I/O registers.
+    ppu: Option<Rc<RefCell<Ppu>>>,
 }
 
 impl Mmu {
     /// Creates a new memory manager unit.
     ///
     /// The initial contents of the memory are unspecified.
-    pub fn new() -> Self {
-        Mmu {
-            bios: None,
-            rom: [0; 0x8000],
-            eram: [0; 0x2000],
-            wram: [0; 0x2000],
-            vram: [0; 0x2000],
-            oam: [0; 0xA0],
-            zram: [0; 0x0080],
-            io_reg: IoRegisters::default(),
-            cartridge_rom: Vec::default(),
-        }
+    pub fn new(ppu: Rc<RefCell<Ppu>>) -> Self {
+        let mut mmu = Mmu::default();
+        mmu.ppu = Some(ppu);
+        mmu
     }
 
     /// Loads a byte slice containing the BIOS into memory.
@@ -102,7 +137,7 @@ impl Mmu {
         let mut bios_memory = [0; BIOS_SIZE];
         bios_memory.copy_from_slice(bios);
 
-        self.bios = Some(bios_memory);
+        self.mem.bios = Some(bios_memory);
 
         Ok(())
     }
@@ -117,8 +152,8 @@ impl Mmu {
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
         self.cartridge_rom = rom.to_vec();
 
-        let initial_banks = &self.cartridge_rom[..self.rom.len()];
-        self.rom.copy_from_slice(initial_banks);
+        let initial_banks = &self.cartridge_rom[..self.mem.rom.len()];
+        self.mem.rom.copy_from_slice(initial_banks);
 
         let title = &rom[0x134..0x144]
             .iter()
@@ -240,36 +275,52 @@ impl Mmu {
 
     /// Returns `true` if the MMU has loaded the BIOS using `Mmu::load_bios`.
     pub fn has_bios(&self) -> bool {
-        self.bios.is_some()
+        self.mem.bios.is_some()
     }
 
     /// Resets the MMU to its initial state, including all I/O registers.
     pub fn reset(&mut self) {
-        self.io_reg = Default::default();
+        self.bios_mapped = true;
     }
 
-    /// Returns the byte at a given memory address.
-    pub fn read_byte(&self, address: u16) -> u8 {
+    /// Create an iterator over the entire memory space.
+    pub fn iter(&self) -> MemoryIterator {
+        MemoryIterator {
+            address_iter: 0x00..0x10000,
+            mmu: self,
+        }
+    }
+
+    fn unmap_bios(&mut self) {
+        info!("unmapping BIOS");
+        self.bios_mapped = false;
+    }
+}
+
+impl Addressable for Mmu {
+    fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
-            0x0000...0x00FF if self.io_reg.bios_mapped && self.has_bios() => {
-                self.bios.unwrap()[address as usize]
+            0x0000...0x00FF if self.bios_mapped && self.has_bios() => {
+                self.mem.bios.unwrap()[address as usize]
             }
 
             // ROM Banks
-            0x0000...0x7FFF => self.rom[address as usize],
+            0x0000...0x7FFF => self.mem.rom[address as usize],
 
             // Graphics RAM
             0x8000...0x9FFF => {
-                let index = address & 0x1FFF;
-                self.vram[index as usize]
+                self.ppu
+                    .as_ref()
+                    .expect("no PPU attached")
+                    .borrow()
+                    .read_byte(address)
             }
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
                 let index = address & 0x1FFF;
-
-                self.eram[index as usize]
+                self.mem.eram[index as usize]
             }
 
             // Working RAM
@@ -277,14 +328,16 @@ impl Mmu {
                 // Addresses E000-FDFF are known as "shadow RAM." They contain an exact copy of
                 // addresses C000-DFFF, until the last 512 bytes of the map.
                 let index = address & 0x1FFF;
-
-                self.wram[index as usize]
+                self.mem.wram[index as usize]
             }
 
-            // OAM
+            // Graphics Sprite Information
             0xFE00...0xFE9F => {
-                let index = address & 0xFF;
-                self.oam[index as usize]
+                self.ppu
+                    .as_ref()
+                    .expect("no PPU attached")
+                    .borrow()
+                    .read_byte(address)
             }
 
             // Reserved, unused
@@ -299,21 +352,14 @@ impl Mmu {
             // Zero-Page RAM
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
-
-                self.zram[index as usize]
+                self.mem.zram[index as usize]
             }
 
             _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
 
-    /// Returns the word at a given memory address, read in little-endian order.
-    pub fn read_word(&self, address: u16) -> u16 {
-        LittleEndian::read_u16(&[self.read_byte(address), self.read_byte(address + 1)])
-    }
-
-    /// Writes a byte to a given memory address.
-    pub fn write_byte(&mut self, address: u16, byte: u8) {
+    fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             // BIOS and ROM Banks
             0x0000...0x7FFF => {
@@ -324,26 +370,32 @@ impl Mmu {
 
             // Graphics RAM
             0x8000...0x9FFF => {
-                let index = address & 0x1FFF;
-                self.vram[index as usize] = byte;
+                self.ppu
+                    .as_ref()
+                    .expect("no PPU attached")
+                    .borrow_mut()
+                    .write_byte(address, byte)
             }
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
                 let index = address & 0x1FFF;
-                self.eram[index as usize] = byte;
+                self.mem.eram[index as usize] = byte;
             }
 
             // Working RAM
             0xC000...0xFDFF => {
                 let index = address & 0x1FFF;
-                self.wram[index as usize] = byte;
+                self.mem.wram[index as usize] = byte;
             }
 
             // Graphics Sprite Information
             0xFE00...0xFE9F => {
-                let index = address & 0xFF;
-                self.oam[index as usize] = byte;
+                self.ppu
+                    .as_ref()
+                    .expect("no PPU attached")
+                    .borrow_mut()
+                    .write_byte(address, byte)
             }
 
             // Reserved, unused
@@ -358,12 +410,12 @@ impl Mmu {
                         // Only the high bit is writable.
                         if byte.has_bit_set(7) {
                             info!("enabling sound controller");
-                            self.io_reg.sound_enabled = true;
+                            warn!("sound controller not implemented");
                         }
                     }
                     // Unmap BIOS
                     0xFF50 => {
-                        if self.io_reg.bios_mapped {
+                        if self.bios_mapped {
                             self.unmap_bios()
                         }
                     }
@@ -374,64 +426,23 @@ impl Mmu {
             // Zero-Page RAM
             0xFF80...0xFFFF => {
                 let index = address & 0x7F;
-                self.zram[index as usize] = byte;
+                self.mem.zram[index as usize] = byte;
             }
 
             _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
-
-    /// Writes a word to a given memory address in little-endian order.
-    pub fn write_word(&mut self, address: u16, word: u16) {
-        let mut bytes = [0u8; 2];
-
-        LittleEndian::write_u16(&mut bytes, word);
-
-        self.write_byte(address, bytes[0]);
-        self.write_byte(address + 1, bytes[1]);
-    }
-
-    /// Create an iterator over the entire memory space.
-    pub fn iter(&self) -> MemoryIterator {
-        MemoryIterator {
-            address_iter: 0x00..0x10000,
-            mmu: self,
-        }
-    }
-
-    fn unmap_bios(&mut self) {
-        info!("unmapping BIOS");
-        self.io_reg.bios_mapped = false;
-    }
-}
-
-impl Debug for Mmu {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let bios: Option<&[u8]> = self.bios.as_ref().map(|b| &b[..]);
-        let rom: &[u8] = &self.rom;
-        let eram: &[u8] = &self.eram;
-        let wram: &[u8] = &self.wram;
-        let vram: &[u8] = &self.vram;
-        let oam: &[u8] = &self.oam;
-        let zram: &[u8] = &self.zram;
-
-        f.debug_struct("Mmu")
-            .field("bios", &bios)
-            .field("rom", &rom)
-            .field("eram", &eram)
-            .field("wram", &wram)
-            .field("vram", &vram)
-            .field("oam", &oam)
-            .field("zram", &zram)
-            .field("io_reg", &self.io_reg)
-            .field("cartridge_rom", &self.cartridge_rom)
-            .finish()
-    }
 }
 
 impl Default for Mmu {
-    fn default() -> Self {
-        Mmu::new()
+    /// Returns an MMU with no components attached.
+    fn default() -> Mmu {
+        Mmu {
+            mem: Default::default(),
+            bios_mapped: true,
+            ppu: None,
+            cartridge_rom: Default::default(),
+        }
     }
 }
 
@@ -479,115 +490,100 @@ impl<'a> Iterator for MemoryIterator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::Mmu;
+    use super::{Mmu, Addressable};
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use graphics::Ppu;
 
     #[test]
     fn dump() {
-        Mmu::new().to_string();
+        let ppu = Ppu::new();
+        let mmu = Mmu::new(Rc::new(RefCell::new(ppu)));
+
+        mmu.to_string();
     }
 
     #[test]
     fn bios() {
-        let mut mmu = Mmu::new();
-        assert!(mmu.io_reg.bios_mapped);
+        let mut mmu = Mmu::default();
+        assert!(mmu.bios_mapped);
 
-        let mut bios_memory = [0; super::BIOS_SIZE];
-        bios_memory[0] = 1;
-        bios_memory[0xFF] = 2;
-        mmu.bios = Some(bios_memory);
+        let mut bios = [0; super::BIOS_SIZE];
+        bios[0] = 1;
+        bios[0xff] = 2;
+        mmu.load_bios(&bios).unwrap();
 
         assert_eq!(mmu.read_byte(0x0000), 1);
-
         assert_eq!(mmu.read_byte(0x00FF), 2);
 
         mmu.write_byte(0xFF50, 1);
-        assert!(!mmu.io_reg.bios_mapped);
+        assert!(!mmu.bios_mapped);
     }
 
     #[test]
     fn rom() {
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu::default();
         mmu.unmap_bios();
 
-        mmu.rom[0] = 1;
+        mmu.mem.rom[0] = 1;
         assert_eq!(mmu.read_byte(0x0000), 1);
 
-        mmu.rom[0x100] = 2;
+        mmu.mem.rom[0x100] = 2;
         assert_eq!(mmu.read_byte(0x0100), 2);
 
-        mmu.rom[0x7FFF] = 3;
+        mmu.mem.rom[0x7FFF] = 3;
         assert_eq!(mmu.read_byte(0x7FFF), 3);
     }
 
     #[test]
-    fn vram() {
-        let mut mmu = Mmu::new();
-
-        mmu.vram[0] = 1;
-        assert_eq!(mmu.read_byte(0x8000), 1);
-
-        mmu.vram[0x1FFF] = 2;
-        assert_eq!(mmu.read_byte(0x9FFF), 2);
-    }
-
-    #[test]
     fn eram() {
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu::default();
 
-        mmu.eram[0] = 1;
+        mmu.mem.eram[0] = 1;
         assert_eq!(mmu.read_byte(0xA000), 1);
 
-        mmu.eram[0x1FFF] = 2;
+        mmu.mem.eram[0x1FFF] = 2;
         assert_eq!(mmu.read_byte(0xBFFF), 2);
     }
 
     #[test]
     fn wram() {
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu::default();
 
-        mmu.wram[0] = 1;
+        mmu.mem.wram[0] = 1;
         assert_eq!(mmu.read_byte(0xC000), 1);
         assert_eq!(mmu.read_byte(0xE000), 1);
 
-        mmu.wram[0x1FFF] = 2;
+        mmu.mem.wram[0x1FFF] = 2;
         assert_eq!(mmu.read_byte(0xDFFF), 2);
 
-        mmu.wram[0x1FFF - 512] = 3;
+        mmu.mem.wram[0x1FFF - 512] = 3;
         assert_eq!(mmu.read_byte(0xFDFF), 3);
     }
 
     #[test]
-    fn oam() {
-        let mut mmu = Mmu::new();
-
-        mmu.oam[0] = 1;
-        assert_eq!(mmu.read_byte(0xFE00), 1);
-
-        mmu.oam[0x9F] = 2;
-        assert_eq!(mmu.read_byte(0xFE9F), 2);
-    }
-
-    #[test]
     fn zram() {
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu::default();
 
-        mmu.zram[0] = 1;
+        mmu.mem.zram[0] = 1;
         assert_eq!(mmu.read_byte(0xFF80), 1);
 
-        mmu.zram[0x7F] = 2;
+        mmu.mem.zram[0x7F] = 2;
         assert_eq!(mmu.read_byte(0xFFFF), 2);
     }
 
     #[test]
     fn words() {
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu::default();
 
-        mmu.wram[0] = 0xAB;
-        mmu.wram[1] = 0xCD;
+        mmu.mem.wram[0] = 0xAB;
+        mmu.mem.wram[1] = 0xCD;
         assert_eq!(mmu.read_word(0xC000), 0xCDAB);
 
         mmu.write_word(0xFF80, 0xABCD);
-        assert_eq!(mmu.zram[0], 0xCD);
-        assert_eq!(mmu.zram[1], 0xAB);
+        assert_eq!(mmu.mem.zram[0], 0xCD);
+        assert_eq!(mmu.mem.zram[1], 0xAB);
     }
 }

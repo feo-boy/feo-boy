@@ -28,26 +28,21 @@ use std::rc::Rc;
 
 use cpu::Cpu;
 use errors::*;
-use graphics::Gpu;
+use graphics::Ppu;
 use memory::Mmu;
 
 pub struct Emulator {
     cpu: Rc<RefCell<Cpu>>,
     mmu: Rc<RefCell<Mmu>>,
-    gpu: Gpu,
 }
 
 impl Emulator {
     pub fn new() -> Self {
-        let mmu = Rc::new(RefCell::new(Mmu::new()));
+        let ppu = Rc::new(RefCell::new(Ppu::new()));
+        let mmu = Rc::new(RefCell::new(Mmu::new(Rc::clone(&ppu))));
         let cpu = Rc::new(RefCell::new(Cpu::new(Rc::clone(&mmu))));
-        let gpu = Gpu::new(Rc::clone(&mmu), Rc::clone(&cpu));
 
-        Emulator {
-            mmu: mmu,
-            cpu: cpu,
-            gpu: gpu,
-        }
+        Emulator { mmu: mmu, cpu: cpu }
     }
 
     /// Reset all emulator components to their initial states.

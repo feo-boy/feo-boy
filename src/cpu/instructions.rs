@@ -8,6 +8,7 @@ use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+use memory::Addressable;
 
 lazy_static! {
     /// Matches instruction descriptions that take operands.

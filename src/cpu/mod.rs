@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder};
 
-use memory::Mmu;
+use memory::{Addressable, Mmu};
 
 bitflags! {
     /// CPU status flags.
@@ -349,13 +349,13 @@ mod tests {
 
     #[test]
     fn skip_bios() {
-        let mmu = Rc::new(RefCell::new(Mmu::new()));
+        let mmu = Rc::new(RefCell::new(Mmu::default()));
         let mut cpu = Cpu::new(Rc::clone(&mmu));
         cpu.reset();
 
         assert_eq!(cpu.reg.pc, 0x100);
 
-        let mmu = Rc::new(RefCell::new(Mmu::new()));
+        let mmu = Rc::new(RefCell::new(Mmu::default()));
 
         let mut cpu = Cpu::new(Rc::clone(&mmu));
         // Load dummy BIOS
