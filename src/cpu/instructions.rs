@@ -283,6 +283,9 @@ impl super::Cpu {
                 }
             }
 
+            // DI
+            0xf3 => self.interrupts = false,
+
             // INC B
             0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
 
@@ -699,6 +702,7 @@ lazy_static! {
         0x33,       "INC SP",       8;
         0x93,       "SUB E",        4;
         0xc3,       "JP NZ,a16",    12;
+        0xf3,       "DI",           4;
         0x04,       "INC B",        4;
         0x14,       "INC D",        4;
         0x24,       "INC H",        4;
