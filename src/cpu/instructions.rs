@@ -47,8 +47,8 @@ impl Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let instruction = if let Some(mat) = DATA_RE.find(self.def.description) {
             let replacement = match mat.as_str() {
-                "d8" | "a8" | "r8" => format!("${:#02x}", &self.operands[0]),
-                "d16" | "a16" => format!("${:#04x}", LittleEndian::read_u16(&self.operands)),
+                "d8" | "a8" | "r8" => format!("${:#04x}", &self.operands[0]),
+                "d16" | "a16" => format!("${:#06x}", LittleEndian::read_u16(&self.operands)),
                 ty => unreachable!("unhandled data type: {}", ty),
             };
 
@@ -97,7 +97,7 @@ impl super::Cpu {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
         let def = INSTRUCTIONS[byte as usize].as_ref().expect(&format!(
-            "could not find data for instruction {:#0x}",
+            "could not find data for instruction {:#04x}",
             byte
         ));
 
@@ -153,6 +153,12 @@ impl super::Cpu {
             0x90 => {
                 let b = self.reg.b;
                 self.reg.sub(b);
+            }
+
+            // AND B
+            0xa0 => {
+                let b = self.reg.b;
+                self.reg.and(b);
             }
 
             // RET NZ
@@ -213,6 +219,12 @@ impl super::Cpu {
                 self.reg.sub(c);
             }
 
+            // AND C
+            0xa1 => {
+                let c = self.reg.c;
+                self.reg.and(c);
+            }
+
             // POP BC
             0xc1 => {
                 let bc = self.pop();
@@ -249,6 +261,12 @@ impl super::Cpu {
                 self.reg.sub(d);
             }
 
+            // AND D
+            0xa2 => {
+                let d = self.reg.d;
+                self.reg.and(d);
+            }
+
             // LD (C),A
             // LD ($FF00+C),A
             0xe2 => {
@@ -272,6 +290,12 @@ impl super::Cpu {
             0x93 => {
                 let e = self.reg.e;
                 self.reg.sub(e);
+            }
+
+            // AND E
+            0xa3 => {
+                let e = self.reg.e;
+                self.reg.and(e);
             }
 
             // JP NZ,a16
@@ -306,6 +330,12 @@ impl super::Cpu {
             0x94 => {
                 let h = self.reg.h;
                 self.reg.sub(h);
+            }
+
+            // AND H
+            0xa4 => {
+                let h = self.reg.h;
+                self.reg.and(h);
             }
 
             // CALL NZ,a16
@@ -344,6 +374,12 @@ impl super::Cpu {
             0x95 => {
                 let l = self.reg.l;
                 self.reg.sub(l);
+            }
+
+            // AND L
+            0xa5 => {
+                let l = self.reg.l;
+                self.reg.and(l);
             }
 
             // PUSH BC
@@ -385,8 +421,20 @@ impl super::Cpu {
                 self.reg.sub(byte);
             }
 
+            // AND (HL)
+            0xa6 => {
+                let byte = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.and(byte);
+            }
+
             // SUB d8
             0xd6 => self.reg.sub(instruction.operands[0]),
+
+            // AND d8
+            0xe6 => {
+                let byte = instruction.operands[0];
+                self.reg.and(byte);
+            }
 
             // LD (HL),A
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
@@ -395,6 +443,12 @@ impl super::Cpu {
             0x97 => {
                 let a = self.reg.a;
                 self.reg.sub(a);
+            }
+
+            // AND A
+            0xa7 => {
+                let a = self.reg.a;
+                self.reg.and(a);
             }
 
             // RST 00H
@@ -626,6 +680,15 @@ impl super::Cpu {
 }
 
 impl super::Registers {
+    /// Bitwise ANDs a byte with the accumulator and sets the flags appropriately.
+    fn and(&mut self, rhs: u8) {
+        self.a &= rhs;
+
+        self.f.remove(SUBTRACT | CARRY);
+        self.f.insert(HALF_CARRY);
+        self.f.set(ZERO, self.a == 0);
+    }
+
     /// Compares a byte with the accumulator.
     ///
     /// Performs a subtraction with the accumulator without actually setting the accumulator to the
@@ -680,6 +743,7 @@ lazy_static! {
         0x00,       "NOP",          4;
         0x20,       "JR NZ,r8",     8;
         0x90,       "SUB B",        4;
+        0xa0,       "AND B",        4;
         0xc0,       "RET NZ",       8;
         0xd0,       "RET NC",       8;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
@@ -689,18 +753,21 @@ lazy_static! {
         0x21,       "LD HL,d16",    12;
         0x31,       "LD SP,d16",    12;
         0x91,       "SUB C",        4;
+        0xa1,       "AND C",        4;
         0xc1,       "POP BC",       12;
         0xd1,       "POP DC",       12;
         0xe1,       "POP HL",       12;
         0xf1,       "POP AF",       12;
         0x32,       "LD (HL-),A",   8;
         0x92,       "SUB D",        4;
+        0xa2,       "AND D",        4;
         0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
         0x03,       "INC BC",       8;
         0x13,       "INC DE",       8;
         0x23,       "INC HL",       8;
         0x33,       "INC SP",       8;
         0x93,       "SUB E",        4;
+        0xa3,       "AND E",        4;
         0xc3,       "JP NZ,a16",    12;
         0xf3,       "DI",           4;
         0x04,       "INC B",        4;
@@ -708,6 +775,7 @@ lazy_static! {
         0x24,       "INC H",        4;
         0x34,       "INC (HL)",     12;
         0x94,       "SUB H",        4;
+        0xa4,       "AND H",        4;
         0xc4,       "CALL NZ,a16",  12;
         0xd4,       "CALL NC,a16",  12;
         0x05,       "DEC B",        4;
@@ -715,6 +783,7 @@ lazy_static! {
         0x25,       "DEC H",        4;
         0x35,       "DEC (HL)",     12;
         0x95,       "SUB L",        4;
+        0xa5,       "AND L",        4;
         0xc5,       "PUSH BC",      16;
         0xd5,       "PUSH DE",      16;
         0xe5,       "PUSH HL",      16;
@@ -723,9 +792,12 @@ lazy_static! {
         0x16,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
         0x96,       "SUB (HL)",     8;
+        0xa6,       "AND (HL)",     8;
         0xd6,       "SUB d8",       8;
+        0xe6,       "AND d8",       8;
         0x77,       "LD (HL),A",    8;
         0x97,       "SUB A",        4;
+        0xa7,       "AND A",        4;
         0xc7,       "RST 00H",      16;
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
