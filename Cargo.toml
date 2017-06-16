@@ -11,7 +11,6 @@ authors = [
 name = "feo-boy"
 doc = false
 path = "src/main.rs"
-test = false
 
 [dependencies]
 bitflags = "0.9"

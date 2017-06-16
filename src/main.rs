@@ -3,12 +3,14 @@ extern crate feo_boy;
 #[macro_use]
 extern crate clap;
 
+#[macro_use]
+extern crate error_chain;
+
 extern crate pretty_env_logger;
 
 use std::io::prelude::*;
 use std::io;
 use std::path::PathBuf;
-use std::process;
 
 use clap::{App, AppSettings, Arg};
 
@@ -22,7 +24,7 @@ struct Config {
     debug: bool,
 }
 
-fn run(config: Config) -> Result<()> {
+fn start_emulator(config: Config) -> Result<()> {
     let mut emulator = Emulator::new();
 
     if let Some(bios) = config.bios {
@@ -66,7 +68,7 @@ fn run(config: Config) -> Result<()> {
     Ok(())
 }
 
-fn main() {
+fn run() -> Result<()> {
     pretty_env_logger::init().unwrap();
 
     let matches = App::new(crate_name!())
@@ -95,20 +97,7 @@ fn main() {
         debug: matches.is_present("debug"),
     };
 
-    if let Err(ref e) = run(config) {
-        let stderr = &mut io::stderr();
-        let errmsg = "Error writing to stderr";
-
-        writeln!(stderr, "error: {}", e).expect(errmsg);
-
-        for e in e.iter().skip(1) {
-            writeln!(stderr, "caused by: {}", e).expect(errmsg);
-        }
-
-        if let Some(backtrace) = e.backtrace() {
-            writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
-        }
-
-        process::exit(1);
-    }
+    start_emulator(config)
 }
+
+quick_main!(run);
