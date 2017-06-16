@@ -292,7 +292,7 @@ impl Mmu {
 
             // I/O Registers
             0xFF00...0xFF7F => {
-                error!("read unimplemented memory: I/O registers");
+                error!("read unimplemented I/O register {:#04x}", address);
                 0x00
             }
 

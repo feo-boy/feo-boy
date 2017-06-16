@@ -177,6 +177,12 @@ impl super::Cpu {
                 self.mmu.borrow_mut().write_byte(address, self.reg.a)
             }
 
+            // LDH A,(a8)
+            0xf0 => {
+                let address = 0xff00u16 + &instruction.operands[0].into();
+                self.reg.a = self.mmu.borrow().read_byte(address);
+            }
+
             // LD BC,d16
             0x01 => {
                 self.reg.bc_mut().write(LittleEndian::read_u16(
@@ -674,6 +680,7 @@ lazy_static! {
         0xc0,       "RET NZ",       8;
         0xd0,       "RET NC",       8;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
+        0xf0,       "LDH A,(a8)",   12;     // AKA LD ($FF00+a8),A
         0x01,       "LD BC,d16",    12;
         0x11,       "LD DE,d16",    12;
         0x21,       "LD HL,d16",    12;
