@@ -95,7 +95,8 @@ impl Mmu {
     /// Returns an error if the slice is not the correct length.
     pub fn load_bios(&mut self, bios: &[u8]) -> Result<()> {
         if bios.len() != BIOS_SIZE {
-            bail!(ErrorKind::InvalidBios(format!("must be exactly {} bytes", BIOS_SIZE)));
+            let msg = format!("must be exactly {} bytes", BIOS_SIZE);
+            bail!(ErrorKind::InvalidBios(msg));
         }
 
         let mut bios_memory = [0; BIOS_SIZE];
@@ -119,11 +120,11 @@ impl Mmu {
         let initial_banks = &self.cartridge_rom[..self.rom.len()];
         self.rom.copy_from_slice(initial_banks);
 
-        info!("title: {}",
-              &rom[0x134..0x144]
-                  .iter()
-                  .map(|&c| c as char)
-                  .collect::<String>());
+        let title = &rom[0x134..0x144]
+            .iter()
+            .map(|&c| c as char)
+            .collect::<String>();
+        info!("title: {}", title);
 
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
@@ -167,11 +168,10 @@ impl Mmu {
             _ => None,
         };
         let bank_info = num_banks
-            .map(|n| if n == 0 {
-                     String::from("no banking")
-                 } else {
-                     format!("{} banks", n)
-                 })
+            .map(|n| match n {
+                0 => String::from("no banking"),
+                n => format!("{} banks", n),
+            })
             .unwrap_or_else(|| String::from("no bank information"));
         info!("ROM size: {}KB ({})", 32 << rom[0x148], bank_info);
 
@@ -185,20 +185,18 @@ impl Mmu {
             _ => None,
         };
         let eram_info = eram_size
-            .map(|n| if n == 0 {
-                     String::from("none")
-                 } else {
-                     format!("{}KB", n)
-                 })
+            .map(|n| match n {
+                0 => String::from("none"),
+                n => format!("{}KB", n),
+            })
             .unwrap_or_else(|| String::from("no information"));
         info!("external RAM size: {}", eram_info);
 
-        info!("region: {}",
-              if rom[0x14A] == 0 {
-                  "Japanese"
-              } else {
-                  "Non-Japanese "
-              });
+        let region = match rom[0x14A] {
+            0 => "Japanese",
+            _ => "Non-Japanese",
+        };
+        info!("region: {}", region);
 
         let header_sum = {
             let mut x = Wrapping(0u8);
@@ -210,9 +208,11 @@ impl Mmu {
         };
         let header_checksum = rom[0x14D];
         if header_sum != header_checksum {
-            let msg = format!("header checksum {:#02} is not equal to sum {:#02}",
-                              header_checksum,
-                              header_sum);
+            let msg = format!(
+                "header checksum {:#02} is not equal to sum {:#02}",
+                header_checksum,
+                header_sum
+            );
             bail!(ErrorKind::InvalidCartridge(msg))
         }
         info!("header checksum OK");
@@ -220,17 +220,19 @@ impl Mmu {
         let global_sum: Wrapping<u16> = rom.iter()
             .enumerate()
             .flat_map(|(i, byte)| match i {
-                          0x14E | 0x14F => None,
-                          _ => Some(Wrapping(*byte as u16)),
-                      })
+                0x14E | 0x14F => None,
+                _ => Some(Wrapping(*byte as u16)),
+            })
             .sum();
         let global_checksum = BigEndian::read_u16(&rom[0x14E..0x150]);
         if global_sum.0 == global_checksum {
             info!("global checksum OK");
         } else {
-            info!("global checksum FAILED: {:#04x} (sum) != {:#04x} (checksum)",
-                  global_sum,
-                  global_checksum);
+            info!(
+                "global checksum FAILED: {:#04x} (sum) != {:#04x} (checksum)",
+                global_sum,
+                global_checksum
+            );
         }
 
         Ok(())
@@ -469,9 +471,9 @@ impl<'a> Iterator for MemoryIterator<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.address_iter
-            .next()
-            .map(|addr| self.mmu.read_byte(addr as u16))
+        self.address_iter.next().map(|addr| {
+            self.mmu.read_byte(addr as u16)
+        })
     }
 }
 

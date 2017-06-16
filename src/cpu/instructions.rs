@@ -96,9 +96,10 @@ impl super::Cpu {
     pub fn fetch(&self) -> Instruction {
         let byte = self.mmu.borrow().read_byte(self.reg.pc);
 
-        let def = INSTRUCTIONS[byte as usize]
-            .as_ref()
-            .expect(&format!("could not find data for instruction {:#0x}", byte));
+        let def = INSTRUCTIONS[byte as usize].as_ref().expect(&format!(
+            "could not find data for instruction {:#0x}",
+            byte
+        ));
 
         let operands = (0..def.num_operands)
             .map(|i| self.mmu.borrow().read_byte(self.reg.pc + 1 + i as u16))
@@ -119,8 +120,10 @@ impl super::Cpu {
         trace!("{:?}", instruction);
 
         // Check that we have exactly as many operands as the instruction requires.
-        debug_assert_eq!(instruction.def.num_operands as usize,
-                         instruction.operands.len());
+        debug_assert_eq!(
+            instruction.def.num_operands as usize,
+            instruction.operands.len()
+        );
 
         // Increment the program counter (PC) *before* executing the instruction.
         //
@@ -170,30 +173,29 @@ impl super::Cpu {
 
             // LDH (a8),A
             0xe0 => {
-                self.mmu
-                    .borrow_mut()
-                    .write_byte(0xff00u16 + &instruction.operands[0].into(), self.reg.a)
+                let address = 0xff00u16 + &instruction.operands[0].into();
+                self.mmu.borrow_mut().write_byte(address, self.reg.a)
             }
 
             // LD BC,d16
             0x01 => {
-                self.reg
-                    .bc_mut()
-                    .write(LittleEndian::read_u16(&instruction.operands))
+                self.reg.bc_mut().write(LittleEndian::read_u16(
+                    &instruction.operands,
+                ))
             }
 
             // LD DE,d16
             0x11 => {
-                self.reg
-                    .de_mut()
-                    .write(LittleEndian::read_u16(&instruction.operands))
+                self.reg.de_mut().write(LittleEndian::read_u16(
+                    &instruction.operands,
+                ))
             }
 
             // LD HL,d16
             0x21 => {
-                self.reg
-                    .hl_mut()
-                    .write(LittleEndian::read_u16(&instruction.operands))
+                self.reg.hl_mut().write(LittleEndian::read_u16(
+                    &instruction.operands,
+                ))
             }
 
             // LD SP,d16
@@ -244,9 +246,8 @@ impl super::Cpu {
             // LD (C),A
             // LD ($FF00+C),A
             0xe2 => {
-                self.mmu
-                    .borrow_mut()
-                    .write_byte(0xFF00 + self.reg.c as u16, self.reg.a);
+                let address = 0xff00u16 + &self.reg.c.into();
+                self.mmu.borrow_mut().write_byte(address, self.reg.a);
             }
 
             // INC BC
