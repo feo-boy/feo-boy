@@ -968,4 +968,30 @@ mod tests {
         // is implemented.
         // assert_eq!(cpu.mmu.borrow().read_byte(0xFF11), 0xab);
     }
+
+    #[test]
+    fn call() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        cpu.reg.sp = 0xffff;
+        cpu.reg.pc = 1;
+        cpu.call(4);
+
+        assert_eq!(cpu.reg.pc, 4);
+        assert_eq!(cpu.pop(), 1);
+    }
+
+    #[test]
+    fn ret() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        cpu.reg.sp = 0xffff;
+        cpu.push(5);
+        cpu.ret();
+
+        assert_eq!(cpu.reg.sp, 0xffff);
+        assert_eq!(cpu.reg.pc, 5);
+    }
 }
