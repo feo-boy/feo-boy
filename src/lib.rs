@@ -21,6 +21,7 @@ pub mod graphics;
 pub mod memory;
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -34,6 +35,7 @@ use memory::Mmu;
 pub struct Emulator {
     cpu: Rc<RefCell<Cpu>>,
     mmu: Rc<RefCell<Mmu>>,
+    debug: Option<Debugger>,
 }
 
 impl Emulator {
@@ -42,7 +44,17 @@ impl Emulator {
         let mmu = Rc::new(RefCell::new(Mmu::new(Rc::clone(&ppu))));
         let cpu = Rc::new(RefCell::new(Cpu::new(Rc::clone(&mmu))));
 
-        Emulator { mmu: mmu, cpu: cpu }
+        Emulator {
+            mmu,
+            cpu,
+            debug: None,
+        }
+    }
+
+    pub fn new_with_debug() -> Self {
+        let mut emulator = Emulator::new();
+        emulator.debug = Some(Debugger::new());
+        emulator
     }
 
     /// Reset all emulator components to their initial states.
@@ -89,7 +101,55 @@ impl Emulator {
         self.cpu.borrow_mut().to_string()
     }
 
+    /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        self.cpu.borrow_mut().step()
+        self.cpu.borrow_mut().step();
+
+        if let Some(ref mut debugger) = self.debug {
+            let pc = self.cpu.borrow().reg.pc;
+            if debugger.breakpoints.contains(&pc) {
+                debugger.paused = true;
+            }
+        }
+    }
+
+    /// Resume execution after pausing.
+    pub fn resume(&mut self) {
+        if let Some(ref mut debugger) = self.debug {
+            debugger.paused = false;
+        }
+    }
+
+    /// Whether the emulator is paused.
+    pub fn is_paused(&self) -> bool {
+        self.debug.as_ref().map_or(false, |d| d.paused)
+    }
+
+    /// Insert a breakpoint at a given memory address.
+    pub fn add_breakpoint(&mut self, breakpoint: u16) {
+        if let Some(ref mut debugger) = self.debug {
+            debugger.breakpoints.insert(breakpoint);
+        }
+    }
+
+    /// Return a list of active breakpoints.
+    pub fn breakpoints(&self) -> Vec<u16> {
+        self.debug.as_ref().map_or(vec![], |d| {
+            d.breakpoints.iter().cloned().collect()
+        })
+    }
+}
+
+struct Debugger {
+    breakpoints: HashSet<u16>,
+    paused: bool,
+}
+
+impl Debugger {
+    fn new() -> Debugger {
+        Debugger {
+            breakpoints: Default::default(),
+            paused: true,
+        }
     }
 }

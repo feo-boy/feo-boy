@@ -11,6 +11,7 @@ extern crate pretty_env_logger;
 use std::io::prelude::*;
 use std::io;
 use std::path::PathBuf;
+use std::process;
 
 use clap::{App, AppSettings, Arg};
 
@@ -24,8 +25,67 @@ struct Config {
     debug: bool,
 }
 
+fn parse_breakpoint(command: &str) -> Result<u16> {
+    let components = command.split(" ").collect::<Vec<_>>();
+
+    if components.len() != 2 {
+        bail!("`b` takes a single argument");
+    }
+
+    let breakpoint = &components[1];
+    if !breakpoint.starts_with("0x") {
+        bail!("breakpoint must start with '0x'");
+    }
+
+    let breakpoint = u16::from_str_radix(&breakpoint[2..], 16).chain_err(
+        || "could not parse hexadecimal number",
+    )?;
+    Ok(breakpoint)
+}
+
+fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
+    match &command[..1] {
+        "s" => emulator.step(),
+        "b" => {
+            let breakpoint = parse_breakpoint(&command)?;
+            emulator.add_breakpoint(breakpoint);
+        }
+        "l" => {
+            let breakpoints = emulator.breakpoints();
+            if breakpoints.is_empty() {
+                println!("no breakpoints");
+            } else {
+                println!("breakpoints:");
+                for breakpoint in emulator.breakpoints() {
+                    println!("{:#06x}", breakpoint);
+                }
+            }
+        }
+        "r" => emulator.resume(),
+        "d" => println!("{}", emulator.dump_memory()),
+        "c" => println!("{}", emulator.dump_state()),
+        "q" => process::exit(0),
+        "?" => {
+            println!("s: step emulator");
+            println!("b: add breakpoint");
+            println!("l: list breakpoints");
+            println!("r: resume execution");
+            println!("d: dump memory");
+            println!("c: cpu state");
+            println!("q: quit");
+        }
+        _ => println!("unknown command"),
+    }
+
+    Ok(())
+}
+
 fn start_emulator(config: Config) -> Result<()> {
-    let mut emulator = Emulator::new();
+    let mut emulator = if config.debug {
+        Emulator::new_with_debug()
+    } else {
+        Emulator::new()
+    };
 
     if let Some(bios) = config.bios {
         emulator.load_bios(bios).chain_err(|| "could not load BIOS")?;
@@ -41,31 +101,18 @@ fn start_emulator(config: Config) -> Result<()> {
     let mut stdin = stdin.lock().lines();
 
     loop {
-        if config.debug {
-            print!("feo debug [sdcq?]: ");
+        if emulator.is_paused() {
+            print!("feo debug [sblrdcq?]: ");
             io::stdout().flush()?;
 
-            if let Some(answer) = stdin.next() {
-                match answer?.as_str() {
-                    "s" => emulator.step(),
-                    "d" => println!("{}", emulator.dump_memory()),
-                    "c" => println!("{}", emulator.dump_state()),
-                    "q" => break,
-                    "?" => {
-                        println!("d: dump memory");
-                        println!("c: cpu state");
-                        println!("s: step emulator");
-                        println!("q: quit");
-                    }
-                    _ => println!("unknown command"),
-                }
+            if let Some(command) = stdin.next() {
+                let command = command?.as_str().to_owned();
+                parse_command(&mut emulator, &command)?;
             }
         } else {
             emulator.step();
         }
     }
-
-    Ok(())
 }
 
 fn run() -> Result<()> {

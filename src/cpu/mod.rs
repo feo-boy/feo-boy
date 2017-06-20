@@ -253,7 +253,7 @@ impl Clock {
 #[derive(Debug)]
 pub struct Cpu {
     /// Registers
-    reg: Registers,
+    pub reg: Registers,
 
     /// The clock corresponding to the last instruction cycle.
     clock: Clock,
