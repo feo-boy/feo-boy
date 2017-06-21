@@ -288,6 +288,22 @@ impl super::Cpu {
                 self.reg.and(d);
             }
 
+            // JP NZ,a16
+            0xc2 => {
+                if !self.reg.f.contains(ZERO) {
+                    self.reg.pc = LittleEndian::read_u16(&instruction.operands);
+                    cycles += 4;
+                }
+            }
+
+            // JP NC,a16
+            0xd2 => {
+                if !self.reg.f.contains(CARRY) {
+                    self.reg.pc = LittleEndian::read_u16(&instruction.operands);
+                    cycles += 4;
+                }
+            }
+
             // LD (C),A
             // LD ($FF00+C),A
             0xe2 => {
@@ -686,7 +702,7 @@ impl super::Cpu {
         }
 
         self.clock.t += cycles;
-        self.clock.m += cycles/4;
+        self.clock.m += cycles / 4;
 
         cycles
     }
@@ -821,6 +837,8 @@ lazy_static! {
         0x32,       "LD (HL-),A",   8;      // AKA LD (HLD),A or LDD A,(HL)
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
+        0xc2,       "JP NZ,a16",    12;
+        0xd2,       "JP NC,a16",    12;
         0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
         0x03,       "INC BC",       8;
         0x13,       "INC DE",       8;
