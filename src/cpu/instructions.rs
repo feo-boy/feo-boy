@@ -335,14 +335,8 @@ impl super::Cpu {
                 self.reg.and(e);
             }
 
-            // JP NZ,a16
-            0xc3 => {
-                if !self.reg.f.contains(ZERO) {
-                    self.reg.pc = LittleEndian::read_u16(&instruction.operands);
-
-                    cycles += 4;
-                }
-            }
+            // JP a16
+            0xc3 => self.reg.pc = LittleEndian::read_u16(&instruction.operands),
 
             // DI
             0xf3 => self.interrupts = false,
@@ -748,7 +742,7 @@ impl super::Cpu {
         self.reg.pc = address;
     }
 
-    /// Performs a RET operation. Does not modify and flags.
+    /// Performs a RET operation. Does not modify any flags.
     fn ret(&mut self) {
         self.reg.pc = self.pop();
     }
@@ -849,7 +843,7 @@ lazy_static! {
         0x33,       "INC SP",       8;
         0x93,       "SUB E",        4;
         0xa3,       "AND E",        4;
-        0xc3,       "JP NZ,a16",    12;
+        0xc3,       "JP a16",       16;
         0xf3,       "DI",           4;
         0x04,       "INC B",        4;
         0x14,       "INC D",        4;
