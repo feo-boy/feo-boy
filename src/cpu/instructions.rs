@@ -777,9 +777,9 @@ impl super::Cpu {
             0x24 => Registers::sla(&mut self.reg.h, &mut self.reg.f),
             0x25 => Registers::sla(&mut self.reg.l, &mut self.reg.f),
             0x26 => {
-                self.reg.f.set(CARRY, self.reg.h.has_bit_set(7));
-                let x: u16 = self.reg.hl() << 1;
-                self.reg.hl_mut().write(x);
+                let x: u8 = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.f.set(CARRY, x.has_bit_set(7));
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), x << 1);
             }
             0x27 => Registers::sla(&mut self.reg.a, &mut self.reg.f),
 
@@ -791,9 +791,12 @@ impl super::Cpu {
             0x2C => Registers::sra(&mut self.reg.h, &mut self.reg.f),
             0x2D => Registers::sra(&mut self.reg.l, &mut self.reg.f),
             0x2E => {
-                self.reg.f.set(CARRY, self.reg.l.has_bit_set(0));
-                let x: i16 = self.reg.hl() as i16 >> 1;
-                self.reg.hl_mut().write(x as u16);
+                let x: u8 = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.f.set(CARRY, x.has_bit_set(0));
+                self.mmu.borrow_mut().write_byte(
+                    self.reg.hl(),
+                    ((x as i8) << 1) as u8,
+                );
             }
             0x2F => Registers::sra(&mut self.reg.a, &mut self.reg.f),
 
@@ -805,9 +808,9 @@ impl super::Cpu {
             0x3C => Registers::srl(&mut self.reg.h, &mut self.reg.f),
             0x3D => Registers::srl(&mut self.reg.l, &mut self.reg.f),
             0x3E => {
-                self.reg.f.set(CARRY, self.reg.l.has_bit_set(0));
-                let x: u16 = self.reg.hl() >> 1;
-                self.reg.hl_mut().write(x);
+                let x: u8 = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.f.set(CARRY, x.has_bit_set(0));
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), x >> 1);
             }
             0x3F => Registers::srl(&mut self.reg.a, &mut self.reg.f),
 
