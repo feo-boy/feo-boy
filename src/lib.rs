@@ -35,6 +35,7 @@ use memory::Mmu;
 pub struct Emulator {
     pub cpu: Rc<RefCell<Cpu>>,
     pub mmu: Rc<RefCell<Mmu>>,
+    pub ppu: Rc<RefCell<Ppu>>,
     debug: Option<Debugger>,
 }
 
@@ -47,6 +48,7 @@ impl Emulator {
         Emulator {
             mmu,
             cpu,
+            ppu,
             debug: None,
         }
     }
@@ -96,6 +98,8 @@ impl Emulator {
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
         self.cpu.borrow_mut().step();
+
+        self.ppu.borrow_mut().step(self.cpu.borrow().clock.t);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.borrow().reg.pc;

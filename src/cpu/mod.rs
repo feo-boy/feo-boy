@@ -256,7 +256,7 @@ pub struct Cpu {
     pub reg: Registers,
 
     /// The clock corresponding to the last instruction cycle.
-    clock: Clock,
+    pub clock: Clock,
 
     /// True if interrupts are enabled.
     interrupts: bool,
