@@ -57,6 +57,8 @@ impl Ppu {
     pub fn step(&mut self, cycles: u32) {
         self.modeclock += cycles;
 
+        debug!("in graphics mode {} at {} cycles", self.mode, self.modeclock);
+
         match self.mode {
             // Horizontal blank
             0 => {
@@ -105,7 +107,7 @@ impl Ppu {
                 if self.modeclock >= 172 {
                     // Enter horizontal blank mode
                     self.modeclock = 0;
-                    self.mode = 3;
+                    self.mode = 0;
                 }
             }
 
