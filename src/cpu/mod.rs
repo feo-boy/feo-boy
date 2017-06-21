@@ -261,6 +261,9 @@ pub struct Cpu {
     /// True if interrupts are enabled.
     interrupts: bool,
 
+    /// True if the CPU is halted.
+    halted: bool,
+
     /// Memory unit
     mmu: Rc<RefCell<Mmu>>,
 }
@@ -271,6 +274,7 @@ impl Cpu {
             reg: Registers::new(),
             clock: Clock::new(),
             interrupts: false,
+            halted: false,
             mmu: mmu,
         }
     }

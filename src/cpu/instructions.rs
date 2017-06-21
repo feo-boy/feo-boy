@@ -141,6 +141,9 @@ impl super::Cpu {
             // NOP
             0x00 => (),
 
+            // STOP
+            0x10 => self.halted = true,
+
             // JR NZ,r8
             0x20 => {
                 if !self.reg.f.contains(ZERO) {
@@ -758,6 +761,7 @@ lazy_static! {
     static ref INSTRUCTIONS: Vec<Option<InstructionDef>> = instructions! {
         // byte     description     cycles
         0x00,       "NOP",          4;
+        0x10,       "STOP",         4;
         0x20,       "JR NZ,r8",     8;
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
