@@ -33,8 +33,8 @@ use graphics::Ppu;
 use memory::Mmu;
 
 pub struct Emulator {
-    cpu: Rc<RefCell<Cpu>>,
-    mmu: Rc<RefCell<Mmu>>,
+    pub cpu: Rc<RefCell<Cpu>>,
+    pub mmu: Rc<RefCell<Mmu>>,
     debug: Option<Debugger>,
 }
 
@@ -91,14 +91,6 @@ impl Emulator {
         info!("loaded ROM successfully");
 
         Ok(())
-    }
-
-    pub fn dump_memory(&self) -> String {
-        self.mmu.borrow().to_string()
-    }
-
-    pub fn dump_state(&self) -> String {
-        self.cpu.borrow_mut().to_string()
     }
 
     /// Fetch and execute a single instruction.

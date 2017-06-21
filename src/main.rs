@@ -62,14 +62,19 @@ fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
             }
         }
         "r" => emulator.resume(),
-        "d" => println!("{}", emulator.dump_memory()),
-        "c" => println!("{}", emulator.dump_state()),
+        "p" => {
+            let cpu = emulator.cpu.borrow();
+            println!("{:#06x}: {}", cpu.reg.pc, cpu.fetch())
+        }
+        "d" => println!("{}", emulator.mmu.borrow().to_string()),
+        "c" => println!("{}", emulator.cpu.borrow().to_string()),
         "q" => process::exit(0),
         "?" => {
             println!("s: step emulator");
             println!("b: add breakpoint");
             println!("l: list breakpoints");
             println!("r: resume execution");
+            println!("p: print current instruction");
             println!("d: dump memory");
             println!("c: cpu state");
             println!("q: quit");
@@ -102,7 +107,7 @@ fn start_emulator(config: Config) -> Result<()> {
 
     loop {
         if emulator.is_paused() {
-            print!("feo debug [sblrdcq?]: ");
+            print!("feo debug [sblrpdcq?]: ");
             io::stdout().flush()?;
 
             if let Some(command) = stdin.next() {
