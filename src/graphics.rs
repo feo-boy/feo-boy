@@ -57,8 +57,6 @@ impl Ppu {
     pub fn step(&mut self, cycles: u32) {
         self.modeclock += cycles;
 
-        debug!("in graphics mode {} at {} cycles", self.mode, self.modeclock);
-
         match self.mode {
             // Horizontal blank
             0 => {
@@ -71,9 +69,13 @@ impl Ppu {
 
                         // Enter vertical blank mode
                         self.mode = 1;
+
+                        debug!("set graphics mode to {}", self.mode);
                     } else {
                         // Enter scanline mode
                         self.mode = 2;
+
+                        debug!("set graphics mode to {}", self.mode);
                     }
                 }
             }
@@ -89,6 +91,8 @@ impl Ppu {
                         // Enter scanline mode
                         self.mode = 2;
                         self.line = 0;
+
+                        debug!("set graphics mode to {}", self.mode);
                     }
                 }
             }
@@ -99,6 +103,8 @@ impl Ppu {
                     // Enter scanline mode reading VRAM
                     self.modeclock = 0;
                     self.mode = 3;
+
+                    debug!("set graphics mode to {}", self.mode);
                 }
             }
 
@@ -108,6 +114,8 @@ impl Ppu {
                     // Enter horizontal blank mode
                     self.modeclock = 0;
                     self.mode = 0;
+
+                    debug!("set graphics mode to {}", self.mode);
                 }
             }
 

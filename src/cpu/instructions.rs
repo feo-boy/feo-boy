@@ -114,9 +114,11 @@ impl super::Cpu {
 
     /// Executes an instruction.
     ///
-    /// All necessary side effects are performed, including updating the program counter and flag
-    /// registers.
-    pub fn execute(&mut self, instruction: Instruction) {
+    /// All necessary side effects are performed, including updating the program counter, flag
+    /// registers, and CPU clock.
+    ///
+    /// Returns the number of clock cycles the instruction takes.
+    pub fn execute(&mut self, instruction: Instruction) -> u32 {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -126,10 +128,7 @@ impl super::Cpu {
             instruction.operands.len()
         );
 
-        // Increment the clock
-        let cycles = instruction.def.cycles as u32;
-        self.clock.m += cycles / 4;
-        self.clock.t += cycles;
+        let mut cycles = instruction.def.cycles as u32;
 
         // Increment the program counter (PC) *before* executing the instruction.
         //
@@ -150,9 +149,7 @@ impl super::Cpu {
 
                     self.reg.pc = (pc + jump as i16) as u16;
 
-                    // Add 4 clock cycles
-                    self.clock.m += 1;
-                    self.clock.t += 4;
+                    cycles += 4;
                 }
             }
 
@@ -173,9 +170,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(ZERO) {
                     self.ret();
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -184,9 +179,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(CARRY) {
                     self.ret();
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -316,9 +309,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(ZERO) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
 
-                    // Add 4 clock cycles
-                    self.clock.m += 1;
-                    self.clock.t += 4;
+                    cycles += 4;
                 }
             }
 
@@ -358,9 +349,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(ZERO) {
                     self.call(LittleEndian::read_u16(&instruction.operands));
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -369,9 +358,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(CARRY) {
                     self.call(LittleEndian::read_u16(&instruction.operands));
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -495,9 +482,7 @@ impl super::Cpu {
                 if self.reg.f.contains(ZERO) {
                     self.ret();
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -506,9 +491,7 @@ impl super::Cpu {
                 if self.reg.f.contains(CARRY) {
                     self.ret();
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -581,9 +564,7 @@ impl super::Cpu {
                 if self.reg.f.contains(ZERO) {
                     self.call(LittleEndian::read_u16(&instruction.operands));
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -592,9 +573,7 @@ impl super::Cpu {
                 if self.reg.f.contains(CARRY) {
                     self.call(LittleEndian::read_u16(&instruction.operands));
 
-                    // Add 12 clock cycles
-                    self.clock.m += 3;
-                    self.clock.t += 12;
+                    cycles += 12;
                 }
             }
 
@@ -666,6 +645,11 @@ impl super::Cpu {
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
+
+        self.clock.t += cycles;
+        self.clock.m += cycles/4;
+
+        cycles
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific

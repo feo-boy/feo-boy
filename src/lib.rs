@@ -97,9 +97,9 @@ impl Emulator {
 
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        self.cpu.borrow_mut().step();
+        let cycles = self.cpu.borrow_mut().step();
 
-        self.ppu.borrow_mut().step(self.cpu.borrow().clock.t);
+        self.ppu.borrow_mut().step(cycles);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.borrow().reg.pc;

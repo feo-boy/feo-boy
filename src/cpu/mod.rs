@@ -276,10 +276,12 @@ impl Cpu {
     }
 
     /// Fetch and execute a single instruction.
-    pub fn step(&mut self) {
+    ///
+    /// Returns the number of cycles the instruction takes.
+    pub fn step(&mut self) -> u32 {
         let instruction = self.fetch();
 
-        self.execute(instruction);
+        self.execute(instruction)
     }
 
     /// Push a value onto the stack.
