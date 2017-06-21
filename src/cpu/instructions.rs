@@ -126,6 +126,11 @@ impl super::Cpu {
             instruction.operands.len()
         );
 
+        // Increment the clock
+        let cycles = instruction.def.cycles as u32;
+        self.clock.m += cycles / 4;
+        self.clock.t += cycles;
+
         // Increment the program counter (PC) *before* executing the instruction.
         //
         // This how the actual hardware handles the PC, as relative jumps and other PC-related
@@ -145,8 +150,9 @@ impl super::Cpu {
 
                     self.reg.pc = (pc + jump as i16) as u16;
 
-                    // FIXME: Need to add four clock cycles to this instruction
-                    // in this case.
+                    // Add 4 clock cycles
+                    self.clock.m += 1;
+                    self.clock.t += 4;
                 }
             }
 
@@ -165,16 +171,22 @@ impl super::Cpu {
             // RET NZ
             0xc0 => {
                 if !self.reg.f.contains(ZERO) {
-                    // FIXME: add 12 cycles
                     self.ret();
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
             // RET NC
             0xd0 => {
                 if !self.reg.f.contains(CARRY) {
-                    // FIXME: add 12 cycles
                     self.ret();
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
@@ -304,7 +316,9 @@ impl super::Cpu {
                 if !self.reg.f.contains(ZERO) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
 
-                    // FIXME: add 4 cycles in this case
+                    // Add 4 clock cycles
+                    self.clock.m += 1;
+                    self.clock.t += 4;
                 }
             }
 
@@ -342,16 +356,22 @@ impl super::Cpu {
             // CALL NZ,a16
             0xc4 => {
                 if !self.reg.f.contains(ZERO) {
-                    // FIXME: add 12 cycles in this case
                     self.call(LittleEndian::read_u16(&instruction.operands));
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
             // CALL NC,a16
             0xd4 => {
                 if !self.reg.f.contains(CARRY) {
-                    // FIXME: add 12 cycles in this case
                     self.call(LittleEndian::read_u16(&instruction.operands));
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
@@ -473,16 +493,22 @@ impl super::Cpu {
             // RET Z
             0xc8 => {
                 if self.reg.f.contains(ZERO) {
-                    // FIXME: add 12 cycles
                     self.ret();
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
             // RET C
             0xd8 => {
                 if self.reg.f.contains(CARRY) {
-                    // FIXME: add 12 cycles
                     self.ret();
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
@@ -553,16 +579,22 @@ impl super::Cpu {
             // CALL Z,a16
             0xcc => {
                 if self.reg.f.contains(ZERO) {
-                    // FIXME: add 12 cycles in this case
                     self.call(LittleEndian::read_u16(&instruction.operands));
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
             // CALL C,a16
             0xdc => {
                 if self.reg.f.contains(CARRY) {
-                    // FIXME: add 12 cycles in this case
                     self.call(LittleEndian::read_u16(&instruction.operands));
+
+                    // Add 12 clock cycles
+                    self.clock.m += 3;
+                    self.clock.t += 12;
                 }
             }
 
