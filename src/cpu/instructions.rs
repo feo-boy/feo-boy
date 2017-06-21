@@ -596,6 +596,9 @@ impl super::Cpu {
                 self.reg.pc += 1;
             }
 
+            // EI
+            0xfb => self.interrupts = true,
+
             // INC C
             0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
 
@@ -897,6 +900,7 @@ lazy_static! {
         0x3b,       "DEC SP",       8;
         0xab,       "XOR E",        4;
         0xcb,       "PREFIX CB",    0;
+        0xfb,       "EI",           4;
         0x0c,       "INC C",        4;
         0x1c,       "INC E",        4;
         0x2c,       "INC L",        4;
