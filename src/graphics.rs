@@ -25,9 +25,23 @@ impl Default for Memory {
 }
 
 /// The picture processing unit.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Ppu {
     mem: Memory,
+
+    /// The current mode number of the PPU operation.
+    ///
+    /// Modes:
+    /// 0 - Horizontal blank
+    /// 1 - Vertical blank
+    /// 2 - Scanline (accessing OAM)
+    /// 3 - Scanline (accessing VRAM)
+    mode: u8,
+    /// The number of PPU clock cycles that have been executed for the current
+    /// PPU operation.
+    modeclock: u32,
+    /// The current line position of the PPU. The last line is 143.
+    line: u8,
 }
 
 
@@ -36,7 +50,67 @@ impl Ppu {
     ///
     /// The initial contents of the memory are unspecified.
     pub fn new() -> Ppu {
-        Ppu { mem: Default::default() }
+        Ppu::default()
+    }
+
+    /// Performs one clock step of the PPU.
+    pub fn step(&mut self, cycles: u32) {
+        self.modeclock += cycles;
+
+        match self.mode {
+            // Horizontal blank
+            0 => {
+                if self.modeclock >= 204 {
+                    self.modeclock = 0;
+                    self.line += 1;
+
+                    if self.line == 143 {
+                        // FIXME: show the image data on the screen here
+
+                        // Enter vertical blank mode
+                        self.mode = 1;
+                    } else {
+                        // Enter scanline mode
+                        self.mode = 2;
+                    }
+                }
+            }
+
+            // Vertical blank
+            1 => {
+                if self.modeclock >= 456 {
+                    self.modeclock = 0;
+                    self.line += 1;
+
+                    // FIXME: Should this be 143?
+                    if self.line > 153 {
+                        // Enter scanline mode
+                        self.mode = 2;
+                        self.line = 0;
+                    }
+                }
+            }
+
+            // Scanline mode reading OAM
+            2 => {
+                if self.modeclock >= 80 {
+                    // Enter scanline mode reading VRAM
+                    self.modeclock = 0;
+                    self.mode = 3;
+                }
+            }
+
+            // Scanline mode reading VRAM
+            3 => {
+                if self.modeclock >= 172 {
+                    // Enter horizontal blank mode
+                    self.modeclock = 0;
+                    self.mode = 3;
+                }
+            }
+
+            _ => panic!("unimplemented PPU mode: {:?}", self.mode),
+        }
     }
 }
 
