@@ -25,6 +25,22 @@ struct Config {
     debug: bool,
 }
 
+fn parse_step(command: &str) -> Result<Option<i32>> {
+    let components = command.split(" ").collect::<Vec<_>>();
+
+    match components.len() {
+        1 => return Ok(None),
+        2 => (),
+        _ => bail!("`s` takes a single optional argument"),
+    }
+
+    let step = components[1].parse().chain_err(
+        || "could not parse step count",
+    )?;
+
+    Ok(Some(step))
+}
+
 fn parse_breakpoint(command: &str) -> Result<u16> {
     let components = command.split(" ").collect::<Vec<_>>();
 
@@ -45,7 +61,13 @@ fn parse_breakpoint(command: &str) -> Result<u16> {
 
 fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
     match &command[..1] {
-        "s" => emulator.step(),
+        "s" => {
+            let step = parse_step(&command)?.unwrap_or_else(|| 1);
+
+            for _ in 0..step {
+                emulator.step();
+            }
+        }
         "b" => {
             let breakpoint = parse_breakpoint(&command)?;
             emulator.add_breakpoint(breakpoint);
