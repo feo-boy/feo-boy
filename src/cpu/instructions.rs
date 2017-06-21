@@ -7,12 +7,13 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
-use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+use bytes::ByteExt;
+use cpu::{Flags, Registers, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 use memory::Addressable;
 
 lazy_static! {
     /// Matches instruction descriptions that take operands.
-    static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8").unwrap();
+    static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8|PREFIX CB").unwrap();
 }
 
 /// A definition of a single instruction.
@@ -50,6 +51,7 @@ impl Display for Instruction {
             let replacement = match mat.as_str() {
                 "d8" | "a8" | "r8" => format!("${:#04x}", &self.operands[0]),
                 "d16" | "a16" => format!("${:#06x}", LittleEndian::read_u16(&self.operands)),
+                "PREFIX CB" => format!("PREFIX CB"),
                 ty => unreachable!("unhandled data type: {}", ty),
             };
 
@@ -75,6 +77,7 @@ macro_rules! instructions {
                     match mat.as_str() {
                         "d8" | "a8" | "r8" => 1,
                         "d16" | "a16" => 2,
+                        "PREFIX CB" => 1,
                         ty => unreachable!("unhandled data type: {}", ty),
                     }
                 }).unwrap_or_default();
@@ -527,10 +530,7 @@ impl super::Cpu {
                 self.reg.xor(e);
             }
 
-            0xcb => {
-                error!("unimplemented prefix instruction");
-                self.reg.pc += 1;
-            }
+            0xcb => self.execute_cb(instruction.operands[0]),
 
             // INC C
             0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
@@ -636,6 +636,186 @@ impl super::Cpu {
         }
     }
 
+    pub fn execute_cb(&mut self, instruction: u8) {
+        match instruction {
+            0x00 => (),
+
+            // BIT x,B
+            0x40 => Registers::bit(0, self.reg.b, &mut self.reg.f),
+            0x48 => Registers::bit(1, self.reg.b, &mut self.reg.f),
+            0x50 => Registers::bit(2, self.reg.b, &mut self.reg.f),
+            0x58 => Registers::bit(3, self.reg.b, &mut self.reg.f),
+            0x60 => Registers::bit(4, self.reg.b, &mut self.reg.f),
+            0x68 => Registers::bit(5, self.reg.b, &mut self.reg.f),
+            0x70 => Registers::bit(6, self.reg.b, &mut self.reg.f),
+            0x78 => Registers::bit(7, self.reg.b, &mut self.reg.f),
+
+            // BIT x,C
+            0x41 => Registers::bit(0, self.reg.c, &mut self.reg.f),
+            0x49 => Registers::bit(1, self.reg.c, &mut self.reg.f),
+            0x51 => Registers::bit(2, self.reg.c, &mut self.reg.f),
+            0x59 => Registers::bit(3, self.reg.c, &mut self.reg.f),
+            0x61 => Registers::bit(4, self.reg.c, &mut self.reg.f),
+            0x69 => Registers::bit(5, self.reg.c, &mut self.reg.f),
+            0x71 => Registers::bit(6, self.reg.c, &mut self.reg.f),
+            0x79 => Registers::bit(7, self.reg.c, &mut self.reg.f),
+
+            // BIT x,D
+            0x42 => Registers::bit(0, self.reg.d, &mut self.reg.f),
+            0x4A => Registers::bit(1, self.reg.d, &mut self.reg.f),
+            0x52 => Registers::bit(2, self.reg.d, &mut self.reg.f),
+            0x5A => Registers::bit(3, self.reg.d, &mut self.reg.f),
+            0x62 => Registers::bit(4, self.reg.d, &mut self.reg.f),
+            0x6A => Registers::bit(5, self.reg.d, &mut self.reg.f),
+            0x72 => Registers::bit(6, self.reg.d, &mut self.reg.f),
+            0x7A => Registers::bit(7, self.reg.d, &mut self.reg.f),
+
+            // BIT x,E
+            0x43 => Registers::bit(0, self.reg.e, &mut self.reg.f),
+            0x4B => Registers::bit(1, self.reg.e, &mut self.reg.f),
+            0x53 => Registers::bit(2, self.reg.e, &mut self.reg.f),
+            0x5B => Registers::bit(3, self.reg.e, &mut self.reg.f),
+            0x63 => Registers::bit(4, self.reg.e, &mut self.reg.f),
+            0x6B => Registers::bit(5, self.reg.e, &mut self.reg.f),
+            0x73 => Registers::bit(6, self.reg.e, &mut self.reg.f),
+            0x7B => Registers::bit(7, self.reg.e, &mut self.reg.f),
+
+            // BIT x,H
+            0x44 => Registers::bit(0, self.reg.h, &mut self.reg.f),
+            0x4C => Registers::bit(1, self.reg.h, &mut self.reg.f),
+            0x54 => Registers::bit(2, self.reg.h, &mut self.reg.f),
+            0x5C => Registers::bit(3, self.reg.h, &mut self.reg.f),
+            0x64 => Registers::bit(4, self.reg.h, &mut self.reg.f),
+            0x6C => Registers::bit(5, self.reg.h, &mut self.reg.f),
+            0x74 => Registers::bit(6, self.reg.h, &mut self.reg.f),
+            0x7C => Registers::bit(7, self.reg.h, &mut self.reg.f),
+
+            // BIT x,L
+            0x45 => Registers::bit(0, self.reg.l, &mut self.reg.f),
+            0x4D => Registers::bit(1, self.reg.l, &mut self.reg.f),
+            0x55 => Registers::bit(2, self.reg.l, &mut self.reg.f),
+            0x5D => Registers::bit(3, self.reg.l, &mut self.reg.f),
+            0x65 => Registers::bit(4, self.reg.l, &mut self.reg.f),
+            0x6D => Registers::bit(5, self.reg.l, &mut self.reg.f),
+            0x75 => Registers::bit(6, self.reg.l, &mut self.reg.f),
+            0x7D => Registers::bit(7, self.reg.l, &mut self.reg.f),
+
+            // BIT x,(HL)
+            // TODO add the extra clock cycles
+            0x46 => {
+                Registers::bit(
+                    0,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x4E => {
+                Registers::bit(
+                    1,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x56 => {
+                Registers::bit(
+                    2,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x5E => {
+                Registers::bit(
+                    3,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x66 => {
+                Registers::bit(
+                    4,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x6E => {
+                Registers::bit(
+                    5,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x76 => {
+                Registers::bit(
+                    6,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+            0x7E => {
+                Registers::bit(
+                    7,
+                    self.mmu.borrow().read_byte(self.reg.hl()),
+                    &mut self.reg.f,
+                )
+            }
+
+            // BIT x,A
+            0x47 => Registers::bit(0, self.reg.a, &mut self.reg.f),
+            0x4F => Registers::bit(1, self.reg.a, &mut self.reg.f),
+            0x57 => Registers::bit(2, self.reg.a, &mut self.reg.f),
+            0x5F => Registers::bit(3, self.reg.a, &mut self.reg.f),
+            0x67 => Registers::bit(4, self.reg.a, &mut self.reg.f),
+            0x6F => Registers::bit(5, self.reg.a, &mut self.reg.f),
+            0x77 => Registers::bit(6, self.reg.a, &mut self.reg.f),
+            0x7F => Registers::bit(7, self.reg.a, &mut self.reg.f),
+
+            // SLA
+            0x20 => Registers::sla(&mut self.reg.b, &mut self.reg.f), 
+            0x21 => Registers::sla(&mut self.reg.c, &mut self.reg.f),  
+            0x22 => Registers::sla(&mut self.reg.d, &mut self.reg.f),
+            0x23 => Registers::sla(&mut self.reg.e, &mut self.reg.f),
+            0x24 => Registers::sla(&mut self.reg.h, &mut self.reg.f),
+            0x25 => Registers::sla(&mut self.reg.l, &mut self.reg.f),
+            0x26 => {
+                self.reg.f.set(CARRY, self.reg.h.has_bit_set(7));
+                let x: u16 = self.reg.hl() << 1;
+                self.reg.hl_mut().write(x);
+            }
+            0x27 => Registers::sla(&mut self.reg.a, &mut self.reg.f),
+
+            // SRA
+            0x28 => Registers::sra(&mut self.reg.b, &mut self.reg.f),
+            0x29 => Registers::sra(&mut self.reg.c, &mut self.reg.f),
+            0x2A => Registers::sra(&mut self.reg.d, &mut self.reg.f),
+            0x2B => Registers::sra(&mut self.reg.e, &mut self.reg.f),
+            0x2C => Registers::sra(&mut self.reg.h, &mut self.reg.f),
+            0x2D => Registers::sra(&mut self.reg.l, &mut self.reg.f),
+            0x2E => {
+                self.reg.f.set(CARRY, self.reg.l.has_bit_set(0));
+                let x: i16 = self.reg.hl() as i16 >> 1;
+                self.reg.hl_mut().write(x as u16);
+            }
+            0x2F => Registers::sra(&mut self.reg.a, &mut self.reg.f),
+
+            // SRL
+            0x38 => Registers::srl(&mut self.reg.b, &mut self.reg.f),
+            0x39 => Registers::srl(&mut self.reg.c, &mut self.reg.f),
+            0x3A => Registers::srl(&mut self.reg.d, &mut self.reg.f),
+            0x3B => Registers::srl(&mut self.reg.e, &mut self.reg.f),
+            0x3C => Registers::srl(&mut self.reg.h, &mut self.reg.f),
+            0x3D => Registers::srl(&mut self.reg.l, &mut self.reg.f),
+            0x3E => {
+                self.reg.f.set(CARRY, self.reg.l.has_bit_set(0));
+                let x: u16 = self.reg.hl() >> 1;
+                self.reg.hl_mut().write(x);
+            }
+            0x3F => Registers::srl(&mut self.reg.a, &mut self.reg.f),
+
+            _ => unreachable!(),
+        }
+
+    }
+
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
     /// address.
     ///
@@ -712,6 +892,30 @@ impl super::Registers {
         self.a ^= rhs;
         self.f = Flags::empty();
         self.f.set(ZERO, self.a == 0);
+    }
+
+    /// Performs a left arithmetric shift
+    fn sla(r: &mut u8, f: &mut Flags) {
+        f.set(CARRY, r.has_bit_set(7));
+        *r <<= 1;
+    }
+
+    /// Performs a right arithmetic shift
+    fn sra(r: &mut u8, f: &mut Flags) {
+        f.set(CARRY, r.has_bit_set(0));
+        *r = (*r as i8 >> 1) as u8;
+    }
+
+    /// Performs a right logical shift
+    fn srl(r: &mut u8, f: &mut Flags) {
+        f.set(CARRY, r.has_bit_set(0));
+        *r >>= 1;
+    }
+
+    fn bit(b: u8, r: u8, f: &mut Flags) {
+        f.set(ZERO, r.has_bit_set(b));
+        f.insert(CARRY);
+        f.remove(HALF_CARRY);
     }
 }
 
@@ -815,7 +1019,7 @@ lazy_static! {
         0x2b,       "DEC HL",       8;
         0x3b,       "DEC SP",       8;
         0xab,       "XOR E",        4;
-        0xcb,       "PREFIX CB",    0;
+        0xcb,       "PREFIX CB",    8;
         0x0c,       "INC C",        4;
         0x1c,       "INC E",        4;
         0x2c,       "INC L",        4;
