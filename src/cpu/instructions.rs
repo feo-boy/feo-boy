@@ -258,6 +258,18 @@ impl super::Cpu {
                 self.reg.af_mut().write(af);
             }
 
+            // LD (BC),A
+            0x02 => self.mmu.borrow_mut().write_byte(self.reg.bc(), self.reg.a),
+
+            // LD (DE),A
+            0x12 => self.mmu.borrow_mut().write_byte(self.reg.de(), self.reg.a),
+
+            // LD (HL+),A
+            0x22 => {
+                self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a);
+                self.reg.hl_mut().add_assign(1);
+            }
+
             // LD (HL-),A
             0x32 => {
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a);
@@ -513,6 +525,30 @@ impl super::Cpu {
             0xd9 => {
                 self.ret();
                 self.interrupts = true;
+            }
+
+            // LD A,(BC)
+            0x0a => {
+                let bc = self.reg.bc();
+                self.reg.a = self.mmu.borrow().read_byte(bc);
+            }
+
+            // LD A,(DE)
+            0x1a => {
+                let de = self.reg.de();
+                self.reg.a = self.mmu.borrow().read_byte(de);
+            }
+
+            // LD A,(HL+)
+            0x2a => {
+                self.reg.a = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.hl_mut().add_assign(1);
+            }
+
+            // LD A,(HL-)
+            0x3a => {
+                self.reg.a = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.hl_mut().sub_assign(1);
             }
 
             // XOR D
@@ -779,7 +815,10 @@ lazy_static! {
         0xd1,       "POP DC",       12;
         0xe1,       "POP HL",       12;
         0xf1,       "POP AF",       12;
-        0x32,       "LD (HL-),A",   8;
+        0x02,       "LD (BC),A",    8;
+        0x12,       "LD (DE),A",    8;
+        0x22,       "LD (HL+),A",   8;      // AKA LD (HLI),A or LDI A,(HL)
+        0x32,       "LD (HL-),A",   8;      // AKA LD (HLD),A or LDD A,(HL)
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
         0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
@@ -829,6 +868,10 @@ lazy_static! {
         0xa9,       "XOR C",        4;
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
+        0x0a,       "LD A,(BC)",    8;
+        0x1a,       "LD A,(DE)",    8;
+        0x2a,       "LD A,(HL+)",   8;      // AKA LD A,(HLI) or LDI A,(HL)
+        0x3a,       "LD A,(HL-)",   8;      // AKA LD A,(HLD) or LDD A,(HL)
         0xaa,       "XOR D",        4;
         0x0b,       "DEC BC",       8;
         0x1b,       "DEC DE",       8;
