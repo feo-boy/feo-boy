@@ -449,7 +449,7 @@ impl Addressable for Mmu {
                             self.unmap_bios()
                         }
                     }
-                    _ => warn!("write to unimplemented I/O register {:#02x}", address),
+                    _ => error!("write to unimplemented I/O register {:#02x}", address),
                 }
             }
 
