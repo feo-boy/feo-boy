@@ -2,7 +2,7 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::num::Wrapping;
@@ -291,6 +291,15 @@ impl Mmu {
         }
     }
 
+    /// Returns an immutable reference to the PPU.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no `Ppu` attached.
+    fn ppu(&self) -> Ref<Ppu> {
+        self.ppu.as_ref().expect("no PPU attached").borrow()
+    }
+
     fn unmap_bios(&mut self) {
         info!("unmapping BIOS");
         self.bios_mapped = false;
@@ -309,13 +318,7 @@ impl Addressable for Mmu {
             0x0000...0x7FFF => self.mem.rom[address as usize],
 
             // Graphics RAM
-            0x8000...0x9FFF => {
-                self.ppu
-                    .as_ref()
-                    .expect("no PPU attached")
-                    .borrow()
-                    .read_byte(address)
-            }
+            0x8000...0x9FFF => self.ppu().read_byte(address),
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
@@ -332,21 +335,48 @@ impl Addressable for Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => {
-                self.ppu
-                    .as_ref()
-                    .expect("no PPU attached")
-                    .borrow()
-                    .read_byte(address)
-            }
+            0xFE00...0xFE9F => self.ppu().read_byte(address),
 
             // Reserved, unused
             0xFEA0...0xFEFF => 0x00,
 
             // I/O Registers
             0xFF00...0xFF7F => {
-                error!("read unimplemented I/O register {:#04x}", address);
-                0x00
+                match address {
+                    // STAT - LCDC Status
+                    0xFF41 => {
+                        let mut register = 0u8;
+
+                        let ppu = self.ppu();
+
+                        // Set the lowest two bits to the mode.
+                        register |= ppu.mode;
+
+                        // Set bit 2 if LY == LYC
+                        register.set_bit(2, self.read_byte(0xFF44) == self.read_byte(0xFF45));
+
+                        // Other bits are set if the various interrupts are enabled.
+                        register.set_bit(3, ppu.interrupts.hblank);
+                        register.set_bit(4, ppu.interrupts.vblank);
+                        register.set_bit(5, ppu.interrupts.oam);
+                        register.set_bit(6, ppu.interrupts.ly_lyc);
+
+                        // The highest bit is unspecified.
+
+                        register
+                    }
+
+                    // LCDC Y-Coordinate
+                    0xFF44 => self.ppu().line,
+
+                    // LYC - LY Compare
+                    0xFF45 => self.ppu().line_compare,
+
+                    _ => {
+                        error!("read unimplemented I/O register {:#04x}", address);
+                        0x00
+                    }
+                }
             }
 
             // Zero-Page RAM
@@ -585,5 +615,17 @@ mod tests {
         mmu.write_word(0xFF80, 0xABCD);
         assert_eq!(mmu.mem.zram[0], 0xCD);
         assert_eq!(mmu.mem.zram[1], 0xAB);
+    }
+
+    #[test]
+    fn stat_register() {
+        let mut ppu = Ppu::new();
+        ppu.line = 40;
+        ppu.line_compare = 40;
+        ppu.interrupts.vblank = true;
+
+        let mmu = Mmu::new(Rc::new(RefCell::new(ppu)));
+
+        assert_eq!(mmu.read_byte(0xFF41), 0b00010100);
     }
 }

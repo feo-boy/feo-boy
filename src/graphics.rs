@@ -24,6 +24,15 @@ impl Default for Memory {
     }
 }
 
+/// Groups information that determines if various interrupts are enabled.
+#[derive(Debug, Default)]
+pub struct Interrupts {
+    pub hblank: bool,
+    pub vblank: bool,
+    pub oam: bool,
+    pub ly_lyc: bool,
+}
+
 /// The picture processing unit.
 #[derive(Debug, Default)]
 pub struct Ppu {
@@ -36,12 +45,22 @@ pub struct Ppu {
     /// 1 - Vertical blank
     /// 2 - Scanline (accessing OAM)
     /// 3 - Scanline (accessing VRAM)
-    mode: u8,
+    pub mode: u8,
+
     /// The number of PPU clock cycles that have been executed for the current
     /// PPU operation.
     modeclock: u32,
+
     /// The current line position of the PPU. The last line is 143.
-    line: u8,
+    pub line: u8,
+
+    /// A value that is compared against the current line.
+    ///
+    /// Used by the LCDC status and LYC I/O registers.
+    pub line_compare: u8,
+
+    /// Contains whether PPU-related interrupts are enabled or disabled.
+    pub interrupts: Interrupts,
 }
 
 
