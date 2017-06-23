@@ -69,11 +69,12 @@ pub struct Ppu {
 
     /// The current mode number of the PPU operation.
     ///
-    /// Modes:
-    /// 0 - Horizontal blank
-    /// 1 - Vertical blank
-    /// 2 - Scanline (accessing OAM)
-    /// 3 - Scanline (accessing VRAM)
+    /// | Mode      | Description               |
+    /// | --------- | ------------------------- |
+    /// | 0         | Horizontal blank          |
+    /// | 1         | Vertical blank            |
+    /// | 2         | Scanline (accessing OAM)  |
+    /// | 3         | Scanline (accessing VRAM) |
     pub mode: u8,
 
     /// The number of PPU clock cycles that have been executed for the current
