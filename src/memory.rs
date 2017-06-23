@@ -2,7 +2,7 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefMut, RefCell};
 use std::default::Default;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::num::Wrapping;
@@ -300,6 +300,15 @@ impl Mmu {
         self.ppu.as_ref().expect("no PPU attached").borrow()
     }
 
+    /// Returns a mutable reference to the PPU.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no `Ppu` attached.
+    fn ppu_mut(&mut self) -> RefMut<Ppu> {
+        self.ppu.as_ref().expect("no PPU attached").borrow_mut()
+    }
+
     fn unmap_bios(&mut self) {
         info!("unmapping BIOS");
         self.bios_mapped = false;
@@ -399,13 +408,7 @@ impl Addressable for Mmu {
             }
 
             // Graphics RAM
-            0x8000...0x9FFF => {
-                self.ppu
-                    .as_ref()
-                    .expect("no PPU attached")
-                    .borrow_mut()
-                    .write_byte(address, byte)
-            }
+            0x8000...0x9FFF => self.ppu_mut().write_byte(address, byte),
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
@@ -420,13 +423,7 @@ impl Addressable for Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => {
-                self.ppu
-                    .as_ref()
-                    .expect("no PPU attached")
-                    .borrow_mut()
-                    .write_byte(address, byte)
-            }
+            0xFE00...0xFE9F => self.ppu_mut().write_byte(address, byte),
 
             // Reserved, unused
             0xFEA0...0xFEFF => (),
@@ -443,6 +440,17 @@ impl Addressable for Mmu {
                             warn!("sound controller not implemented");
                         }
                     }
+
+                    // STAT - LCDC Status
+                    0xFF41 => {
+                        let mut ppu = self.ppu_mut();
+
+                        ppu.interrupts.hblank = byte.has_bit_set(3);
+                        ppu.interrupts.vblank = byte.has_bit_set(4);
+                        ppu.interrupts.oam = byte.has_bit_set(5);
+                        ppu.interrupts.ly_lyc = byte.has_bit_set(6);
+                    }
+
                     // Unmap BIOS
                     0xFF50 => {
                         if self.bios_mapped {
