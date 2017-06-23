@@ -432,6 +432,26 @@ impl Addressable for Mmu {
             0xFF00...0xFF7F => {
                 // I/O Registers
                 match address {
+                    // NR11 - Channel 1 Sound length/Wave pattern duty
+                    0xFF11 => {
+                        warn!("attempted to modify sound channel 1 wave (unimplemented)");
+                    }
+
+                    // NR12 - Channel 1 Volume Envelope
+                    0xFF12 => {
+                        warn!("attempted to modify sound channel 1 volume (unimplemented)");
+                    }
+
+                    // NR50 - Channel control / ON-OFF / Volume
+                    0xFF24 => {
+                        warn!("attempted to modify master volume (unimplemented)");
+                    }
+
+                    // NR51 - Selection of Sound output terminal
+                    0xFF25 => {
+                        warn!("attempted to modify sound output terminal (unimplemented)");
+                    }
+
                     // Sound on/off
                     0xFF26 => {
                         // Only the high bit is writable.
