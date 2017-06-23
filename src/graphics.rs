@@ -6,6 +6,35 @@ use std::fmt;
 
 use memory::Addressable;
 
+/// The colors that can be displayed by the DMG.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Shade {
+    White,
+    LightGray,
+    DarkGray,
+    Black,
+}
+
+impl Default for Shade {
+    fn default() -> Shade {
+        Shade::White
+    }
+}
+
+impl From<u8> for Shade {
+    fn from(val: u8) -> Shade {
+        use self::Shade::*;
+
+        match val {
+            0 => White,
+            1 => LightGray,
+            2 => DarkGray,
+            3 => Black,
+            _ => panic!("only 0-3 correspond to valid shades"),
+        }
+    }
+}
+
 /// Memory managed by the PPU.
 struct Memory {
     /// Video RAM.
@@ -51,6 +80,12 @@ pub struct Ppu {
     /// PPU operation.
     modeclock: u32,
 
+    /// The background palette.
+    ///
+    /// This array can be thought of as a map from color number to shade, where the color numbers
+    /// are those used by the Background and Window tiles.
+    pub bg_palette: [Shade; 4],
+
     /// The current line position of the PPU. The last line is 143.
     pub line: u8,
 
@@ -62,7 +97,6 @@ pub struct Ppu {
     /// Contains whether PPU-related interrupts are enabled or disabled.
     pub interrupts: Interrupts,
 }
-
 
 impl Ppu {
     /// Creates a new picture processing unit.

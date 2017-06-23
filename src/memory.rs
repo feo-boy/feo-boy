@@ -471,6 +471,16 @@ impl Addressable for Mmu {
                         ppu.interrupts.ly_lyc = byte.has_bit_set(6);
                     }
 
+                    // BGP - BG Palette Data
+                    0xFF47 => {
+                        let mut palette = &mut self.ppu_mut().bg_palette;
+
+                        for i in 0..4 {
+                            let shade = (byte >> (i * 2)) & 0x3;
+                            palette[i] = shade.into();
+                        }
+                    }
+
                     // Unmap BIOS
                     0xFF50 => {
                         if self.bios_mapped {
@@ -655,5 +665,25 @@ mod tests {
         let mmu = Mmu::new(Rc::new(RefCell::new(ppu)));
 
         assert_eq!(mmu.read_byte(0xFF41), 0b00010100);
+    }
+
+    #[test]
+    fn background_palette_register() {
+        use graphics::Shade;
+
+        let ppu = Rc::new(RefCell::new(Ppu::new()));
+        let mut mmu = Mmu::new(Rc::clone(&ppu));
+
+        mmu.write_byte(0xFF47, 0b10010011);
+
+        assert_eq!(
+            mmu.ppu().bg_palette,
+            [
+                Shade::Black,
+                Shade::White,
+                Shade::LightGray,
+                Shade::DarkGray,
+            ]
+        );
     }
 }
