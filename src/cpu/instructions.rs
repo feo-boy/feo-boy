@@ -147,11 +147,15 @@ impl super::Cpu {
             // JR NZ,r8
             0x20 => {
                 if !self.reg.f.contains(ZERO) {
-                    let jump = instruction.operands[0] as i8;
-                    let pc = self.reg.pc as i16;
+                    self.jr(instruction.operands[0] as i8);
+                    cycles += 4;
+                }
+            }
 
-                    self.reg.pc = (pc + jump as i16) as u16;
-
+            // JR NC,r8
+            0x30 => {
+                if !self.reg.f.contains(CARRY) {
+                    self.jr(instruction.operands[0] as i8);
                     cycles += 4;
                 }
             }
@@ -496,6 +500,25 @@ impl super::Cpu {
             // RST 30H
             0xf7 => self.rst(0x0030),
 
+            // JR r8
+            0x18 => self.jr(instruction.operands[0] as i8),
+
+            // JR Z,r8
+            0x28 => {
+                if self.reg.f.contains(ZERO) {
+                    self.jr(instruction.operands[0] as i8);
+                    cycles += 4;
+                }
+            }
+
+            // JR C,r8
+            0x38 => {
+                if self.reg.f.contains(CARRY) {
+                    self.jr(instruction.operands[0] as i8);
+                    cycles += 4;
+                }
+            }
+
             // XOR B
             0xa8 => {
                 let b = self.reg.b;
@@ -746,6 +769,12 @@ impl super::Cpu {
     fn ret(&mut self) {
         self.reg.pc = self.pop();
     }
+
+    /// Performs JR (relative jump) operation. Does not modify any flags.
+    fn jr(&mut self, jump: i8) {
+        let pc = self.reg.pc as i16;
+        self.reg.pc = (pc + jump as i16) as u16;
+    }
 }
 
 impl super::Registers {
@@ -812,6 +841,7 @@ lazy_static! {
         0x00,       "NOP",          4;
         0x10,       "STOP",         4;
         0x20,       "JR NZ,r8",     8;
+        0x30,       "JR NC,r8",     8;
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
         0xc0,       "RET NZ",       8;
@@ -877,6 +907,9 @@ lazy_static! {
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
         0xf7,       "RST 30H",      16;
+        0x18,       "JR r8",        12;
+        0x28,       "JR Z,r8",      8;
+        0x38,       "JR C,r8",      8;
         0xa8,       "XOR B",        4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
@@ -1028,6 +1061,22 @@ mod tests {
         };
         cpu.execute(instruction);
         assert_eq!(cpu.reg.pc, 4);
+    }
+
+    #[test]
+    fn jr() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        cpu.reg.pc = 0x01;
+
+        // Move forward 10
+        cpu.jr(0x0a);
+        assert_eq!(cpu.reg.pc, 0x0b);
+
+        // Move backward 10
+        cpu.jr(!0x0a + 1);
+        assert_eq!(cpu.reg.pc, 0x01);
     }
 
     #[test]
