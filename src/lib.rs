@@ -33,8 +33,8 @@ use graphics::Ppu;
 use memory::Mmu;
 
 pub struct Emulator {
-    pub cpu: Rc<RefCell<Cpu>>,
-    pub mmu: Rc<RefCell<Mmu>>,
+    pub cpu: Cpu,
+    pub mmu: Mmu,
     pub ppu: Rc<RefCell<Ppu>>,
     debug: Option<Debugger>,
 }
@@ -42,8 +42,8 @@ pub struct Emulator {
 impl Emulator {
     pub fn new() -> Self {
         let ppu = Rc::new(RefCell::new(Ppu::new()));
-        let mmu = Rc::new(RefCell::new(Mmu::new(Rc::clone(&ppu))));
-        let cpu = Rc::new(RefCell::new(Cpu::new(Rc::clone(&mmu))));
+        let mmu = Mmu::new(Rc::clone(&ppu));
+        let cpu = Cpu::new();
 
         Emulator {
             mmu,
@@ -61,8 +61,8 @@ impl Emulator {
 
     /// Reset all emulator components to their initial states.
     pub fn reset(&mut self) {
-        self.mmu.borrow_mut().reset();
-        self.cpu.borrow_mut().reset();
+        self.mmu.reset();
+        self.cpu.reset(&self.mmu);
     }
 
     pub fn load_bios<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
@@ -73,7 +73,7 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.borrow_mut().load_bios(&buf)?;
+        self.mmu.load_bios(&buf)?;
 
         info!("loaded BIOS successfully");
 
@@ -88,7 +88,7 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.borrow_mut().load_rom(&buf)?;
+        self.mmu.load_rom(&buf)?;
 
         info!("loaded ROM successfully");
 
@@ -97,12 +97,11 @@ impl Emulator {
 
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        let cycles = self.cpu.borrow_mut().step();
-
+        let cycles = self.cpu.step(&mut self.mmu);
         self.ppu.borrow_mut().step(cycles);
 
         if let Some(ref mut debugger) = self.debug {
-            let pc = self.cpu.borrow().reg.pc;
+            let pc = self.cpu.reg.pc;
             if debugger.breakpoints.contains(&pc) {
                 debugger.paused = true;
             }

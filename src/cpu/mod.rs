@@ -4,12 +4,10 @@
 
 mod instructions;
 
-use std::cell::RefCell;
 use std::default::Default;
 use std::fmt;
 use std::num::Wrapping;
 use std::ops::{AddAssign, SubAssign};
-use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder};
 
@@ -250,7 +248,7 @@ impl Clock {
 }
 
 /// The CPU.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Cpu {
     /// Registers
     pub reg: Registers,
@@ -263,52 +261,42 @@ pub struct Cpu {
 
     /// True if the CPU is halted.
     halted: bool,
-
-    /// Memory unit
-    mmu: Rc<RefCell<Mmu>>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Rc<RefCell<Mmu>>) -> Cpu {
-        Cpu {
-            reg: Registers::new(),
-            clock: Clock::new(),
-            interrupts: false,
-            halted: false,
-            mmu: mmu,
-        }
+    pub fn new() -> Cpu {
+        Cpu::default()
     }
 
     /// Fetch and execute a single instruction.
     ///
     /// Returns the number of cycles the instruction takes.
-    pub fn step(&mut self) -> u32 {
-        let instruction = self.fetch();
-
-        self.execute(instruction)
+    pub fn step(&mut self, mmu: &mut Mmu) -> u32 {
+        let instruction = self.fetch(mmu);
+        self.execute(instruction, mmu)
     }
 
     /// Push a value onto the stack.
     ///
     /// Uses the current value of `SP`, and decrements it.
-    pub fn push(&mut self, value: u16) {
+    pub fn push(&mut self, value: u16, mmu: &mut Mmu) {
         self.reg.sp -= 2;
-        self.mmu.borrow_mut().write_word(self.reg.sp, value);
+        mmu.write_word(self.reg.sp, value);
     }
 
     /// Pop a value off the stack.
     ///
     /// Uses the current value of `SP`, and increments it.
-    pub fn pop(&mut self) -> u16 {
-        let value = self.mmu.borrow().read_word(self.reg.sp);
+    pub fn pop(&mut self, mmu: &Mmu) -> u16 {
+        let value = mmu.read_word(self.reg.sp);
         self.reg.sp += 2;
         value
     }
 
     /// Reset registers to their initial values.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, mmu: &Mmu) {
         // Skip the BIOS if we didn't load it.
-        self.reg.pc = if !self.mmu.borrow().has_bios() {
+        self.reg.pc = if !mmu.has_bios() {
             info!("skipping BIOS: none loaded");
             0x100
         } else {
@@ -325,9 +313,7 @@ impl fmt::Display for Cpu {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
     use std::ops::SubAssign;
-    use std::rc::Rc;
 
     use memory::Mmu;
 
@@ -355,30 +341,30 @@ mod tests {
 
     #[test]
     fn skip_bios() {
-        let mmu = Rc::new(RefCell::new(Mmu::default()));
-        let mut cpu = Cpu::new(Rc::clone(&mmu));
-        cpu.reset();
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new();
+        cpu.reset(&mmu);
 
         assert_eq!(cpu.reg.pc, 0x100);
 
-        let mmu = Rc::new(RefCell::new(Mmu::default()));
+        let mut mmu = Mmu::default();
+        let mut cpu = Cpu::new();
 
-        let mut cpu = Cpu::new(Rc::clone(&mmu));
         // Load dummy BIOS
-        mmu.borrow_mut().load_bios(&[0; 256]).unwrap();
-        cpu.reset();
+        mmu.load_bios(&[0; 256]).unwrap();
+        cpu.reset(&mmu);
 
         assert_eq!(cpu.reg.pc, 0x00);
     }
 
     #[test]
     fn push_pop() {
-        let mmu = Rc::new(RefCell::new(Mmu::default()));
-        let mut cpu = Cpu::new(Rc::clone(&mmu));
+        let mut mmu = Mmu::default();
+        let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
 
-        cpu.push(0xcafe);
-        assert_eq!(cpu.pop(), 0xcafe);
+        cpu.push(0xcafe, &mut mmu);
+        assert_eq!(cpu.pop(&mmu), 0xcafe);
     }
 }
