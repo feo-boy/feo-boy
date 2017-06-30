@@ -172,6 +172,12 @@ impl super::Cpu {
             // LD (HL),B
             0x70 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.b),
 
+            // ADD A,B
+            0x80 => {
+                let b = self.reg.b;
+                self.reg.add(b);
+            }
+
             // SUB B
             0x90 => {
                 let b = self.reg.b;
@@ -250,6 +256,12 @@ impl super::Cpu {
             // LD (HL),C
             0x71 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.c),
 
+            // ADD A,C
+            0x81 => {
+                let c = self.reg.c;
+                self.reg.add(c);
+            }
+
             // SUB C
             0x91 => {
                 let c = self.reg.c;
@@ -315,6 +327,12 @@ impl super::Cpu {
 
             // LD (HL),D
             0x72 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.d),
+
+            // ADD A,D
+            0x82 => {
+                let d = self.reg.d;
+                self.reg.add(d);
+            }
 
             // SUB D
             0x92 => {
@@ -382,6 +400,12 @@ impl super::Cpu {
             // LD (HL),E
             0x73 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.e),
 
+            // ADD A,E
+            0x83 => {
+                let e = self.reg.e;
+                self.reg.add(e);
+            }
+
             // SUB E
             0x93 => {
                 let e = self.reg.e;
@@ -427,6 +451,12 @@ impl super::Cpu {
 
             // LD (HL),H
             0x74 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.h),
+
+            // ADD A,H
+            0x84 => {
+                let h = self.reg.h;
+                self.reg.add(h);
+            }
 
             // SUB H
             0x94 => {
@@ -485,6 +515,12 @@ impl super::Cpu {
 
             // LD (HL),L
             0x75 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.l),
+
+            // ADD A,L
+            0x85 => {
+                let l = self.reg.l;
+                self.reg.add(l);
+            }
 
             // SUB L
             0x95 => {
@@ -548,6 +584,12 @@ impl super::Cpu {
             // LD H,(HL)
             0x66 => self.reg.h = self.mmu.borrow().read_byte(self.reg.hl()),
 
+            // ADD A,(HL)
+            0x86 => {
+                let byte = self.mmu.borrow().read_byte(self.reg.hl());
+                self.reg.add(byte);
+            }
+
             // SUB (HL)
             0x96 => {
                 let byte = self.mmu.borrow().read_byte(self.reg.hl());
@@ -559,6 +601,9 @@ impl super::Cpu {
                 let byte = self.mmu.borrow().read_byte(self.reg.hl());
                 self.reg.and(byte);
             }
+
+            // ADD A,d8
+            0xc6 => self.reg.add(instruction.operands[0]),
 
             // SUB d8
             0xd6 => self.reg.sub(instruction.operands[0]),
@@ -580,6 +625,12 @@ impl super::Cpu {
 
             // LD (HL),A
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
+
+            // ADD A,A
+            0x87 => {
+                let a = self.reg.a;
+                self.reg.add(a);
+            }
 
             // SUB A
             0x97 => {
@@ -1011,6 +1062,17 @@ impl super::Registers {
         self.f.set(CARRY, is_carry_sub(self.a, rhs));
     }
 
+    /// Adds a byte to the accumulator and sets the flags appropriately.
+    fn add(&mut self, rhs: u8) {
+        self.f.remove(SUBTRACT);
+        self.f.set(HALF_CARRY, is_half_carry_add(self.a, rhs));
+        self.f.set(CARRY, is_carry_add(self.a, rhs));
+
+        self.a = self.a.wrapping_add(rhs);
+
+        self.f.set(ZERO, self.a == 0);
+    }
+
     /// Subtracts a byte from the accumulator and sets the flags appropriately.
     fn sub(&mut self, rhs: u8) {
         self.cp(rhs);
@@ -1023,6 +1085,11 @@ impl super::Registers {
         self.f = Flags::empty();
         self.f.set(ZERO, self.a == 0);
     }
+}
+
+/// Returns `true` if the addition of two bytes requires a carry.
+fn is_carry_add(a: u8, b: u8) -> bool {
+    ((a as u16 + b as u16) & 0x0100) == 0x0100
 }
 
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
@@ -1059,6 +1126,7 @@ lazy_static! {
         0x50,       "LD D,B",       4;
         0x60,       "LD H,B",       4;
         0x70,       "LD (HL),B",    8;
+        0x80,       "ADD A,B",      4;
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
         0xc0,       "RET NZ",       8;
@@ -1073,6 +1141,7 @@ lazy_static! {
         0x51,       "LD D,C",       4;
         0x61,       "LD H,C",       4;
         0x71,       "LD (HL),C",    8;
+        0x81,       "ADD A,C",      4;
         0x91,       "SUB C",        4;
         0xa1,       "AND C",        4;
         0xc1,       "POP BC",       12;
@@ -1087,6 +1156,7 @@ lazy_static! {
         0x52,       "LD D,D",       4;
         0x62,       "LD H,D",       4;
         0x72,       "LD (HL),D",    8;
+        0x82,       "ADD A,D",      4;
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
         0xc2,       "JP NZ,a16",    12;
@@ -1101,6 +1171,7 @@ lazy_static! {
         0x53,       "LD D,E",       4;
         0x63,       "LD H,E",       4;
         0x73,       "LD (HL),E",    8;
+        0x83,       "ADD A,E",      4;
         0x93,       "SUB E",        4;
         0xa3,       "AND E",        4;
         0xc3,       "JP a16",       16;
@@ -1113,6 +1184,7 @@ lazy_static! {
         0x54,       "LD D,H",       4;
         0x64,       "LD H,H",       4;
         0x74,       "LD (HL),H",    8;
+        0x84,       "ADD A,H",      4;
         0x94,       "SUB H",        4;
         0xa4,       "AND H",        4;
         0xc4,       "CALL NZ,a16",  12;
@@ -1125,6 +1197,7 @@ lazy_static! {
         0x55,       "LD D,L",       4;
         0x65,       "LD H,L",       4;
         0x75,       "LD (HL),L",    8;
+        0x85,       "ADD A,L",      4;
         0x95,       "SUB L",        4;
         0xa5,       "AND L",        4;
         0xc5,       "PUSH BC",      16;
@@ -1138,14 +1211,17 @@ lazy_static! {
         0x46,       "LD B,(HL)",    8;
         0x56,       "LD D,(HL)",    8;
         0x66,       "LD H,(HL)",    8;
+        0x86,       "ADD A,(HL)",   8;
         0x96,       "SUB (HL)",     8;
         0xa6,       "AND (HL)",     8;
+        0xc6,       "ADD A,d8",     8;
         0xd6,       "SUB d8",       8;
         0xe6,       "AND d8",       8;
         0x47,       "LD B,A",       4;
         0x57,       "LD D,A",       4;
         0x67,       "LD H,A",       4;
         0x77,       "LD (HL),A",    8;
+        0x87,       "ADD A,A",      4;
         0x97,       "SUB A",        4;
         0xa7,       "AND A",        4;
         0xc7,       "RST 00H",      16;
@@ -1258,6 +1334,10 @@ mod tests {
 
     #[test]
     fn carry() {
+        assert!(super::is_carry_add(0xff, 0xff));
+        assert!(super::is_carry_add(0xff, 0x01));
+        assert!(!super::is_carry_add(0x00, 0x01));
+
         assert!(super::is_carry_sub(0x00, 0x01));
         assert!(!super::is_carry_sub(0xff, 0x0f));
     }
