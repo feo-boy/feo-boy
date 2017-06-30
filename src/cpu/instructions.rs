@@ -160,6 +160,18 @@ impl super::Cpu {
                 }
             }
 
+            // LD B,B
+            0x40 => (),
+
+            // LD D,B
+            0x50 => self.reg.d = self.reg.b,
+
+            // LD H,B
+            0x60 => self.reg.h = self.reg.b,
+
+            // LD (HL),B
+            0x70 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.b),
+
             // SUB B
             0x90 => {
                 let b = self.reg.b;
@@ -226,6 +238,18 @@ impl super::Cpu {
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(&instruction.operands),
 
+            // LD B,C
+            0x41 => self.reg.b = self.reg.c,
+
+            // LD D,C
+            0x51 => self.reg.d = self.reg.c,
+
+            // LD H,C
+            0x61 => self.reg.h = self.reg.c,
+
+            // LD (HL),C
+            0x71 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.c),
+
             // SUB C
             0x91 => {
                 let c = self.reg.c;
@@ -280,6 +304,18 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // LD B,D
+            0x42 => self.reg.b = self.reg.d,
+
+            // LD D,D
+            0x52 => (),
+
+            // LD H,D
+            0x62 => self.reg.h = self.reg.d,
+
+            // LD (HL),D
+            0x72 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.d),
+
             // SUB D
             0x92 => {
                 let d = self.reg.d;
@@ -327,6 +363,18 @@ impl super::Cpu {
             // INC SP
             0x33 => self.reg.sp.add_assign(1),
 
+            // LD B,E
+            0x43 => self.reg.b = self.reg.e,
+
+            // LD D,E
+            0x53 => self.reg.d = self.reg.e,
+
+            // LD H,E
+            0x63 => self.reg.h = self.reg.e,
+
+            // LD (HL),E
+            0x73 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.e),
+
             // SUB E
             0x93 => {
                 let e = self.reg.e;
@@ -360,6 +408,18 @@ impl super::Cpu {
                 Self::inc(&mut byte, &mut self.reg.f);
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
             }
+
+            // LD B,H
+            0x44 => self.reg.b = self.reg.h,
+
+            // LD D,H
+            0x54 => self.reg.d = self.reg.h,
+
+            // LD H,H
+            0x64 => (),
+
+            // LD (HL),H
+            0x74 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.h),
 
             // SUB H
             0x94 => {
@@ -407,6 +467,18 @@ impl super::Cpu {
                 self.mmu.borrow_mut().write_byte(self.reg.hl(), byte);
             }
 
+            // LD B,L
+            0x45 => self.reg.b = self.reg.l,
+
+            // LD D,L
+            0x55 => self.reg.d = self.reg.l,
+
+            // LD H,L
+            0x65 => self.reg.h = self.reg.l,
+
+            // LD (HL),L
+            0x75 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.l),
+
             // SUB L
             0x95 => {
                 let l = self.reg.l;
@@ -451,6 +523,23 @@ impl super::Cpu {
 
             // LD H,d8
             0x26 => self.reg.h = instruction.operands[0],
+
+            // LD (HL),d8
+            0x36 => {
+                self.mmu.borrow_mut().write_byte(
+                    self.reg.hl(),
+                    instruction.operands[0],
+                )
+            }
+
+            // LD B,(HL)
+            0x46 => self.reg.b = self.mmu.borrow().read_byte(self.reg.hl()),
+
+            // LD D,(HL)
+            0x56 => self.reg.d = self.mmu.borrow().read_byte(self.reg.hl()),
+
+            // LD H,(HL)
+            0x66 => self.reg.h = self.mmu.borrow().read_byte(self.reg.hl()),
 
             // SUB (HL)
             0x96 => {
@@ -842,6 +931,10 @@ lazy_static! {
         0x10,       "STOP",         4;
         0x20,       "JR NZ,r8",     8;
         0x30,       "JR NC,r8",     8;
+        0x40,       "LD B,B",       4;
+        0x50,       "LD D,B",       4;
+        0x60,       "LD H,B",       4;
+        0x70,       "LD (HL),B",    8;
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
         0xc0,       "RET NZ",       8;
@@ -852,6 +945,10 @@ lazy_static! {
         0x11,       "LD DE,d16",    12;
         0x21,       "LD HL,d16",    12;
         0x31,       "LD SP,d16",    12;
+        0x41,       "LD B,C",       4;
+        0x51,       "LD D,C",       4;
+        0x61,       "LD H,C",       4;
+        0x71,       "LD (HL),C",    8;
         0x91,       "SUB C",        4;
         0xa1,       "AND C",        4;
         0xc1,       "POP BC",       12;
@@ -862,6 +959,10 @@ lazy_static! {
         0x12,       "LD (DE),A",    8;
         0x22,       "LD (HL+),A",   8;      // AKA LD (HLI),A or LDI A,(HL)
         0x32,       "LD (HL-),A",   8;      // AKA LD (HLD),A or LDD A,(HL)
+        0x42,       "LD B,D",       4;
+        0x52,       "LD D,D",       4;
+        0x62,       "LD H,D",       4;
+        0x72,       "LD (HL),D",    8;
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
         0xc2,       "JP NZ,a16",    12;
@@ -871,6 +972,10 @@ lazy_static! {
         0x13,       "INC DE",       8;
         0x23,       "INC HL",       8;
         0x33,       "INC SP",       8;
+        0x43,       "LD B,E",       4;
+        0x53,       "LD D,E",       4;
+        0x63,       "LD H,E",       4;
+        0x73,       "LD (HL),E",    8;
         0x93,       "SUB E",        4;
         0xa3,       "AND E",        4;
         0xc3,       "JP a16",       16;
@@ -879,6 +984,10 @@ lazy_static! {
         0x14,       "INC D",        4;
         0x24,       "INC H",        4;
         0x34,       "INC (HL)",     12;
+        0x44,       "LD B,H",       4;
+        0x54,       "LD D,H",       4;
+        0x64,       "LD H,H",       4;
+        0x74,       "LD (HL),H",    8;
         0x94,       "SUB H",        4;
         0xa4,       "AND H",        4;
         0xc4,       "CALL NZ,a16",  12;
@@ -887,6 +996,10 @@ lazy_static! {
         0x15,       "DEC D",        4;
         0x25,       "DEC H",        4;
         0x35,       "DEC (HL)",     12;
+        0x45,       "LD B,L",       4;
+        0x55,       "LD D,L",       4;
+        0x65,       "LD H,L",       4;
+        0x75,       "LD (HL),L",    8;
         0x95,       "SUB L",        4;
         0xa5,       "AND L",        4;
         0xc5,       "PUSH BC",      16;
@@ -896,6 +1009,10 @@ lazy_static! {
         0x06,       "LD B,d8",      8;
         0x16,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
+        0x36,       "LD (HL),d8",   12;
+        0x46,       "LD B,(HL)",    8;
+        0x56,       "LD D,(HL)",    8;
+        0x66,       "LD H,(HL)",    8;
         0x96,       "SUB (HL)",     8;
         0xa6,       "AND (HL)",     8;
         0xd6,       "SUB d8",       8;
