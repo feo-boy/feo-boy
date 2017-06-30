@@ -351,6 +351,13 @@ impl super::Cpu {
                 self.mmu.borrow_mut().write_byte(address, self.reg.a);
             }
 
+            // LD A,(C)
+            // LD A,($FF00+C)
+            0xf2 => {
+                let address = 0xff00u16 + &self.reg.c.into();
+                self.reg.a = self.mmu.borrow().read_byte(address);
+            }
+
             // INC BC
             0x03 => self.reg.bc_mut().add_assign(1),
 
@@ -562,6 +569,15 @@ impl super::Cpu {
                 self.reg.and(byte);
             }
 
+            // LD B,A
+            0x47 => self.reg.b = self.reg.a,
+
+            // LD D,A
+            0x57 => self.reg.d = self.reg.a,
+
+            // LD H,A
+            0x67 => self.reg.h = self.reg.a,
+
             // LD (HL),A
             0x77 => self.mmu.borrow_mut().write_byte(self.reg.hl(), self.reg.a),
 
@@ -608,6 +624,18 @@ impl super::Cpu {
                 }
             }
 
+            // LD C,B
+            0x48 => self.reg.c = self.reg.b,
+
+            // LD E,B
+            0x58 => self.reg.e = self.reg.b,
+
+            // LD L,B
+            0x68 => self.reg.l = self.reg.b,
+
+            // LD A,B
+            0x78 => self.reg.a = self.reg.b,
+
             // XOR B
             0xa8 => {
                 let b = self.reg.b;
@@ -631,6 +659,18 @@ impl super::Cpu {
                     cycles += 12;
                 }
             }
+
+            // LD C,C
+            0x49 => (),
+
+            // LD E,C
+            0x59 => self.reg.e = self.reg.c,
+
+            // LD L,C
+            0x69 => self.reg.l = self.reg.c,
+
+            // LD A,C
+            0x79 => self.reg.a = self.reg.c,
 
             // XOR C
             0xa9 => {
@@ -673,10 +713,34 @@ impl super::Cpu {
                 self.reg.hl_mut().sub_assign(1);
             }
 
+            // LD C,D
+            0x4a => self.reg.c = self.reg.d,
+
+            // LD E,D
+            0x5a => self.reg.e = self.reg.d,
+
+            // LD L,D
+            0x6a => self.reg.l = self.reg.d,
+
+            // LD A,D
+            0x7a => self.reg.a = self.reg.d,
+
             // XOR D
             0xaa => {
                 let d = self.reg.d;
                 self.reg.xor(d);
+            }
+
+            // LD (a16),A
+            0xea => {
+                let address = LittleEndian::read_u16(&instruction.operands);
+                self.mmu.borrow_mut().write_byte(address, self.reg.a);
+            }
+
+            // LD A,(a16)
+            0xfa => {
+                let address = LittleEndian::read_u16(&instruction.operands);
+                self.reg.a = self.mmu.borrow().read_byte(address);
             }
 
             // DEC BC
@@ -690,6 +754,18 @@ impl super::Cpu {
 
             // DEC SP
             0x3b => self.reg.sp -= 1,
+
+            // LD C,E
+            0x4b => self.reg.c = self.reg.e,
+
+            // LD E,E
+            0x5b => (),
+
+            // LD L,E
+            0x6b => self.reg.l = self.reg.e,
+
+            // LD A,E
+            0x7b => self.reg.a = self.reg.e,
 
             // XOR E
             0xab => {
@@ -716,6 +792,18 @@ impl super::Cpu {
 
             // INC A
             0x3c => Self::inc(&mut self.reg.a, &mut self.reg.f),
+
+            // LD C,H
+            0x4c => self.reg.c = self.reg.h,
+
+            // LD E,H
+            0x5c => self.reg.e = self.reg.h,
+
+            // LD L,H
+            0x6c => self.reg.l = self.reg.h,
+
+            // LD A,H
+            0x7c => self.reg.a = self.reg.h,
 
             // XOR H
             0xac => {
@@ -753,6 +841,18 @@ impl super::Cpu {
             // DEC A
             0x3d => Self::dec(&mut self.reg.a, &mut self.reg.f),
 
+            // LD C,L
+            0x4d => self.reg.c = self.reg.l,
+
+            // LD E,L
+            0x5d => self.reg.e = self.reg.l,
+
+            // LD L,L
+            0x6d => (),
+
+            // LD A,L
+            0x7d => self.reg.a = self.reg.l,
+
             // XOR L
             0xad => {
                 let l = self.reg.l;
@@ -776,6 +876,18 @@ impl super::Cpu {
             // LD A,d8
             0x3e => self.reg.a = instruction.operands[0],
 
+            // LD C,(HL)
+            0x4e => self.reg.c = self.mmu.borrow().read_byte(self.reg.hl()),
+
+            // LD E,(HL)
+            0x5e => self.reg.e = self.mmu.borrow().read_byte(self.reg.hl()),
+
+            // LD L,(HL)
+            0x6e => self.reg.l = self.mmu.borrow().read_byte(self.reg.hl()),
+
+            // LD A,(HL)
+            0x7e => self.reg.a = self.mmu.borrow().read_byte(self.reg.hl()),
+
             // XOR (HL)
             0xae => {
                 let byte = self.mmu.borrow().read_byte(self.reg.hl());
@@ -787,6 +899,18 @@ impl super::Cpu {
 
             // CP d8
             0xfe => self.reg.cp(instruction.operands[0]),
+
+            // LD C,A
+            0x4f => self.reg.c = self.reg.a,
+
+            // LD E,A
+            0x5f => self.reg.e = self.reg.a,
+
+            // LD L,A
+            0x6f => self.reg.l = self.reg.a,
+
+            // LD A,A
+            0x7f => (),
 
             // XOR A
             0xaf => {
@@ -967,7 +1091,8 @@ lazy_static! {
         0xa2,       "AND D",        4;
         0xc2,       "JP NZ,a16",    12;
         0xd2,       "JP NC,a16",    12;
-        0xe2,       "LD (C),A",     8;      // AKA LD ($rFF00+C),A
+        0xe2,       "LD (C),A",     8;      // AKA LD ($FF00+C),A
+        0xf2,       "LD A,(C)",     8;      // AKA LD A,($FF00+C)
         0x03,       "INC BC",       8;
         0x13,       "INC DE",       8;
         0x23,       "INC HL",       8;
@@ -1017,6 +1142,9 @@ lazy_static! {
         0xa6,       "AND (HL)",     8;
         0xd6,       "SUB d8",       8;
         0xe6,       "AND d8",       8;
+        0x47,       "LD B,A",       4;
+        0x57,       "LD D,A",       4;
+        0x67,       "LD H,A",       4;
         0x77,       "LD (HL),A",    8;
         0x97,       "SUB A",        4;
         0xa7,       "AND A",        4;
@@ -1027,9 +1155,17 @@ lazy_static! {
         0x18,       "JR r8",        12;
         0x28,       "JR Z,r8",      8;
         0x38,       "JR C,r8",      8;
+        0x48,       "LD C,B",       4;
+        0x58,       "LD E,B",       4;
+        0x68,       "LD L,B",       4;
+        0x78,       "LD A,B",       4;
         0xa8,       "XOR B",        4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
+        0x49,       "LD C,C",       4;
+        0x59,       "LD E,C",       4;
+        0x69,       "LD L,C",       4;
+        0x79,       "LD A,C",       4;
         0xa9,       "XOR C",        4;
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
@@ -1037,11 +1173,21 @@ lazy_static! {
         0x1a,       "LD A,(DE)",    8;
         0x2a,       "LD A,(HL+)",   8;      // AKA LD A,(HLI) or LDI A,(HL)
         0x3a,       "LD A,(HL-)",   8;      // AKA LD A,(HLD) or LDD A,(HL)
+        0x4a,       "LD C,D",       4;
+        0x5a,       "LD E,D",       4;
+        0x6a,       "LD L,D",       4;
+        0x7a,       "LD A,D",       4;
         0xaa,       "XOR D",        4;
+        0xea,       "LD (a16),A",   16;
+        0xfa,       "LD A,(a16)",   16;
         0x0b,       "DEC BC",       8;
         0x1b,       "DEC DE",       8;
         0x2b,       "DEC HL",       8;
         0x3b,       "DEC SP",       8;
+        0x4b,       "LD C,E",       4;
+        0x5b,       "LD E,E",       4;
+        0x6b,       "LD L,E",       4;
+        0x7b,       "LD A,E",       4;
         0xab,       "XOR E",        4;
         0xcb,       "PREFIX CB",    0;
         0xfb,       "EI",           4;
@@ -1049,6 +1195,10 @@ lazy_static! {
         0x1c,       "INC E",        4;
         0x2c,       "INC L",        4;
         0x3c,       "INC A",        4;
+        0x4c,       "LD C,H",       4;
+        0x5c,       "LD E,H",       4;
+        0x6c,       "LD L,H",       4;
+        0x7c,       "LD A,H",       4;
         0xac,       "XOR H",        4;
         0xcc,       "CALL Z,a16",   12;
         0xdc,       "CALL C,a16",   12;
@@ -1056,15 +1206,27 @@ lazy_static! {
         0x1d,       "DEC E",        4;
         0x2d,       "DEC L",        4;
         0x3d,       "DEC A",        4;
+        0x4d,       "LD C,L",       4;
+        0x5d,       "LD E,L",       4;
+        0x6d,       "LD L,L",       4;
+        0x7d,       "LD A,L",       4;
         0xad,       "XOR L",        4;
         0xcd,       "CALL a16",     24;
         0x0e,       "LD C,d8",      8;
         0x1e,       "LD E,d8",      8;
         0x2e,       "LD L,d8",      8;
         0x3e,       "LD A,d8",      8;
+        0x4e,       "LD C,(HL)",    8;
+        0x5e,       "LD E,(HL)",    8;
+        0x6e,       "LD L,(HL)",    8;
+        0x7e,       "LD A,(HL)",    8;
         0xae,       "XOR (HL)",     8;
         0xee,       "XOR d8",       8;
         0xfe,       "CP d8",        8;
+        0x4f,       "LD C,A",       4;
+        0x5f,       "LD E,A",       4;
+        0x6f,       "LD L,A",       4;
+        0x7f,       "LD A,A",       4;
         0xaf,       "XOR A",        4;
         0xcf,       "RST 08H",      16;
         0xdf,       "RST 18H",      16;
@@ -1081,7 +1243,7 @@ mod tests {
     use smallvec::SmallVec;
 
     use cpu::Cpu;
-    use memory::Mmu;
+    use memory::{Addressable, Mmu};
 
     use super::{INSTRUCTIONS, Instruction};
 
@@ -1212,6 +1374,40 @@ mod tests {
         // FIXME: We can't actually test this until the I/O memory
         // is implemented.
         // assert_eq!(cpu.mmu.borrow().read_byte(0xFF11), 0xab);
+    }
+
+    // FIXME: Add test for 0xf2 after I/O memory is implemented.
+
+    #[test]
+    fn ld_addr_a16_a() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        cpu.reg.a = 0x11;
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xea].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0x00, 0xc0]),
+        };
+        cpu.execute(instruction);
+
+        assert_eq!(cpu.mmu.borrow().read_byte(0xc000), 0x11);
+    }
+
+    #[test]
+    fn ld_a_addr_a16() {
+        let mmu = Mmu::default();
+        let mut cpu = Cpu::new(Rc::new(RefCell::new(mmu)));
+
+        cpu.mmu.borrow_mut().write_byte(0xc000, 0xaa);
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xfa].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0x00, 0xc0]),
+        };
+        cpu.execute(instruction);
+
+        assert_eq!(cpu.reg.a, 0xaa);
     }
 
     #[test]
