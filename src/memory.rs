@@ -461,6 +461,22 @@ impl Addressable for Mmu {
                         }
                     }
 
+                    // LCDC - LCD Control
+                    0xFF40 => {
+                        let control = &mut self.ppu_mut().control;
+
+                        control.display_enabled = byte.has_bit_set(7);
+                        control.window_map_start =
+                            if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
+                        control.window_enabled = byte.has_bit_set(5);
+                        control.window_data_start =
+                            if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
+                        control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
+                        control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
+                        control.sprites_enabled = byte.has_bit_set(1);
+                        control.background_enabled = byte.has_bit_set(0);
+                    }
+
                     // STAT - LCDC Status
                     0xFF41 => {
                         let mut ppu = self.ppu_mut();

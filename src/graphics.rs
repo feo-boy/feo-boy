@@ -62,10 +62,40 @@ pub struct Interrupts {
     pub ly_lyc: bool,
 }
 
+/// Core LCD settings.
+#[derive(Debug, Default)]
+pub struct LcdControl {
+    /// Whether the LCD is operating.
+    pub display_enabled: bool,
+
+    /// True if window memory should be displayed.
+    pub window_enabled: bool,
+
+    /// True if sprites should be displayed.
+    pub sprites_enabled: bool,
+
+    /// True if the background should be displayed.
+    pub background_enabled: bool,
+
+    /// The address of the start of the window tile map.
+    pub window_map_start: u16,
+
+    /// The address of the start of the background and window tile data.
+    pub window_data_start: u16,
+
+    /// The address of the start of the background tile map.
+    pub bg_map_start: u16,
+
+    /// The size of the sprites being used. Valid values are 8x8 and 8x16.
+    pub sprite_size: (u8, u8),
+}
+
 /// The picture processing unit.
 #[derive(Debug, Default)]
 pub struct Ppu {
     mem: Memory,
+
+    pub control: LcdControl,
 
     /// The current mode number of the PPU operation.
     ///
