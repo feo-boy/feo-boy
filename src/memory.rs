@@ -503,6 +503,32 @@ impl Addressable for Mmu {
                         }
                     }
 
+                    // OBP0 - Object Palette 0 Data
+                    0xFF48 => {
+                        use graphics::Shade;
+
+                        let mut palette = &mut self.ppu_mut().sprite_palette[0];
+
+                        palette[0] = Shade::Transparent;
+                        for i in 1..4 {
+                            let shade = (byte >> (i * 2)) & 0x3;
+                            palette[i] = shade.into();
+                        }
+                    }
+
+                    // OBP1 - Object Palette 1 Data
+                    0xFF49 => {
+                        use graphics::Shade;
+
+                        let mut palette = &mut self.ppu_mut().sprite_palette[1];
+
+                        palette[0] = Shade::Transparent;
+                        for i in 1..4 {
+                            let shade = (byte >> (i * 2)) & 0x3;
+                            palette[i] = shade.into();
+                        }
+                    }
+
                     // Unmap BIOS
                     0xFF50 => {
                         if self.bios_mapped {

@@ -13,6 +13,9 @@ pub enum Shade {
     LightGray,
     DarkGray,
     Black,
+
+    /// A shade that is only used by sprites.
+    Transparent,
 }
 
 impl Default for Shade {
@@ -123,6 +126,12 @@ pub struct Ppu {
     /// This array can be thought of as a map from color number to shade, where the color numbers
     /// are those used by the Background and Window tiles.
     pub bg_palette: [Shade; 4],
+
+    /// The two object palettes.
+    ///
+    /// Each array can be thought of as a map from color number to shade, where the color numbers
+    /// are those used by the sprite tiles. Note that color 0 is always transparent for sprites.
+    pub sprite_palette: [[Shade; 4]; 2],
 
     /// The current line position of the PPU. The last line is 143.
     pub line: u8,
