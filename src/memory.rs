@@ -313,6 +313,151 @@ impl Mmu {
         info!("unmapping BIOS");
         self.bios_mapped = false;
     }
+
+    fn read_io_register(&self, address: u16) -> u8 {
+        match address {
+            // STAT - LCDC Status
+            0xFF41 => {
+                let mut register = 0u8;
+
+                let ppu = self.ppu();
+
+                // Set the lowest two bits to the mode.
+                register |= ppu.mode;
+
+                // Set bit 2 if LY == LYC
+                register.set_bit(2, self.read_byte(0xFF44) == self.read_byte(0xFF45));
+
+                // Other bits are set if the various interrupts are enabled.
+                register.set_bit(3, ppu.interrupts.hblank);
+                register.set_bit(4, ppu.interrupts.vblank);
+                register.set_bit(5, ppu.interrupts.oam);
+                register.set_bit(6, ppu.interrupts.ly_lyc);
+
+                // The highest bit is unspecified.
+
+                register
+            }
+
+            // LCDC Y-Coordinate
+            0xFF44 => self.ppu().line,
+
+            // LYC - LY Compare
+            0xFF45 => self.ppu().line_compare,
+
+            _ => {
+                error!("read unimplemented I/O register {:#04x}", address);
+                0x00
+            }
+        }
+    }
+
+    fn write_io_register(&mut self, address: u16, byte: u8) {
+        match address {
+            // NR11 - Channel 1 Sound length/Wave pattern duty
+            0xFF11 => {
+                warn!("attempted to modify sound channel 1 wave (unimplemented)");
+            }
+
+            // NR12 - Channel 1 Volume Envelope
+            0xFF12 => {
+                warn!("attempted to modify sound channel 1 volume (unimplemented)");
+            }
+
+            // NR50 - Channel control / ON-OFF / Volume
+            0xFF24 => {
+                warn!("attempted to modify master volume (unimplemented)");
+            }
+
+            // NR51 - Selection of Sound output terminal
+            0xFF25 => {
+                warn!("attempted to modify sound output terminal (unimplemented)");
+            }
+
+            // Sound on/off
+            0xFF26 => {
+                // Only the high bit is writable.
+                if byte.has_bit_set(7) {
+                    info!("enabling sound controller");
+                    warn!("sound controller not implemented");
+                }
+            }
+
+            // LCDC - LCD Control
+            0xFF40 => {
+                let control = &mut self.ppu_mut().control;
+
+                control.display_enabled = byte.has_bit_set(7);
+                control.window_map_start = if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
+                control.window_enabled = byte.has_bit_set(5);
+                control.window_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
+                control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
+                control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
+                control.sprites_enabled = byte.has_bit_set(1);
+                control.background_enabled = byte.has_bit_set(0);
+            }
+
+            // STAT - LCDC Status
+            0xFF41 => {
+                let mut ppu = self.ppu_mut();
+
+                ppu.interrupts.hblank = byte.has_bit_set(3);
+                ppu.interrupts.vblank = byte.has_bit_set(4);
+                ppu.interrupts.oam = byte.has_bit_set(5);
+                ppu.interrupts.ly_lyc = byte.has_bit_set(6);
+            }
+
+            // SCY - Scroll Y
+            0xFF42 => self.ppu_mut().bg_scroll.y = byte,
+
+            // SCX - Scroll X
+            0xFF43 => self.ppu_mut().bg_scroll.x = byte,
+
+            // BGP - BG Palette Data
+            0xFF47 => {
+                let mut palette = &mut self.ppu_mut().bg_palette;
+
+                for i in 0..4 {
+                    let shade = (byte >> (i * 2)) & 0x3;
+                    palette[i] = shade.into();
+                }
+            }
+
+            // OBP0 - Object Palette 0 Data
+            0xFF48 => {
+                use graphics::Shade;
+
+                let mut palette = &mut self.ppu_mut().sprite_palette[0];
+
+                palette[0] = Shade::Transparent;
+                for i in 1..4 {
+                    let shade = (byte >> (i * 2)) & 0x3;
+                    palette[i] = shade.into();
+                }
+            }
+
+            // OBP1 - Object Palette 1 Data
+            0xFF49 => {
+                use graphics::Shade;
+
+                let mut palette = &mut self.ppu_mut().sprite_palette[1];
+
+                palette[0] = Shade::Transparent;
+                for i in 1..4 {
+                    let shade = (byte >> (i * 2)) & 0x3;
+                    palette[i] = shade.into();
+                }
+            }
+
+            // Unmap BIOS
+            0xFF50 => {
+                if self.bios_mapped {
+                    self.unmap_bios()
+                }
+            }
+            _ => error!("write to unimplemented I/O register {:#02x}", address),
+        }
+    }
 }
 
 impl Addressable for Mmu {
@@ -350,43 +495,7 @@ impl Addressable for Mmu {
             0xFEA0...0xFEFF => 0x00,
 
             // I/O Registers
-            0xFF00...0xFF7F => {
-                match address {
-                    // STAT - LCDC Status
-                    0xFF41 => {
-                        let mut register = 0u8;
-
-                        let ppu = self.ppu();
-
-                        // Set the lowest two bits to the mode.
-                        register |= ppu.mode;
-
-                        // Set bit 2 if LY == LYC
-                        register.set_bit(2, self.read_byte(0xFF44) == self.read_byte(0xFF45));
-
-                        // Other bits are set if the various interrupts are enabled.
-                        register.set_bit(3, ppu.interrupts.hblank);
-                        register.set_bit(4, ppu.interrupts.vblank);
-                        register.set_bit(5, ppu.interrupts.oam);
-                        register.set_bit(6, ppu.interrupts.ly_lyc);
-
-                        // The highest bit is unspecified.
-
-                        register
-                    }
-
-                    // LCDC Y-Coordinate
-                    0xFF44 => self.ppu().line,
-
-                    // LYC - LY Compare
-                    0xFF45 => self.ppu().line_compare,
-
-                    _ => {
-                        error!("read unimplemented I/O register {:#04x}", address);
-                        0x00
-                    }
-                }
-            }
+            0xFF00...0xFF7F => self.read_io_register(address),
 
             // Zero-Page RAM
             0xFF80...0xFFFF => {
@@ -428,116 +537,8 @@ impl Addressable for Mmu {
             // Reserved, unused
             0xFEA0...0xFEFF => (),
 
-            // Memory-Mapped I/O
-            0xFF00...0xFF7F => {
-                // I/O Registers
-                match address {
-                    // NR11 - Channel 1 Sound length/Wave pattern duty
-                    0xFF11 => {
-                        warn!("attempted to modify sound channel 1 wave (unimplemented)");
-                    }
-
-                    // NR12 - Channel 1 Volume Envelope
-                    0xFF12 => {
-                        warn!("attempted to modify sound channel 1 volume (unimplemented)");
-                    }
-
-                    // NR50 - Channel control / ON-OFF / Volume
-                    0xFF24 => {
-                        warn!("attempted to modify master volume (unimplemented)");
-                    }
-
-                    // NR51 - Selection of Sound output terminal
-                    0xFF25 => {
-                        warn!("attempted to modify sound output terminal (unimplemented)");
-                    }
-
-                    // Sound on/off
-                    0xFF26 => {
-                        // Only the high bit is writable.
-                        if byte.has_bit_set(7) {
-                            info!("enabling sound controller");
-                            warn!("sound controller not implemented");
-                        }
-                    }
-
-                    // LCDC - LCD Control
-                    0xFF40 => {
-                        let control = &mut self.ppu_mut().control;
-
-                        control.display_enabled = byte.has_bit_set(7);
-                        control.window_map_start =
-                            if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
-                        control.window_enabled = byte.has_bit_set(5);
-                        control.window_data_start =
-                            if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
-                        control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
-                        control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
-                        control.sprites_enabled = byte.has_bit_set(1);
-                        control.background_enabled = byte.has_bit_set(0);
-                    }
-
-                    // STAT - LCDC Status
-                    0xFF41 => {
-                        let mut ppu = self.ppu_mut();
-
-                        ppu.interrupts.hblank = byte.has_bit_set(3);
-                        ppu.interrupts.vblank = byte.has_bit_set(4);
-                        ppu.interrupts.oam = byte.has_bit_set(5);
-                        ppu.interrupts.ly_lyc = byte.has_bit_set(6);
-                    }
-
-                    // SCY - Scroll Y
-                    0xFF42 => self.ppu_mut().bg_scroll.y = byte,
-
-                    // SCX - Scroll X
-                    0xFF43 => self.ppu_mut().bg_scroll.x = byte,
-
-                    // BGP - BG Palette Data
-                    0xFF47 => {
-                        let mut palette = &mut self.ppu_mut().bg_palette;
-
-                        for i in 0..4 {
-                            let shade = (byte >> (i * 2)) & 0x3;
-                            palette[i] = shade.into();
-                        }
-                    }
-
-                    // OBP0 - Object Palette 0 Data
-                    0xFF48 => {
-                        use graphics::Shade;
-
-                        let mut palette = &mut self.ppu_mut().sprite_palette[0];
-
-                        palette[0] = Shade::Transparent;
-                        for i in 1..4 {
-                            let shade = (byte >> (i * 2)) & 0x3;
-                            palette[i] = shade.into();
-                        }
-                    }
-
-                    // OBP1 - Object Palette 1 Data
-                    0xFF49 => {
-                        use graphics::Shade;
-
-                        let mut palette = &mut self.ppu_mut().sprite_palette[1];
-
-                        palette[0] = Shade::Transparent;
-                        for i in 1..4 {
-                            let shade = (byte >> (i * 2)) & 0x3;
-                            palette[i] = shade.into();
-                        }
-                    }
-
-                    // Unmap BIOS
-                    0xFF50 => {
-                        if self.bios_mapped {
-                            self.unmap_bios()
-                        }
-                    }
-                    _ => error!("write to unimplemented I/O register {:#02x}", address),
-                }
-            }
+            // I/O Registers
+            0xFF00...0xFF7F => self.write_io_register(address, byte),
 
             // Zero-Page RAM
             0xFF80...0xFFFF => {
