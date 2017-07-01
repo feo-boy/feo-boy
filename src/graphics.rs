@@ -90,6 +90,13 @@ pub struct LcdControl {
     pub sprite_size: (u8, u8),
 }
 
+/// An X/Y coordinate pair.
+#[derive(Debug, Default)]
+pub struct Position {
+    pub x: u8,
+    pub y: u8,
+}
+
 /// The picture processing unit.
 #[derive(Debug, Default)]
 pub struct Ppu {
@@ -119,6 +126,10 @@ pub struct Ppu {
 
     /// The current line position of the PPU. The last line is 143.
     pub line: u8,
+
+    /// The position in the 256x256 background tile map that should be displayed from the upper
+    /// left.
+    pub bg_scroll: Position,
 
     /// A value that is compared against the current line.
     ///

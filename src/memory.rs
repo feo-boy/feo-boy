@@ -487,6 +487,12 @@ impl Addressable for Mmu {
                         ppu.interrupts.ly_lyc = byte.has_bit_set(6);
                     }
 
+                    // SCY - Scroll Y
+                    0xFF42 => self.ppu_mut().bg_scroll.y = byte,
+
+                    // SCX - Scroll X
+                    0xFF43 => self.ppu_mut().bg_scroll.x = byte,
+
                     // BGP - BG Palette Data
                     0xFF47 => {
                         let mut palette = &mut self.ppu_mut().bg_palette;
