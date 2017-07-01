@@ -150,6 +150,10 @@ impl Mmu {
     ///
     /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        if rom.len() < self.mem.rom.len() {
+            bail!(ErrorKind::InvalidCartridge("size too small".into()))
+        }
+
         self.cartridge_rom = rom.to_vec();
 
         let initial_banks = &self.cartridge_rom[..self.mem.rom.len()];
@@ -160,6 +164,25 @@ impl Mmu {
             .map(|&c| c as char)
             .collect::<String>();
         info!("title: {}", title);
+
+        let header_sum = {
+            let mut x = Wrapping(0u8);
+            for byte in rom[0x134..0x14D].iter() {
+                x = x - Wrapping(*byte) - Wrapping(1u8);
+            }
+
+            x.0
+        };
+        let header_checksum = rom[0x14D];
+        if header_sum != header_checksum {
+            let msg = format!(
+                "header checksum {:#02} is not equal to sum {:#02}",
+                header_checksum,
+                header_sum
+            );
+            bail!(ErrorKind::InvalidCartridge(msg))
+        }
+        info!("header checksum OK");
 
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
@@ -232,25 +255,6 @@ impl Mmu {
             _ => "Non-Japanese",
         };
         info!("region: {}", region);
-
-        let header_sum = {
-            let mut x = Wrapping(0u8);
-            for byte in rom[0x134..0x14D].iter() {
-                x = x - Wrapping(*byte) - Wrapping(1u8);
-            }
-
-            x.0
-        };
-        let header_checksum = rom[0x14D];
-        if header_sum != header_checksum {
-            let msg = format!(
-                "header checksum {:#02} is not equal to sum {:#02}",
-                header_checksum,
-                header_sum
-            );
-            bail!(ErrorKind::InvalidCartridge(msg))
-        }
-        info!("header checksum OK");
 
         let global_sum: Wrapping<u16> = rom.iter()
             .enumerate()
