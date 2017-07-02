@@ -703,6 +703,30 @@ impl super::Cpu {
                 }
             }
 
+            // ADD HL,BC
+            0x09 => {
+                let bc = self.reg.bc();
+                self.reg.add_hl(bc);
+            }
+
+            // ADD HL,DE
+            0x19 => {
+                let de = self.reg.de();
+                self.reg.add_hl(de);
+            }
+
+            // ADD HL,HL
+            0x29 => {
+                let hl = self.reg.hl();
+                self.reg.add_hl(hl);
+            }
+
+            // ADD HL,SP
+            0x39 => {
+                let sp = self.reg.sp;
+                self.reg.add_hl(sp);
+            }
+
             // LD C,C
             0x49 => (),
 
@@ -1060,6 +1084,17 @@ impl super::Registers {
         self.f.set(ZERO, self.a == 0);
     }
 
+    /// Adds a 16-bit number to the HL register pair and sets the flags appropriately.
+    fn add_hl(&mut self, rhs: u16) {
+        let hl = self.hl();
+
+        self.f.remove(SUBTRACT);
+        self.f.set(HALF_CARRY, is_half_carry_add_16(hl, rhs));
+        self.f.set(CARRY, is_carry_add_16(hl, rhs));
+
+        self.hl_mut().add_assign(rhs);
+    }
+
     /// Subtracts a byte from the accumulator and sets the flags appropriately.
     fn sub(&mut self, rhs: u8) {
         self.cp(rhs);
@@ -1076,13 +1111,24 @@ impl super::Registers {
 
 /// Returns `true` if the addition of two bytes requires a carry.
 fn is_carry_add(a: u8, b: u8) -> bool {
-    ((a as u16 + b as u16) & 0x0100) == 0x0100
+    a.wrapping_add(b) < a
+}
+
+/// Returns `true` if the addition of two 16-bit numbers requires a carry.
+fn is_carry_add_16(a: u16, b: u16) -> bool {
+    a.wrapping_add(b) < a
 }
 
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
 /// nibble to the high nibble).
 fn is_half_carry_add(a: u8, b: u8) -> bool {
     (((a & 0xf).wrapping_add(b & 0xf)) & 0x10) == 0x10
+}
+
+/// Returns `true` if the addition of two 16-bit numbers would require a half carry (a carry from
+/// bit 11 to 12, zero-indexed).
+fn is_half_carry_add_16(a: u16, b: u16) -> bool {
+    (((a & 0xfff).wrapping_add(b & 0xfff)) & 0x1000) == 0x1000
 }
 
 /// Returns `true` if the subtraction of two bytes requires a carry from the most significant bit.
@@ -1225,6 +1271,10 @@ lazy_static! {
         0xa8,       "XOR B",        4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
+        0x09,       "ADD HL,BC",    8;
+        0x19,       "ADD HL,DE",    8;
+        0x29,       "ADD HL,HL",    8;
+        0x39,       "ADD HL,SP",    8;
         0x49,       "LD C,C",       4;
         0x59,       "LD E,C",       4;
         0x69,       "LD L,C",       4;
@@ -1313,6 +1363,10 @@ mod tests {
         assert!(super::is_half_carry_add(0x0f, 0x01));
         assert!(!super::is_half_carry_add(0x37, 0x44));
 
+        assert!(super::is_half_carry_add_16(0x0fff, 0x0fff));
+        assert!(super::is_half_carry_add_16(0x0fff, 0x0001));
+        assert!(!super::is_half_carry_add_16(0x0000, 0x0001));
+
         assert!(super::is_half_carry_sub(0xf0, 0x01));
         assert!(!super::is_half_carry_sub(0xff, 0xf0));
     }
@@ -1322,6 +1376,10 @@ mod tests {
         assert!(super::is_carry_add(0xff, 0xff));
         assert!(super::is_carry_add(0xff, 0x01));
         assert!(!super::is_carry_add(0x00, 0x01));
+
+        assert!(super::is_carry_add_16(0xffff, 0xffff));
+        assert!(super::is_carry_add_16(0xffff, 0x0001));
+        assert!(!super::is_carry_add_16(0x0000, 0x0001));
 
         assert!(super::is_carry_sub(0x00, 0x01));
         assert!(!super::is_carry_sub(0xff, 0x0f));
