@@ -85,8 +85,8 @@ fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
         }
         "r" => emulator.resume(),
         "p" => {
-            let cpu = &emulator.cpu;
-            println!("{:#06x}: {}", cpu.reg.pc, cpu.fetch(&emulator.bus))
+            let (address, instruction) = emulator.current_instruction();
+            println!("{:#06x}: {}", address, instruction);
         }
         "d" => println!("{}", emulator.bus.to_string()),
         "c" => println!("{}", emulator.cpu.to_string()),

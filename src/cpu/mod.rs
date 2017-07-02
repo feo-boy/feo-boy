@@ -14,6 +14,8 @@ use byteorder::{BigEndian, ByteOrder};
 use bus::Bus;
 use memory::{Addressable, Mmu};
 
+pub use self::instructions::Instruction;
+
 bitflags! {
     /// CPU status flags.
     #[derive(Default)]

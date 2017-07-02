@@ -27,7 +27,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use bus::Bus;
-use cpu::Cpu;
+use cpu::{Cpu, Instruction};
 use errors::*;
 use graphics::Ppu;
 use memory::Mmu;
@@ -132,6 +132,12 @@ impl Emulator {
         self.debug.as_ref().map_or(vec![], |d| {
             d.breakpoints.iter().cloned().collect()
         })
+    }
+
+    /// Returns the current value of the program counter and the instruction at that memory
+    /// address.
+    pub fn current_instruction(&self) -> (u16, Instruction) {
+        (self.cpu.reg.pc, self.cpu.fetch(&self.bus))
     }
 }
 
