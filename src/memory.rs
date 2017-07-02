@@ -342,7 +342,11 @@ impl Addressable for Mmu {
             0x0000...0x7FFF => {
                 // While BIOS and ROM are read-only, if the cartridge has a memory bank controller,
                 // writes to this region will trigger a bank switch.
-                unimplemented!()
+                warn!(
+                    "attempted to write {:#04x} to read-only memory at {:#06x}",
+                    byte,
+                    address
+                );
             }
 
             // Graphics RAM
