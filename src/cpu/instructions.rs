@@ -703,6 +703,13 @@ impl super::Cpu {
                 }
             }
 
+            // ADD SP,r8
+            0xe8 => self.reg.add_sp(instruction.operands[0] as i8),
+
+            // LD HL,SP+r8
+            // LDHL SP,r8
+            0xf8 => self.reg.ld_hl_sp_r8(instruction.operands[0] as i8),
+
             // ADD HL,BC
             0x09 => {
                 let bc = self.reg.bc();
@@ -1095,6 +1102,35 @@ impl super::Registers {
         self.hl_mut().add_assign(rhs);
     }
 
+    /// Adds a signed byte to the stack pointer, SP, and sets the flags appropriately.
+    fn add_sp(&mut self, rhs: i8) {
+        self.set_sp_r8_flags(rhs);
+
+        let sp = self.sp as i16;
+        self.sp = (sp + rhs as i16) as u16;
+    }
+
+    /// Places the result of adding a signed byte to the stack pointer, SP, in the register pair
+    /// HL, and sets the flags appropriately.
+    fn ld_hl_sp_r8(&mut self, rhs: i8) {
+        self.set_sp_r8_flags(rhs);
+
+        let sp = self.sp as i16;
+        self.hl_mut().write((sp + rhs as i16) as u16);
+    }
+
+    /// Sets the flags appropriately for adding a signed byte to the stack pointer, SP. Note that
+    /// the carry and half-carry flags are set as if the signed byte is unsigned and is being added
+    /// to the low byte of SP.
+    fn set_sp_r8_flags(&mut self, rhs: i8) {
+        let low_byte = self.sp as u8;
+
+        self.f.remove(ZERO);
+        self.f.remove(SUBTRACT);
+        self.f.set(HALF_CARRY, is_half_carry_add(low_byte, rhs as u8));
+        self.f.set(CARRY, is_carry_add(low_byte, rhs as u8));
+    }
+
     /// Subtracts a byte from the accumulator and sets the flags appropriately.
     fn sub(&mut self, rhs: u8) {
         self.cp(rhs);
@@ -1271,6 +1307,8 @@ lazy_static! {
         0xa8,       "XOR B",        4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
+        0xe8,       "ADD SP,r8",    16;
+        0xf8,       "LD HL,SP+r8",  12;     // AKA LDHL SP,r8
         0x09,       "ADD HL,BC",    8;
         0x19,       "ADD HL,DE",    8;
         0x29,       "ADD HL,HL",    8;
