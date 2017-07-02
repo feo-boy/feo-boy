@@ -250,6 +250,15 @@ impl Clock {
     }
 }
 
+/// Whether various CPU interrupts are enabled.
+#[derive(Debug, Default)]
+pub struct Interrupts {
+    pub lcd_stat: bool,
+    pub timer: bool,
+    pub serial: bool,
+    pub joypad: bool,
+}
+
 /// The CPU.
 #[derive(Debug, Default)]
 pub struct Cpu {

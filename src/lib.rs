@@ -32,6 +32,7 @@ use errors::*;
 use graphics::Ppu;
 use memory::Mmu;
 
+#[derive(Debug, Default)]
 pub struct Emulator {
     pub cpu: Cpu,
     pub bus: Bus,
@@ -44,6 +45,7 @@ impl Emulator {
         let bus = Bus {
             ppu: Ppu::new(),
             mmu: Mmu::new(),
+            ..Default::default()
         };
 
         Emulator {
@@ -141,6 +143,7 @@ impl Emulator {
     }
 }
 
+#[derive(Debug, Default)]
 struct Debugger {
     breakpoints: HashSet<u16>,
     paused: bool,

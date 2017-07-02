@@ -6,6 +6,7 @@ use std::ops::Range;
 use itertools::Itertools;
 
 use bytes::ByteExt;
+use cpu;
 use graphics::Ppu;
 use memory::{Addressable, Mmu};
 
@@ -17,6 +18,7 @@ use memory::{Addressable, Mmu};
 pub struct Bus {
     pub ppu: Ppu,
     pub mmu: Mmu,
+    pub interrupts: cpu::Interrupts,
 }
 
 impl Addressable for Bus {
@@ -47,7 +49,11 @@ impl Bus {
     }
 
     fn read_io_register(&self, address: u16) -> u8 {
-        let Bus { ref ppu, .. } = *self;
+        let Bus {
+            ref ppu,
+            ref interrupts,
+            ..
+        } = *self;
 
         match address {
             // STAT - LCDC Status
@@ -80,6 +86,19 @@ impl Bus {
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
 
+            0xFFFF => {
+                let mut byte = 0x00;
+                byte.set_bit(0, ppu.interrupts.vblank);
+                byte.set_bit(1, interrupts.lcd_stat);
+                byte.set_bit(2, interrupts.timer);
+                byte.set_bit(3, interrupts.serial);
+                byte.set_bit(4, interrupts.joypad);
+
+                // Remaining bits are unspecified.
+
+                byte
+            }
+
             _ => {
                 error!("read unimplemented I/O register {:#04x}", address);
                 0x00
@@ -91,6 +110,7 @@ impl Bus {
         let Bus {
             ref mut ppu,
             ref mut mmu,
+            ref mut interrupts,
             ..
         } = *self;
 
@@ -194,6 +214,15 @@ impl Bus {
                     mmu.unmap_bios();
                 }
             }
+
+            0xFFFF => {
+                ppu.interrupts.vblank = byte.has_bit_set(0);
+                interrupts.lcd_stat = byte.has_bit_set(1);
+                interrupts.timer = byte.has_bit_set(2);
+                interrupts.serial = byte.has_bit_set(3);
+                interrupts.joypad = byte.has_bit_set(4);
+            }
+
             _ => error!("write to unimplemented I/O register {:#02x}", address),
         }
     }
