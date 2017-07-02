@@ -14,19 +14,19 @@ extern crate itertools;
 extern crate regex;
 extern crate smallvec;
 
+pub mod bus;
 pub mod bytes;
 pub mod cpu;
 pub mod errors;
 pub mod graphics;
 pub mod memory;
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::rc::Rc;
 
+use bus::Bus;
 use cpu::Cpu;
 use errors::*;
 use graphics::Ppu;
@@ -34,21 +34,21 @@ use memory::Mmu;
 
 pub struct Emulator {
     pub cpu: Cpu,
-    pub mmu: Mmu,
-    pub ppu: Rc<RefCell<Ppu>>,
+    pub bus: Bus,
     debug: Option<Debugger>,
 }
 
 impl Emulator {
     pub fn new() -> Self {
-        let ppu = Rc::new(RefCell::new(Ppu::new()));
-        let mmu = Mmu::new(Rc::clone(&ppu));
         let cpu = Cpu::new();
+        let bus = Bus {
+            ppu: Ppu::new(),
+            mmu: Mmu::new(),
+        };
 
         Emulator {
-            mmu,
             cpu,
-            ppu,
+            bus,
             debug: None,
         }
     }
@@ -61,8 +61,8 @@ impl Emulator {
 
     /// Reset all emulator components to their initial states.
     pub fn reset(&mut self) {
-        self.mmu.reset();
-        self.cpu.reset(&self.mmu);
+        self.bus.mmu.reset();
+        self.cpu.reset(&self.bus.mmu);
     }
 
     pub fn load_bios<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
@@ -73,7 +73,7 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.load_bios(&buf)?;
+        self.bus.mmu.load_bios(&buf)?;
 
         info!("loaded BIOS successfully");
 
@@ -88,7 +88,7 @@ impl Emulator {
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
 
-        self.mmu.load_rom(&buf)?;
+        self.bus.mmu.load_rom(&buf)?;
 
         info!("loaded ROM successfully");
 
@@ -97,8 +97,8 @@ impl Emulator {
 
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        let cycles = self.cpu.step(&mut self.mmu);
-        self.ppu.borrow_mut().step(cycles);
+        let cycles = self.cpu.step(&mut self.bus);
+        self.bus.ppu.step(cycles);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;

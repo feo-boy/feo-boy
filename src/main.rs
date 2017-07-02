@@ -86,9 +86,9 @@ fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
         "r" => emulator.resume(),
         "p" => {
             let cpu = &emulator.cpu;
-            println!("{:#06x}: {}", cpu.reg.pc, cpu.fetch(&emulator.mmu))
+            println!("{:#06x}: {}", cpu.reg.pc, cpu.fetch(&emulator.bus))
         }
-        "d" => println!("{}", emulator.mmu.to_string()),
+        "d" => println!("{}", emulator.bus.to_string()),
         "c" => println!("{}", emulator.cpu.to_string()),
         "q" => process::exit(0),
         "?" => {

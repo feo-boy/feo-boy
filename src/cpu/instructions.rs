@@ -7,8 +7,9 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
+use bus::Bus;
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
-use memory::{Addressable, Mmu};
+use memory::Addressable;
 
 lazy_static! {
     /// Matches instruction descriptions that take operands.
@@ -94,8 +95,8 @@ macro_rules! instructions {
 
 impl super::Cpu {
     /// Decodes the next instruction.
-    pub fn fetch(&self, mmu: &Mmu) -> Instruction {
-        let byte = mmu.read_byte(self.reg.pc);
+    pub fn fetch(&self, bus: &Bus) -> Instruction {
+        let byte = bus.read_byte(self.reg.pc);
 
         let def = INSTRUCTIONS[byte as usize].as_ref().expect(&format!(
             "could not find data for instruction {:#04x}",
@@ -103,7 +104,7 @@ impl super::Cpu {
         ));
 
         let operands = (0..def.num_operands)
-            .map(|i| mmu.read_byte(self.reg.pc + 1 + i as u16))
+            .map(|i| bus.read_byte(self.reg.pc + 1 + i as u16))
             .collect();
 
         Instruction {
@@ -118,7 +119,7 @@ impl super::Cpu {
     /// registers, and CPU clock.
     ///
     /// Returns the number of clock cycles the instruction takes.
-    pub fn execute(&mut self, instruction: Instruction, mmu: &mut Mmu) -> u32 {
+    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) -> u32 {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -170,7 +171,7 @@ impl super::Cpu {
             0x60 => self.reg.h = self.reg.b,
 
             // LD (HL),B
-            0x70 => mmu.write_byte(self.reg.hl(), self.reg.b),
+            0x70 => bus.write_byte(self.reg.hl(), self.reg.b),
 
             // ADD A,B
             0x80 => {
@@ -193,7 +194,7 @@ impl super::Cpu {
             // RET NZ
             0xc0 => {
                 if !self.reg.f.contains(ZERO) {
-                    self.ret(mmu);
+                    self.ret(bus);
                     cycles += 12;
                 }
             }
@@ -201,7 +202,7 @@ impl super::Cpu {
             // RET NC
             0xd0 => {
                 if !self.reg.f.contains(CARRY) {
-                    self.ret(mmu);
+                    self.ret(bus);
                     cycles += 12;
                 }
             }
@@ -209,13 +210,13 @@ impl super::Cpu {
             // LDH (a8),A
             0xe0 => {
                 let address = 0xff00u16 + &instruction.operands[0].into();
-                mmu.write_byte(address, self.reg.a)
+                bus.write_byte(address, self.reg.a)
             }
 
             // LDH A,(a8)
             0xf0 => {
                 let address = 0xff00u16 + &instruction.operands[0].into();
-                self.reg.a = mmu.read_byte(address);
+                self.reg.a = bus.read_byte(address);
             }
 
             // LD BC,d16
@@ -252,7 +253,7 @@ impl super::Cpu {
             0x61 => self.reg.h = self.reg.c,
 
             // LD (HL),C
-            0x71 => mmu.write_byte(self.reg.hl(), self.reg.c),
+            0x71 => bus.write_byte(self.reg.hl(), self.reg.c),
 
             // ADD A,C
             0x81 => {
@@ -274,43 +275,43 @@ impl super::Cpu {
 
             // POP BC
             0xc1 => {
-                let bc = self.pop(mmu);
+                let bc = self.pop(bus);
                 self.reg.bc_mut().write(bc);
             }
 
             // POP DE
             0xd1 => {
-                let de = self.pop(mmu);
+                let de = self.pop(bus);
                 self.reg.de_mut().write(de);
             }
 
             // POP HL
             0xe1 => {
-                let hl = self.pop(mmu);
+                let hl = self.pop(bus);
                 self.reg.hl_mut().write(hl);
             }
 
             // POP AF
             0xf1 => {
-                let af = self.pop(mmu);
+                let af = self.pop(bus);
                 self.reg.af_mut().write(af);
             }
 
             // LD (BC),A
-            0x02 => mmu.write_byte(self.reg.bc(), self.reg.a),
+            0x02 => bus.write_byte(self.reg.bc(), self.reg.a),
 
             // LD (DE),A
-            0x12 => mmu.write_byte(self.reg.de(), self.reg.a),
+            0x12 => bus.write_byte(self.reg.de(), self.reg.a),
 
             // LD (HL+),A
             0x22 => {
-                mmu.write_byte(self.reg.hl(), self.reg.a);
+                bus.write_byte(self.reg.hl(), self.reg.a);
                 self.reg.hl_mut().add_assign(1);
             }
 
             // LD (HL-),A
             0x32 => {
-                mmu.write_byte(self.reg.hl(), self.reg.a);
+                bus.write_byte(self.reg.hl(), self.reg.a);
                 self.reg.hl_mut().sub_assign(1);
             }
 
@@ -324,7 +325,7 @@ impl super::Cpu {
             0x62 => self.reg.h = self.reg.d,
 
             // LD (HL),D
-            0x72 => mmu.write_byte(self.reg.hl(), self.reg.d),
+            0x72 => bus.write_byte(self.reg.hl(), self.reg.d),
 
             // ADD A,D
             0x82 => {
@@ -364,14 +365,14 @@ impl super::Cpu {
             // LD ($FF00+C),A
             0xe2 => {
                 let address = 0xff00u16 + &self.reg.c.into();
-                mmu.write_byte(address, self.reg.a);
+                bus.write_byte(address, self.reg.a);
             }
 
             // LD A,(C)
             // LD A,($FF00+C)
             0xf2 => {
                 let address = 0xff00u16 + &self.reg.c.into();
-                self.reg.a = mmu.read_byte(address);
+                self.reg.a = bus.read_byte(address);
             }
 
             // INC BC
@@ -396,7 +397,7 @@ impl super::Cpu {
             0x63 => self.reg.h = self.reg.e,
 
             // LD (HL),E
-            0x73 => mmu.write_byte(self.reg.hl(), self.reg.e),
+            0x73 => bus.write_byte(self.reg.hl(), self.reg.e),
 
             // ADD A,E
             0x83 => {
@@ -433,9 +434,9 @@ impl super::Cpu {
 
             // INC (HL)
             0x34 => {
-                let mut byte = mmu.read_byte(self.reg.hl());
+                let mut byte = bus.read_byte(self.reg.hl());
                 Self::inc(&mut byte, &mut self.reg.f);
-                mmu.write_byte(self.reg.hl(), byte);
+                bus.write_byte(self.reg.hl(), byte);
             }
 
             // LD B,H
@@ -448,7 +449,7 @@ impl super::Cpu {
             0x64 => (),
 
             // LD (HL),H
-            0x74 => mmu.write_byte(self.reg.hl(), self.reg.h),
+            0x74 => bus.write_byte(self.reg.hl(), self.reg.h),
 
             // ADD A,H
             0x84 => {
@@ -472,7 +473,7 @@ impl super::Cpu {
             0xc4 => {
                 if !self.reg.f.contains(ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
-                    self.call(address, mmu);
+                    self.call(address, bus);
                     cycles += 12;
                 }
             }
@@ -481,7 +482,7 @@ impl super::Cpu {
             0xd4 => {
                 if !self.reg.f.contains(CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
-                    self.call(address, mmu);
+                    self.call(address, bus);
                     cycles += 12;
                 }
             }
@@ -497,9 +498,9 @@ impl super::Cpu {
 
             // DEC (HL)
             0x35 => {
-                let mut byte = mmu.read_byte(self.reg.hl());
+                let mut byte = bus.read_byte(self.reg.hl());
                 Self::dec(&mut byte, &mut self.reg.f);
-                mmu.write_byte(self.reg.hl(), byte);
+                bus.write_byte(self.reg.hl(), byte);
             }
 
             // LD B,L
@@ -512,7 +513,7 @@ impl super::Cpu {
             0x65 => self.reg.h = self.reg.l,
 
             // LD (HL),L
-            0x75 => mmu.write_byte(self.reg.hl(), self.reg.l),
+            0x75 => bus.write_byte(self.reg.hl(), self.reg.l),
 
             // ADD A,L
             0x85 => {
@@ -535,25 +536,25 @@ impl super::Cpu {
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
-                self.push(bc, mmu);
+                self.push(bc, bus);
             }
 
             // PUSH DE
             0xd5 => {
                 let de = self.reg.de();
-                self.push(de, mmu);
+                self.push(de, bus);
             }
 
             // PUSH HL
             0xe5 => {
                 let hl = self.reg.hl();
-                self.push(hl, mmu);
+                self.push(hl, bus);
             }
 
             // PUSH AF
             0xf5 => {
                 let af = self.reg.af();
-                self.push(af, mmu);
+                self.push(af, bus);
             }
 
             // LD B,d8
@@ -566,32 +567,32 @@ impl super::Cpu {
             0x26 => self.reg.h = instruction.operands[0],
 
             // LD (HL),d8
-            0x36 => mmu.write_byte(self.reg.hl(), instruction.operands[0]),
+            0x36 => bus.write_byte(self.reg.hl(), instruction.operands[0]),
 
             // LD B,(HL)
-            0x46 => self.reg.b = mmu.read_byte(self.reg.hl()),
+            0x46 => self.reg.b = bus.read_byte(self.reg.hl()),
 
             // LD D,(HL)
-            0x56 => self.reg.d = mmu.read_byte(self.reg.hl()),
+            0x56 => self.reg.d = bus.read_byte(self.reg.hl()),
 
             // LD H,(HL)
-            0x66 => self.reg.h = mmu.read_byte(self.reg.hl()),
+            0x66 => self.reg.h = bus.read_byte(self.reg.hl()),
 
             // ADD A,(HL)
             0x86 => {
-                let byte = mmu.read_byte(self.reg.hl());
+                let byte = bus.read_byte(self.reg.hl());
                 self.reg.add(byte);
             }
 
             // SUB (HL)
             0x96 => {
-                let byte = mmu.read_byte(self.reg.hl());
+                let byte = bus.read_byte(self.reg.hl());
                 self.reg.sub(byte);
             }
 
             // AND (HL)
             0xa6 => {
-                let byte = mmu.read_byte(self.reg.hl());
+                let byte = bus.read_byte(self.reg.hl());
                 self.reg.and(byte);
             }
 
@@ -617,7 +618,7 @@ impl super::Cpu {
             0x67 => self.reg.h = self.reg.a,
 
             // LD (HL),A
-            0x77 => mmu.write_byte(self.reg.hl(), self.reg.a),
+            0x77 => bus.write_byte(self.reg.hl(), self.reg.a),
 
             // ADD A,A
             0x87 => {
@@ -638,16 +639,16 @@ impl super::Cpu {
             }
 
             // RST 00H
-            0xc7 => self.rst(0x0000, mmu),
+            0xc7 => self.rst(0x0000, bus),
 
             // RST 10H
-            0xd7 => self.rst(0x0010, mmu),
+            0xd7 => self.rst(0x0010, bus),
 
             // RST 20H
-            0xe7 => self.rst(0x0020, mmu),
+            0xe7 => self.rst(0x0020, bus),
 
             // RST 30H
-            0xf7 => self.rst(0x0030, mmu),
+            0xf7 => self.rst(0x0030, bus),
 
             // JR r8
             0x18 => self.jr(instruction.operands[0] as i8),
@@ -689,7 +690,7 @@ impl super::Cpu {
             // RET Z
             0xc8 => {
                 if self.reg.f.contains(ZERO) {
-                    self.ret(mmu);
+                    self.ret(bus);
                     cycles += 12;
                 }
             }
@@ -697,7 +698,7 @@ impl super::Cpu {
             // RET C
             0xd8 => {
                 if self.reg.f.contains(CARRY) {
-                    self.ret(mmu);
+                    self.ret(bus);
                     cycles += 12;
                 }
             }
@@ -722,30 +723,30 @@ impl super::Cpu {
 
             // RET
             0xc9 => {
-                self.ret(mmu);
+                self.ret(bus);
             }
 
             // RETI
             0xd9 => {
-                self.ret(mmu);
+                self.ret(bus);
                 self.interrupts = true;
             }
 
             // LD A,(BC)
-            0x0a => self.reg.a = mmu.read_byte(self.reg.bc()),
+            0x0a => self.reg.a = bus.read_byte(self.reg.bc()),
 
             // LD A,(DE)
-            0x1a => self.reg.a = mmu.read_byte(self.reg.de()),
+            0x1a => self.reg.a = bus.read_byte(self.reg.de()),
 
             // LD A,(HL+)
             0x2a => {
-                self.reg.a = mmu.read_byte(self.reg.hl());
+                self.reg.a = bus.read_byte(self.reg.hl());
                 self.reg.hl_mut().add_assign(1);
             }
 
             // LD A,(HL-)
             0x3a => {
-                self.reg.a = mmu.read_byte(self.reg.hl());
+                self.reg.a = bus.read_byte(self.reg.hl());
                 self.reg.hl_mut().sub_assign(1);
             }
 
@@ -770,13 +771,13 @@ impl super::Cpu {
             // LD (a16),A
             0xea => {
                 let address = LittleEndian::read_u16(&instruction.operands);
-                mmu.write_byte(address, self.reg.a);
+                bus.write_byte(address, self.reg.a);
             }
 
             // LD A,(a16)
             0xfa => {
                 let address = LittleEndian::read_u16(&instruction.operands);
-                self.reg.a = mmu.read_byte(address);
+                self.reg.a = bus.read_byte(address);
             }
 
             // DEC BC
@@ -851,7 +852,7 @@ impl super::Cpu {
             0xcc => {
                 if self.reg.f.contains(ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
-                    self.call(address, mmu);
+                    self.call(address, bus);
                     cycles += 12;
                 }
             }
@@ -860,7 +861,7 @@ impl super::Cpu {
             0xdc => {
                 if self.reg.f.contains(CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
-                    self.call(address, mmu);
+                    self.call(address, bus);
                     cycles += 12;
                 }
             }
@@ -898,7 +899,7 @@ impl super::Cpu {
             // CALL a16
             0xcd => {
                 let address = LittleEndian::read_u16(&instruction.operands);
-                self.call(address, mmu);
+                self.call(address, bus);
             }
 
             // LD C,d8
@@ -914,20 +915,20 @@ impl super::Cpu {
             0x3e => self.reg.a = instruction.operands[0],
 
             // LD C,(HL)
-            0x4e => self.reg.c = mmu.read_byte(self.reg.hl()),
+            0x4e => self.reg.c = bus.read_byte(self.reg.hl()),
 
             // LD E,(HL)
-            0x5e => self.reg.e = mmu.read_byte(self.reg.hl()),
+            0x5e => self.reg.e = bus.read_byte(self.reg.hl()),
 
             // LD L,(HL)
-            0x6e => self.reg.l = mmu.read_byte(self.reg.hl()),
+            0x6e => self.reg.l = bus.read_byte(self.reg.hl()),
 
             // LD A,(HL)
-            0x7e => self.reg.a = mmu.read_byte(self.reg.hl()),
+            0x7e => self.reg.a = bus.read_byte(self.reg.hl()),
 
             // XOR (HL)
             0xae => {
-                let byte = mmu.read_byte(self.reg.hl());
+                let byte = bus.read_byte(self.reg.hl());
                 self.reg.xor(byte);
             }
 
@@ -957,16 +958,16 @@ impl super::Cpu {
             }
 
             // RST 08H
-            0xcf => self.rst(0x0008, mmu),
+            0xcf => self.rst(0x0008, bus),
 
             // RST 18H
-            0xdf => self.rst(0x0018, mmu),
+            0xdf => self.rst(0x0018, bus),
 
             // RST 28H
-            0xef => self.rst(0x0028, mmu),
+            0xef => self.rst(0x0028, bus),
 
             // RST 38H
-            0xff => self.rst(0x0038, mmu),
+            0xff => self.rst(0x0038, bus),
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
@@ -982,9 +983,9 @@ impl super::Cpu {
     ///
     /// The current value of the program counter is assumed to be the address of the next
     /// instruction.
-    fn rst(&mut self, addr: u16, mmu: &mut Mmu) {
+    fn rst(&mut self, addr: u16, bus: &mut Bus) {
         let pc = self.reg.pc;
-        self.push(pc, mmu);
+        self.push(pc, bus);
         self.reg.pc = addr;
     }
 
@@ -1009,15 +1010,15 @@ impl super::Cpu {
     }
 
     /// Performs a CALL operation. Does not modify any flags.
-    fn call(&mut self, address: u16, mmu: &mut Mmu) {
+    fn call(&mut self, address: u16, bus: &mut Bus) {
         let pc = self.reg.pc;
-        self.push(pc, mmu);
+        self.push(pc, bus);
         self.reg.pc = address;
     }
 
     /// Performs a RET operation. Does not modify any flags.
-    fn ret(&mut self, mmu: &Mmu) {
-        self.reg.pc = self.pop(mmu);
+    fn ret(&mut self, bus: &Bus) {
+        self.reg.pc = self.pop(bus);
     }
 
     /// Performs JR (relative jump) operation. Does not modify any flags.
@@ -1301,8 +1302,9 @@ lazy_static! {
 mod tests {
     use smallvec::SmallVec;
 
+    use bus::Bus;
     use cpu::Cpu;
-    use memory::{Addressable, Mmu};
+    use memory::Addressable;
 
     use super::{INSTRUCTIONS, Instruction};
 
@@ -1351,12 +1353,12 @@ mod tests {
 
     #[test]
     fn fetch_nop() {
-        let mmu = Mmu::default();
+        let bus = Bus::default();
         let cpu = Cpu::new();
 
-        // FIXME: This test works because the MMU will be empty initially (that is, full of NOPs).
+        // FIXME: This test works because memory will be empty initially (that is, full of NOPs).
         // However, this is fragile.
-        let nop = cpu.fetch(&mmu);
+        let nop = cpu.fetch(&bus);
 
         assert_eq!(nop.def.byte, 0x00);
         assert_eq!(nop.def.num_operands, 0);
@@ -1365,7 +1367,7 @@ mod tests {
 
     #[test]
     fn rst() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
@@ -1375,15 +1377,15 @@ mod tests {
             def: INSTRUCTIONS[0xff].as_ref().unwrap(),
             operands: Default::default(),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0x38);
-        assert_eq!(cpu.pop(&mmu), 0xAB + 1);
+        assert_eq!(cpu.pop(&bus), 0xAB + 1);
     }
 
     #[test]
     fn jr_nz() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.pc = 0;
@@ -1393,7 +1395,7 @@ mod tests {
             def: INSTRUCTIONS[0x20].as_ref().unwrap(),
             operands: SmallVec::from_slice(&[0x0a]),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
 
         // Move backward 10
@@ -1401,7 +1403,7 @@ mod tests {
             def: INSTRUCTIONS[0x20].as_ref().unwrap(),
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
     }
 
@@ -1422,7 +1424,7 @@ mod tests {
 
     #[test]
     fn ld_addr_c_a() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.c = 0x11;
@@ -1432,17 +1434,17 @@ mod tests {
             def: INSTRUCTIONS[0xe2].as_ref().unwrap(),
             operands: Default::default(),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
         // FIXME: We can't actually test this until the I/O memory
         // is implemented.
-        // assert_eq!(cpu.mmu.read_byte(0xFF11), 0xab);
+        // assert_eq!(cpu.bus.read_byte(0xFF11), 0xab);
     }
 
     // FIXME: Add test for 0xf2 after I/O memory is implemented.
 
     #[test]
     fn ld_addr_a16_a() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.a = 0x11;
@@ -1451,48 +1453,48 @@ mod tests {
             def: INSTRUCTIONS[0xea].as_ref().unwrap(),
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
 
-        assert_eq!(mmu.read_byte(0xc000), 0x11);
+        assert_eq!(bus.read_byte(0xc000), 0x11);
     }
 
     #[test]
     fn ld_a_addr_a16() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
-        mmu.write_byte(0xc000, 0xaa);
+        bus.write_byte(0xc000, 0xaa);
 
         let instruction = Instruction {
             def: INSTRUCTIONS[0xfa].as_ref().unwrap(),
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
-        cpu.execute(instruction, &mut mmu);
+        cpu.execute(instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xaa);
     }
 
     #[test]
     fn call() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
         cpu.reg.pc = 1;
-        cpu.call(4, &mut mmu);
+        cpu.call(4, &mut bus);
 
         assert_eq!(cpu.reg.pc, 4);
-        assert_eq!(cpu.pop(&mmu), 1);
+        assert_eq!(cpu.pop(&bus), 1);
     }
 
     #[test]
     fn ret() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
-        cpu.push(5, &mut mmu);
-        cpu.ret(&mmu);
+        cpu.push(5, &mut bus);
+        cpu.ret(&bus);
 
         assert_eq!(cpu.reg.sp, 0xffff);
         assert_eq!(cpu.reg.pc, 5);

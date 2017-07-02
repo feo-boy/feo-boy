@@ -11,6 +11,7 @@ use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{BigEndian, ByteOrder};
 
+use bus::Bus;
 use memory::{Addressable, Mmu};
 
 bitflags! {
@@ -271,24 +272,24 @@ impl Cpu {
     /// Fetch and execute a single instruction.
     ///
     /// Returns the number of cycles the instruction takes.
-    pub fn step(&mut self, mmu: &mut Mmu) -> u32 {
-        let instruction = self.fetch(mmu);
-        self.execute(instruction, mmu)
+    pub fn step(&mut self, bus: &mut Bus) -> u32 {
+        let instruction = self.fetch(bus);
+        self.execute(instruction, bus)
     }
 
     /// Push a value onto the stack.
     ///
     /// Uses the current value of `SP`, and decrements it.
-    pub fn push(&mut self, value: u16, mmu: &mut Mmu) {
+    pub fn push(&mut self, value: u16, bus: &mut Bus) {
         self.reg.sp -= 2;
-        mmu.write_word(self.reg.sp, value);
+        bus.write_word(self.reg.sp, value);
     }
 
     /// Pop a value off the stack.
     ///
     /// Uses the current value of `SP`, and increments it.
-    pub fn pop(&mut self, mmu: &Mmu) -> u16 {
-        let value = mmu.read_word(self.reg.sp);
+    pub fn pop(&mut self, bus: &Bus) -> u16 {
+        let value = bus.read_word(self.reg.sp);
         self.reg.sp += 2;
         value
     }
@@ -315,7 +316,7 @@ impl fmt::Display for Cpu {
 mod tests {
     use std::ops::SubAssign;
 
-    use memory::Mmu;
+    use bus::Bus;
 
     use super::{Cpu, Registers};
 
@@ -341,30 +342,30 @@ mod tests {
 
     #[test]
     fn skip_bios() {
-        let mmu = Mmu::default();
+        let bus = Bus::default();
         let mut cpu = Cpu::new();
-        cpu.reset(&mmu);
+        cpu.reset(&bus.mmu);
 
         assert_eq!(cpu.reg.pc, 0x100);
 
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         // Load dummy BIOS
-        mmu.load_bios(&[0; 256]).unwrap();
-        cpu.reset(&mmu);
+        bus.mmu.load_bios(&[0; 256]).unwrap();
+        cpu.reset(&bus.mmu);
 
         assert_eq!(cpu.reg.pc, 0x00);
     }
 
     #[test]
     fn push_pop() {
-        let mut mmu = Mmu::default();
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
 
-        cpu.push(0xcafe, &mut mmu);
-        assert_eq!(cpu.pop(&mmu), 0xcafe);
+        cpu.push(0xcafe, &mut bus);
+        assert_eq!(cpu.pop(&bus), 0xcafe);
     }
 }

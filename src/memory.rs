@@ -2,21 +2,15 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
-use std::cell::{Ref, RefMut, RefCell};
 use std::default::Default;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt::{self, Debug, Formatter};
 use std::num::Wrapping;
-use std::ops::Range;
-use std::rc::Rc;
 
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
-use itertools::Itertools;
 
-use bytes::ByteExt;
 use errors::*;
-use graphics::Ppu;
 
-const BIOS_SIZE: usize = 0x0100;
+pub const BIOS_SIZE: usize = 0x0100;
 
 /// Operations for memory-like structs.
 pub trait Addressable {
@@ -103,26 +97,22 @@ pub struct Mmu {
     mem: Memory,
 
     /// Whether the BIOS is mapped or not.
-    bios_mapped: bool,
+    pub bios_mapped: bool,
 
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Vec<u8>,
-
-    /// A reference to the picture processing unit.
-    ///
-    /// Graphics memory reads and writes are forwarded to this unit, as well as any relevant
-    /// modifications of the I/O registers.
-    ppu: Option<Rc<RefCell<Ppu>>>,
 }
 
 impl Mmu {
     /// Creates a new memory manager unit.
     ///
     /// The initial contents of the memory are unspecified.
-    pub fn new(ppu: Rc<RefCell<Ppu>>) -> Self {
-        let mut mmu = Mmu::default();
-        mmu.ppu = Some(ppu);
-        mmu
+    pub fn new() -> Self {
+        Mmu {
+            mem: Memory::default(),
+            bios_mapped: true,
+            cartridge_rom: vec![],
+        }
     }
 
     /// Loads a byte slice containing the BIOS into memory.
@@ -287,180 +277,15 @@ impl Mmu {
         self.bios_mapped = true;
     }
 
-    /// Create an iterator over the entire memory space.
-    pub fn iter(&self) -> MemoryIterator {
-        MemoryIterator {
-            address_iter: 0x00..0x10000,
-            mmu: self,
-        }
-    }
-
-    /// Returns an immutable reference to the PPU.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no `Ppu` attached.
-    fn ppu(&self) -> Ref<Ppu> {
-        self.ppu.as_ref().expect("no PPU attached").borrow()
-    }
-
-    /// Returns a mutable reference to the PPU.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no `Ppu` attached.
-    fn ppu_mut(&mut self) -> RefMut<Ppu> {
-        self.ppu.as_ref().expect("no PPU attached").borrow_mut()
-    }
-
-    fn unmap_bios(&mut self) {
+    pub fn unmap_bios(&mut self) {
         info!("unmapping BIOS");
         self.bios_mapped = false;
     }
+}
 
-    fn read_io_register(&self, address: u16) -> u8 {
-        match address {
-            // STAT - LCDC Status
-            0xFF41 => {
-                let mut register = 0u8;
-
-                let ppu = self.ppu();
-
-                // Set the lowest two bits to the mode.
-                register |= ppu.mode;
-
-                // Set bit 2 if LY == LYC
-                register.set_bit(2, self.read_byte(0xFF44) == self.read_byte(0xFF45));
-
-                // Other bits are set if the various interrupts are enabled.
-                register.set_bit(3, ppu.interrupts.hblank);
-                register.set_bit(4, ppu.interrupts.vblank);
-                register.set_bit(5, ppu.interrupts.oam);
-                register.set_bit(6, ppu.interrupts.ly_lyc);
-
-                // The highest bit is unspecified.
-
-                register
-            }
-
-            // LCDC Y-Coordinate
-            0xFF44 => self.ppu().line,
-
-            // LYC - LY Compare
-            0xFF45 => self.ppu().line_compare,
-
-            _ => {
-                error!("read unimplemented I/O register {:#04x}", address);
-                0x00
-            }
-        }
-    }
-
-    fn write_io_register(&mut self, address: u16, byte: u8) {
-        match address {
-            // NR11 - Channel 1 Sound length/Wave pattern duty
-            0xFF11 => {
-                warn!("attempted to modify sound channel 1 wave (unimplemented)");
-            }
-
-            // NR12 - Channel 1 Volume Envelope
-            0xFF12 => {
-                warn!("attempted to modify sound channel 1 volume (unimplemented)");
-            }
-
-            // NR50 - Channel control / ON-OFF / Volume
-            0xFF24 => {
-                warn!("attempted to modify master volume (unimplemented)");
-            }
-
-            // NR51 - Selection of Sound output terminal
-            0xFF25 => {
-                warn!("attempted to modify sound output terminal (unimplemented)");
-            }
-
-            // Sound on/off
-            0xFF26 => {
-                // Only the high bit is writable.
-                if byte.has_bit_set(7) {
-                    info!("enabling sound controller");
-                    warn!("sound controller not implemented");
-                }
-            }
-
-            // LCDC - LCD Control
-            0xFF40 => {
-                let control = &mut self.ppu_mut().control;
-
-                control.display_enabled = byte.has_bit_set(7);
-                control.window_map_start = if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
-                control.window_enabled = byte.has_bit_set(5);
-                control.window_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
-                control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
-                control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
-                control.sprites_enabled = byte.has_bit_set(1);
-                control.background_enabled = byte.has_bit_set(0);
-            }
-
-            // STAT - LCDC Status
-            0xFF41 => {
-                let mut ppu = self.ppu_mut();
-
-                ppu.interrupts.hblank = byte.has_bit_set(3);
-                ppu.interrupts.vblank = byte.has_bit_set(4);
-                ppu.interrupts.oam = byte.has_bit_set(5);
-                ppu.interrupts.ly_lyc = byte.has_bit_set(6);
-            }
-
-            // SCY - Scroll Y
-            0xFF42 => self.ppu_mut().bg_scroll.y = byte,
-
-            // SCX - Scroll X
-            0xFF43 => self.ppu_mut().bg_scroll.x = byte,
-
-            // BGP - BG Palette Data
-            0xFF47 => {
-                let mut palette = &mut self.ppu_mut().bg_palette;
-
-                for i in 0..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
-
-            // OBP0 - Object Palette 0 Data
-            0xFF48 => {
-                use graphics::Shade;
-
-                let mut palette = &mut self.ppu_mut().sprite_palette[0];
-
-                palette[0] = Shade::Transparent;
-                for i in 1..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
-
-            // OBP1 - Object Palette 1 Data
-            0xFF49 => {
-                use graphics::Shade;
-
-                let mut palette = &mut self.ppu_mut().sprite_palette[1];
-
-                palette[0] = Shade::Transparent;
-                for i in 1..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
-
-            // Unmap BIOS
-            0xFF50 => {
-                if self.bios_mapped {
-                    self.unmap_bios()
-                }
-            }
-            _ => error!("write to unimplemented I/O register {:#02x}", address),
-        }
+impl Default for Mmu {
+    fn default() -> Mmu {
+        Mmu::new()
     }
 }
 
@@ -476,7 +301,7 @@ impl Addressable for Mmu {
             0x0000...0x7FFF => self.mem.rom[address as usize],
 
             // Graphics RAM
-            0x8000...0x9FFF => self.ppu().read_byte(address),
+            0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
@@ -493,16 +318,16 @@ impl Addressable for Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => self.ppu().read_byte(address),
+            0xFE00...0xFE9F => panic!("sprite RAM is present on the PPU"),
 
             // Reserved, unused
             0xFEA0...0xFEFF => 0x00,
 
             // I/O Registers
-            0xFF00...0xFF7F => self.read_io_register(address),
+            0xFF00...0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
 
             // Zero-Page RAM
-            0xFF80...0xFFFF => {
+            0xFF80...0xFFFE => {
                 let index = address & 0x7F;
                 self.mem.zram[index as usize]
             }
@@ -521,7 +346,7 @@ impl Addressable for Mmu {
             }
 
             // Graphics RAM
-            0x8000...0x9FFF => self.ppu_mut().write_byte(address, byte),
+            0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
             0xA000...0xBFFF => {
@@ -536,16 +361,16 @@ impl Addressable for Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => self.ppu_mut().write_byte(address, byte),
+            0xFE00...0xFE9F => panic!("sprite RAM is present on the PPU"),
 
             // Reserved, unused
             0xFEA0...0xFEFF => (),
 
             // I/O Registers
-            0xFF00...0xFF7F => self.write_io_register(address, byte),
+            0xFF00...0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
 
             // Zero-Page RAM
-            0xFF80...0xFFFF => {
+            0xFF80...0xFFFE => {
                 let index = address & 0x7F;
                 self.mem.zram[index as usize] = byte;
             }
@@ -555,93 +380,9 @@ impl Addressable for Mmu {
     }
 }
 
-impl Default for Mmu {
-    /// Returns an MMU with no components attached.
-    fn default() -> Mmu {
-        Mmu {
-            mem: Default::default(),
-            bios_mapped: true,
-            ppu: None,
-            cartridge_rom: Default::default(),
-        }
-    }
-}
-
-impl Display for Mmu {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        const LINE_LENGTH: usize = 32;
-
-        let mut address = 0;
-
-        for chunk in &self.iter().chunks(LINE_LENGTH) {
-            for (i, byte) in chunk.enumerate() {
-                if i == 0 || i == LINE_LENGTH / 2 {
-                    write!(f, "{:04x} ", address + i)?;
-                }
-
-                write!(f, "{:02x} ", byte)?;
-            }
-
-            writeln!(f)?;
-
-            address += LINE_LENGTH;
-        }
-
-        Ok(())
-    }
-}
-
-/// An iterator over the MMU's memory.
-///
-/// Returns each byte in little-endian order.
-pub struct MemoryIterator<'a> {
-    mmu: &'a Mmu,
-    address_iter: Range<u32>,
-}
-
-impl<'a> Iterator for MemoryIterator<'a> {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.address_iter.next().map(|addr| {
-            self.mmu.read_byte(addr as u16)
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Mmu, Addressable};
-
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    use graphics::Ppu;
-
-    #[test]
-    fn dump() {
-        let ppu = Ppu::new();
-        let mmu = Mmu::new(Rc::new(RefCell::new(ppu)));
-
-        mmu.to_string();
-    }
-
-    #[test]
-    fn bios() {
-        let mut mmu = Mmu::default();
-        assert!(mmu.bios_mapped);
-
-        let mut bios = [0; super::BIOS_SIZE];
-        bios[0] = 1;
-        bios[0xff] = 2;
-        mmu.load_bios(&bios).unwrap();
-
-        assert_eq!(mmu.read_byte(0x0000), 1);
-        assert_eq!(mmu.read_byte(0x00FF), 2);
-
-        mmu.write_byte(0xFF50, 1);
-        assert!(!mmu.bios_mapped);
-    }
 
     #[test]
     fn rom() {
@@ -691,8 +432,8 @@ mod tests {
         mmu.mem.zram[0] = 1;
         assert_eq!(mmu.read_byte(0xFF80), 1);
 
-        mmu.mem.zram[0x7F] = 2;
-        assert_eq!(mmu.read_byte(0xFFFF), 2);
+        mmu.mem.zram[0x7E] = 2;
+        assert_eq!(mmu.read_byte(0xFFFE), 2);
     }
 
     #[test]
@@ -706,37 +447,5 @@ mod tests {
         mmu.write_word(0xFF80, 0xABCD);
         assert_eq!(mmu.mem.zram[0], 0xCD);
         assert_eq!(mmu.mem.zram[1], 0xAB);
-    }
-
-    #[test]
-    fn stat_register() {
-        let mut ppu = Ppu::new();
-        ppu.line = 40;
-        ppu.line_compare = 40;
-        ppu.interrupts.vblank = true;
-
-        let mmu = Mmu::new(Rc::new(RefCell::new(ppu)));
-
-        assert_eq!(mmu.read_byte(0xFF41), 0b00010100);
-    }
-
-    #[test]
-    fn background_palette_register() {
-        use graphics::Shade;
-
-        let ppu = Rc::new(RefCell::new(Ppu::new()));
-        let mut mmu = Mmu::new(Rc::clone(&ppu));
-
-        mmu.write_byte(0xFF47, 0b10010011);
-
-        assert_eq!(
-            mmu.ppu().bg_palette,
-            [
-                Shade::Black,
-                Shade::White,
-                Shade::LightGray,
-                Shade::DarkGray,
-            ]
-        );
     }
 }
