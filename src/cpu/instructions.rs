@@ -191,6 +191,12 @@ impl super::Cpu {
                 self.reg.and(b);
             }
 
+            // OR B
+            0xb0 => {
+                let b = self.reg.b;
+                self.reg.or(b);
+            }
+
             // RET NZ
             0xc0 => {
                 if !self.reg.f.contains(ZERO) {
@@ -273,6 +279,12 @@ impl super::Cpu {
                 self.reg.and(c);
             }
 
+            // OR C
+            0xb1 => {
+                let c = self.reg.c;
+                self.reg.or(c);
+            }
+
             // POP BC
             0xc1 => {
                 let bc = self.pop(bus);
@@ -343,6 +355,12 @@ impl super::Cpu {
             0xa2 => {
                 let d = self.reg.d;
                 self.reg.and(d);
+            }
+
+            // OR D
+            0xb2 => {
+                let d = self.reg.d;
+                self.reg.or(d);
             }
 
             // JP NZ,a16
@@ -417,6 +435,12 @@ impl super::Cpu {
                 self.reg.and(e);
             }
 
+            // OR E
+            0xb3 => {
+                let e = self.reg.e;
+                self.reg.or(e);
+            }
+
             // JP a16
             0xc3 => self.reg.pc = LittleEndian::read_u16(&instruction.operands),
 
@@ -467,6 +491,12 @@ impl super::Cpu {
             0xa4 => {
                 let h = self.reg.h;
                 self.reg.and(h);
+            }
+
+            // OR H
+            0xb4 => {
+                let h = self.reg.h;
+                self.reg.or(h);
             }
 
             // CALL NZ,a16
@@ -533,6 +563,12 @@ impl super::Cpu {
                 self.reg.and(l);
             }
 
+            // OR L
+            0xb5 => {
+                let l = self.reg.l;
+                self.reg.or(l);
+            }
+
             // PUSH BC
             0xc5 => {
                 let bc = self.reg.bc();
@@ -596,6 +632,12 @@ impl super::Cpu {
                 self.reg.and(byte);
             }
 
+            // OR (HL)
+            0xb6 => {
+                let byte = bus.read_byte(self.reg.hl());
+                self.reg.and(byte);
+            }
+
             // ADD A,d8
             0xc6 => self.reg.add(instruction.operands[0]),
 
@@ -603,10 +645,10 @@ impl super::Cpu {
             0xd6 => self.reg.sub(instruction.operands[0]),
 
             // AND d8
-            0xe6 => {
-                let byte = instruction.operands[0];
-                self.reg.and(byte);
-            }
+            0xe6 => self.reg.and(instruction.operands[0]),
+
+            // OR d8
+            0xf6 => self.reg.or(instruction.operands[0]),
 
             // LD B,A
             0x47 => self.reg.b = self.reg.a,
@@ -636,6 +678,12 @@ impl super::Cpu {
             0xa7 => {
                 let a = self.reg.a;
                 self.reg.and(a);
+            }
+
+            // OR A
+            0xb7 => {
+                let a = self.reg.a;
+                self.reg.or(a);
             }
 
             // RST 00H
@@ -1210,9 +1258,18 @@ impl super::Registers {
         self.a = self.a.wrapping_sub(rhs);
     }
 
-    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately.
+    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately. Unsets
+    /// the other flags.
     fn xor(&mut self, rhs: u8) {
         self.a ^= rhs;
+        self.f = Flags::empty();
+        self.f.set(ZERO, self.a == 0);
+    }
+
+    /// Peforms an OR with the accumulator and sets the zero flag appropriately. Unsets the other
+    /// flags.
+    fn or(&mut self, rhs: u8) {
+        self.a |= rhs;
         self.f = Flags::empty();
         self.f.set(ZERO, self.a == 0);
     }
@@ -1271,6 +1328,7 @@ lazy_static! {
         0x80,       "ADD A,B",      4;
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
+        0xb0,       "OR B",         4;
         0xc0,       "RET NZ",       8;
         0xd0,       "RET NC",       8;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
@@ -1286,6 +1344,7 @@ lazy_static! {
         0x81,       "ADD A,C",      4;
         0x91,       "SUB C",        4;
         0xa1,       "AND C",        4;
+        0xb1,       "OR C",         4;
         0xc1,       "POP BC",       12;
         0xd1,       "POP DC",       12;
         0xe1,       "POP HL",       12;
@@ -1301,6 +1360,7 @@ lazy_static! {
         0x82,       "ADD A,D",      4;
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
+        0xb2,       "OR D",         4;
         0xc2,       "JP NZ,a16",    12;
         0xd2,       "JP NC,a16",    12;
         0xe2,       "LD (C),A",     8;      // AKA LD ($FF00+C),A
@@ -1316,6 +1376,7 @@ lazy_static! {
         0x83,       "ADD A,E",      4;
         0x93,       "SUB E",        4;
         0xa3,       "AND E",        4;
+        0xb3,       "OR E",         4;
         0xc3,       "JP a16",       16;
         0xf3,       "DI",           4;
         0x04,       "INC B",        4;
@@ -1329,6 +1390,7 @@ lazy_static! {
         0x84,       "ADD A,H",      4;
         0x94,       "SUB H",        4;
         0xa4,       "AND H",        4;
+        0xb4,       "OR H",         4;
         0xc4,       "CALL NZ,a16",  12;
         0xd4,       "CALL NC,a16",  12;
         0x05,       "DEC B",        4;
@@ -1342,6 +1404,7 @@ lazy_static! {
         0x85,       "ADD A,L",      4;
         0x95,       "SUB L",        4;
         0xa5,       "AND L",        4;
+        0xb5,       "OR L",         4;
         0xc5,       "PUSH BC",      16;
         0xd5,       "PUSH DE",      16;
         0xe5,       "PUSH HL",      16;
@@ -1356,9 +1419,11 @@ lazy_static! {
         0x86,       "ADD A,(HL)",   8;
         0x96,       "SUB (HL)",     8;
         0xa6,       "AND (HL)",     8;
+        0xb6,       "OR (HL)",      8;
         0xc6,       "ADD A,d8",     8;
         0xd6,       "SUB d8",       8;
         0xe6,       "AND d8",       8;
+        0xf6,       "OR d8",        8;
         0x47,       "LD B,A",       4;
         0x57,       "LD D,A",       4;
         0x67,       "LD H,A",       4;
@@ -1366,6 +1431,7 @@ lazy_static! {
         0x87,       "ADD A,A",      4;
         0x97,       "SUB A",        4;
         0xa7,       "AND A",        4;
+        0xb7,       "OR A",         4;
         0xc7,       "RST 00H",      16;
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
