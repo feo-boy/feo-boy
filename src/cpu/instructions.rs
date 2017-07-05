@@ -681,6 +681,12 @@ impl super::Cpu {
             // LD A,B
             0x78 => self.reg.a = self.reg.b,
 
+            // ADC A,B
+            0x88 => {
+                let b = self.reg.b;
+                self.reg.adc(b);
+            }
+
             // XOR B
             0xa8 => {
                 let b = self.reg.b;
@@ -746,6 +752,12 @@ impl super::Cpu {
             // LD A,C
             0x79 => self.reg.a = self.reg.c,
 
+            // ADC A,C
+            0x89 => {
+                let c = self.reg.c;
+                self.reg.adc(c);
+            }
+
             // XOR C
             0xa9 => {
                 let c = self.reg.c;
@@ -793,6 +805,12 @@ impl super::Cpu {
             // LD A,D
             0x7a => self.reg.a = self.reg.d,
 
+            // ADC A,D
+            0x8a => {
+                let d = self.reg.d;
+                self.reg.adc(d);
+            }
+
             // XOR D
             0xaa => {
                 let d = self.reg.d;
@@ -835,6 +853,12 @@ impl super::Cpu {
             // LD A,E
             0x7b => self.reg.a = self.reg.e,
 
+            // ADC A,E
+            0x8b => {
+                let e = self.reg.e;
+                self.reg.adc(e);
+            }
+
             // XOR E
             0xab => {
                 let e = self.reg.e;
@@ -872,6 +896,12 @@ impl super::Cpu {
 
             // LD A,H
             0x7c => self.reg.a = self.reg.h,
+
+            // ADC A,H
+            0x8c => {
+                let h = self.reg.h;
+                self.reg.adc(h);
+            }
 
             // XOR H
             0xac => {
@@ -921,6 +951,12 @@ impl super::Cpu {
             // LD A,L
             0x7d => self.reg.a = self.reg.l,
 
+            // ADC A,L
+            0x8d => {
+                let l = self.reg.l;
+                self.reg.adc(l);
+            }
+
             // XOR L
             0xad => {
                 let l = self.reg.l;
@@ -957,11 +993,20 @@ impl super::Cpu {
             // LD A,(HL)
             0x7e => self.reg.a = bus.read_byte(self.reg.hl()),
 
+            // ADC A,(HL)
+            0x8e => {
+                let byte = bus.read_byte(self.reg.hl());
+                self.reg.adc(byte);
+            }
+
             // XOR (HL)
             0xae => {
                 let byte = bus.read_byte(self.reg.hl());
                 self.reg.xor(byte);
             }
+
+            // ADC A,d8
+            0xce => self.reg.adc(instruction.operands[0]),
 
             // XOR d8
             0xee => self.reg.xor(instruction.operands[0]),
@@ -980,6 +1025,12 @@ impl super::Cpu {
 
             // LD A,A
             0x7f => (),
+
+            // ADC A,A
+            0x8f => {
+                let a = self.reg.a;
+                self.reg.adc(a);
+            }
 
             // XOR A
             0xaf => {
@@ -1091,6 +1142,25 @@ impl super::Registers {
         self.f.set(ZERO, self.a == 0);
     }
 
+    /// Adds a byte and the value of the carry to the accumulator and sets the flags appropriately.
+    fn adc(&mut self, rhs: u8) {
+        let carry = if self.f.contains(CARRY) { 1 } else { 0 };
+
+        let c = is_carry_add(self.a, rhs) || is_carry_add(rhs, carry) ||
+            is_carry_add(self.a.wrapping_add(rhs), carry);
+
+        let hc = is_half_carry_add(self.a, rhs) || is_half_carry_add(rhs, carry) ||
+            is_half_carry_add(self.a.wrapping_add(rhs), carry);
+
+        self.f.remove(SUBTRACT);
+        self.f.set(HALF_CARRY, hc);
+        self.f.set(CARRY, c);
+
+        self.a = self.a.wrapping_add(rhs).wrapping_add(carry);
+
+        self.f.set(ZERO, self.a == 0);
+    }
+
     /// Adds a 16-bit number to the HL register pair and sets the flags appropriately.
     fn add_hl(&mut self, rhs: u16) {
         let hl = self.hl();
@@ -1127,7 +1197,10 @@ impl super::Registers {
 
         self.f.remove(ZERO);
         self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, is_half_carry_add(low_byte, rhs as u8));
+        self.f.set(
+            HALF_CARRY,
+            is_half_carry_add(low_byte, rhs as u8),
+        );
         self.f.set(CARRY, is_carry_add(low_byte, rhs as u8));
     }
 
@@ -1304,6 +1377,7 @@ lazy_static! {
         0x58,       "LD E,B",       4;
         0x68,       "LD L,B",       4;
         0x78,       "LD A,B",       4;
+        0x88,       "ADC A,B",      4;
         0xa8,       "XOR B",        4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
@@ -1317,6 +1391,7 @@ lazy_static! {
         0x59,       "LD E,C",       4;
         0x69,       "LD L,C",       4;
         0x79,       "LD A,C",       4;
+        0x89,       "ADC A,C",      4;
         0xa9,       "XOR C",        4;
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
@@ -1328,6 +1403,7 @@ lazy_static! {
         0x5a,       "LD E,D",       4;
         0x6a,       "LD L,D",       4;
         0x7a,       "LD A,D",       4;
+        0x8a,       "ADC A,D",      4;
         0xaa,       "XOR D",        4;
         0xea,       "LD (a16),A",   16;
         0xfa,       "LD A,(a16)",   16;
@@ -1339,6 +1415,7 @@ lazy_static! {
         0x5b,       "LD E,E",       4;
         0x6b,       "LD L,E",       4;
         0x7b,       "LD A,E",       4;
+        0x8b,       "ADC A,E",      4;
         0xab,       "XOR E",        4;
         0xcb,       "PREFIX CB",    0;
         0xfb,       "EI",           4;
@@ -1350,6 +1427,7 @@ lazy_static! {
         0x5c,       "LD E,H",       4;
         0x6c,       "LD L,H",       4;
         0x7c,       "LD A,H",       4;
+        0x8c,       "ADC A,H",      4;
         0xac,       "XOR H",        4;
         0xcc,       "CALL Z,a16",   12;
         0xdc,       "CALL C,a16",   12;
@@ -1361,6 +1439,7 @@ lazy_static! {
         0x5d,       "LD E,L",       4;
         0x6d,       "LD L,L",       4;
         0x7d,       "LD A,L",       4;
+        0x8d,       "ADC A,L",      4;
         0xad,       "XOR L",        4;
         0xcd,       "CALL a16",     24;
         0x0e,       "LD C,d8",      8;
@@ -1371,13 +1450,16 @@ lazy_static! {
         0x5e,       "LD E,(HL)",    8;
         0x6e,       "LD L,(HL)",    8;
         0x7e,       "LD A,(HL)",    8;
+        0x8e,       "ADC A,(HL)",   8;
         0xae,       "XOR (HL)",     8;
+        0xce,       "ADC A,d8",     8;
         0xee,       "XOR d8",       8;
         0xfe,       "CP d8",        8;
         0x4f,       "LD C,A",       4;
         0x5f,       "LD E,A",       4;
         0x6f,       "LD L,A",       4;
         0x7f,       "LD A,A",       4;
+        0x8f,       "ADC A,A",      4;
         0xaf,       "XOR A",        4;
         0xcf,       "RST 08H",      16;
         0xdf,       "RST 18H",      16;
