@@ -650,6 +650,9 @@ impl super::Cpu {
             // OR d8
             0xf6 => self.reg.or(instruction.operands[0]),
 
+            // DAA
+            0x27 => self.reg.daa(),
+
             // LD B,A
             0x47 => self.reg.b = self.reg.a,
 
@@ -1387,6 +1390,32 @@ impl super::Registers {
         self.f = Flags::empty();
         self.f.set(ZERO, self.a == 0);
     }
+
+    /// Performs a decimal adjust (DAA) operation on register A so that the correct representation
+    /// of Binary Coded Decimal (BCD) is obtained.
+    fn daa(&mut self) {
+        let mut correction = 0;
+        let a = self.a;
+
+        if self.a > 0x99 || self.f.contains(CARRY) {
+            correction += 0x60;
+            self.f.insert(CARRY);
+        }
+
+        if (self.a & 0xf) > 0x9 || self.f.contains(HALF_CARRY) {
+            correction += 0x6;
+        }
+
+        if self.f.contains(SUBTRACT) {
+            self.a = self.a.wrapping_sub(correction);
+        } else {
+            self.a = self.a.wrapping_add(correction);
+        }
+
+        // Set the half carry flag if there has been a carry/borrow between bits 3 and 4
+        self.f.set(HALF_CARRY, ((a & 0x10) ^ (self.a & 0x10)) == 0);
+        self.f.set(ZERO, self.a == 0);
+    }
 }
 
 /// Returns `true` if the addition of two bytes requires a carry.
@@ -1539,6 +1568,7 @@ lazy_static! {
         0xd6,       "SUB d8",       8;
         0xe6,       "AND d8",       8;
         0xf6,       "OR d8",        8;
+        0x27,       "DAA",          4;
         0x47,       "LD B,A",       4;
         0x57,       "LD D,A",       4;
         0x67,       "LD H,A",       4;
@@ -1875,4 +1905,6 @@ mod tests {
         assert_eq!(cpu.reg.sp, 0xffff);
         assert_eq!(cpu.reg.pc, 5);
     }
+
+    // FIXME: daa needs tests
 }
