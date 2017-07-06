@@ -747,6 +747,12 @@ impl super::Cpu {
                 self.reg.xor(b)
             }
 
+            // CP B
+            0xb8 => {
+                let b = self.reg.b;
+                self.reg.cp(b);
+            }
+
             // RET Z
             0xc8 => {
                 if self.reg.f.contains(ZERO) {
@@ -824,6 +830,12 @@ impl super::Cpu {
                 self.reg.xor(c);
             }
 
+            // CP C
+            0xb9 => {
+                let c = self.reg.c;
+                self.reg.cp(c);
+            }
+
             // RET
             0xc9 => {
                 self.ret(bus);
@@ -883,6 +895,12 @@ impl super::Cpu {
                 self.reg.xor(d);
             }
 
+            // CP D
+            0xba => {
+                let d = self.reg.d;
+                self.reg.cp(d);
+            }
+
             // LD (a16),A
             0xea => {
                 let address = LittleEndian::read_u16(&instruction.operands);
@@ -937,6 +955,12 @@ impl super::Cpu {
                 self.reg.xor(e);
             }
 
+            // CP E
+            0xbb => {
+                let e = self.reg.e;
+                self.reg.cp(e);
+            }
+
             0xcb => {
                 error!("unimplemented prefix instruction");
                 self.reg.pc += 1;
@@ -985,6 +1009,12 @@ impl super::Cpu {
             0xac => {
                 let h = self.reg.h;
                 self.reg.xor(h);
+            }
+
+            // CP H
+            0xbc => {
+                let h = self.reg.h;
+                self.reg.cp(h);
             }
 
             // CALL Z,a16
@@ -1047,6 +1077,12 @@ impl super::Cpu {
                 self.reg.xor(l);
             }
 
+            // CP L
+            0xbd => {
+                let l = self.reg.l;
+                self.reg.cp(l);
+            }
+
             // CALL a16
             0xcd => {
                 let address = LittleEndian::read_u16(&instruction.operands);
@@ -1095,6 +1131,12 @@ impl super::Cpu {
                 self.reg.xor(byte);
             }
 
+            // CP (HL)
+            0xbe => {
+                let byte = bus.read_byte(self.reg.hl());
+                self.reg.cp(byte);
+            }
+
             // ADC A,d8
             0xce => self.reg.adc(instruction.operands[0]),
 
@@ -1136,6 +1178,12 @@ impl super::Cpu {
                 // Effectively sets A to 0 and unconditionally sets the Zero flag.
                 let a = self.reg.a;
                 self.reg.xor(a);
+            }
+
+            // CP A
+            0xbf => {
+                let a = self.reg.a;
+                self.reg.cp(a);
             }
 
             // RST 08H
@@ -1513,6 +1561,7 @@ lazy_static! {
         0x88,       "ADC A,B",      4;
         0x98,       "SBC A,B",      4;
         0xa8,       "XOR B",        4;
+        0xb8,       "CP B",         4;
         0xc8,       "RET Z",        8;
         0xd8,       "RET C",        8;
         0xe8,       "ADD SP,r8",    16;
@@ -1528,6 +1577,7 @@ lazy_static! {
         0x89,       "ADC A,C",      4;
         0x99,       "SBC A,C",      4;
         0xa9,       "XOR C",        4;
+        0xb9,       "CP C",         4;
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
         0x0a,       "LD A,(BC)",    8;
@@ -1541,6 +1591,7 @@ lazy_static! {
         0x8a,       "ADC A,D",      4;
         0x9a,       "SBC A,D",      4;
         0xaa,       "XOR D",        4;
+        0xba,       "CP D",         4;
         0xea,       "LD (a16),A",   16;
         0xfa,       "LD A,(a16)",   16;
         0x0b,       "DEC BC",       8;
@@ -1554,6 +1605,7 @@ lazy_static! {
         0x8b,       "ADC A,E",      4;
         0x9b,       "SBC A,E",      4;
         0xab,       "XOR E",        4;
+        0xbb,       "CP E",         4;
         0xcb,       "PREFIX CB",    0;
         0xfb,       "EI",           4;
         0x0c,       "INC C",        4;
@@ -1567,6 +1619,7 @@ lazy_static! {
         0x8c,       "ADC A,H",      4;
         0x9c,       "SBC A,H",      4;
         0xac,       "XOR H",        4;
+        0xbc,       "CP H",         4;
         0xcc,       "CALL Z,a16",   12;
         0xdc,       "CALL C,a16",   12;
         0x0d,       "DEC C",        4;
@@ -1580,6 +1633,7 @@ lazy_static! {
         0x8d,       "ADC A,L",      4;
         0x9d,       "SBC A,L",      4;
         0xad,       "XOR L",        4;
+        0xbd,       "CP L",         4;
         0xcd,       "CALL a16",     24;
         0x0e,       "LD C,d8",      8;
         0x1e,       "LD E,d8",      8;
@@ -1592,6 +1646,7 @@ lazy_static! {
         0x8e,       "ADC A,(HL)",   8;
         0x9e,       "SBC A,(HL)",   8;
         0xae,       "XOR (HL)",     8;
+        0xbe,       "CP (HL)",      8;
         0xce,       "ADC A,d8",     8;
         0xde,       "SBC A,d8",     8;
         0xee,       "XOR d8",       8;
@@ -1603,6 +1658,7 @@ lazy_static! {
         0x8f,       "ADC A,A",      4;
         0x9f,       "SBC A,A",      4;
         0xaf,       "XOR A",        4;
+        0xbf,       "CP A",         4;
         0xcf,       "RST 08H",      16;
         0xdf,       "RST 18H",      16;
         0xef,       "RST 28H",      16;
