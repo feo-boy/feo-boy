@@ -4,8 +4,6 @@
 
 use std::fmt;
 
-use memory::Addressable;
-
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Shade {
@@ -226,10 +224,8 @@ impl Ppu {
             _ => panic!("unimplemented PPU mode: {:?}", self.mode),
         }
     }
-}
 
-impl Addressable for Ppu {
-    fn read_byte(&self, address: u16) -> u8 {
+    pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000...0x9FFF => {
                 let index = address & 0x1FFF;
@@ -245,7 +241,7 @@ impl Addressable for Ppu {
         }
     }
 
-    fn write_byte(&mut self, address: u16, byte: u8) {
+    pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000...0x9FFF => {
                 let index = address & 0x1FFF;
@@ -277,8 +273,6 @@ impl fmt::Debug for Memory {
 #[cfg(test)]
 mod tests {
     use super::Ppu;
-
-    use memory::Addressable;
 
     #[test]
     fn vram() {

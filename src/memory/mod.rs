@@ -36,6 +36,16 @@ pub trait Addressable {
     }
 }
 
+impl Addressable for [u8; 0x10000] {
+    fn read_byte(&self, address: u16) -> u8 {
+        self[address as usize]
+    }
+
+    fn write_byte(&mut self, address: u16, byte: u8) {
+        self[address as usize] = byte;
+    }
+}
+
 /// Memory managed by the MMU.
 ///
 /// VRAM and OAM are stored in the PPU.
@@ -281,16 +291,8 @@ impl Mmu {
         info!("unmapping BIOS");
         self.bios_mapped = false;
     }
-}
 
-impl Default for Mmu {
-    fn default() -> Mmu {
-        Mmu::new()
-    }
-}
-
-impl Addressable for Mmu {
-    fn read_byte(&self, address: u16) -> u8 {
+    pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
             0x0000...0x00FF if self.bios_mapped && self.has_bios() => {
@@ -336,7 +338,7 @@ impl Addressable for Mmu {
         }
     }
 
-    fn write_byte(&mut self, address: u16, byte: u8) {
+    pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             // BIOS and ROM Banks
             0x0000...0x7FFF => {
@@ -384,9 +386,15 @@ impl Addressable for Mmu {
     }
 }
 
+impl Default for Mmu {
+    fn default() -> Mmu {
+        Mmu::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Mmu, Addressable};
+    use super::Mmu;
 
     #[test]
     fn rom() {
@@ -442,14 +450,16 @@ mod tests {
 
     #[test]
     fn words() {
-        let mut mmu = Mmu::default();
+        use super::Addressable;
 
-        mmu.mem.wram[0] = 0xAB;
-        mmu.mem.wram[1] = 0xCD;
-        assert_eq!(mmu.read_word(0xC000), 0xCDAB);
+        let mut bus = [0u8; 0x10000];
 
-        mmu.write_word(0xFF80, 0xABCD);
-        assert_eq!(mmu.mem.zram[0], 0xCD);
-        assert_eq!(mmu.mem.zram[1], 0xAB);
+        bus[0xC000] = 0xAB;
+        bus[0xC001] = 0xCD;
+        assert_eq!(bus.read_word(0xC000), 0xCDAB);
+
+        bus.write_word(0x1234, 0xABCD);
+        assert_eq!(bus[0x1234], 0xCD);
+        assert_eq!(bus[0x1235], 0xAB);
     }
 }

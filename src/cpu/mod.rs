@@ -11,7 +11,6 @@ use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{BigEndian, ByteOrder};
 
-use bus::Bus;
 use memory::{Addressable, Mmu};
 
 pub use self::instructions::Instruction;
@@ -283,7 +282,7 @@ impl Cpu {
     /// Fetch and execute a single instruction.
     ///
     /// Returns the number of cycles the instruction takes.
-    pub fn step(&mut self, bus: &mut Bus) -> u32 {
+    pub fn step<B: Addressable>(&mut self, bus: &mut B) -> u32 {
         let instruction = self.fetch(bus);
         self.execute(instruction, bus)
     }
@@ -291,7 +290,7 @@ impl Cpu {
     /// Push a value onto the stack.
     ///
     /// Uses the current value of `SP`, and decrements it.
-    pub fn push(&mut self, value: u16, bus: &mut Bus) {
+    pub fn push<B: Addressable>(&mut self, value: u16, bus: &mut B) {
         self.reg.sp -= 2;
         bus.write_word(self.reg.sp, value);
     }
@@ -299,7 +298,7 @@ impl Cpu {
     /// Pop a value off the stack.
     ///
     /// Uses the current value of `SP`, and increments it.
-    pub fn pop(&mut self, bus: &Bus) -> u16 {
+    pub fn pop<B: Addressable>(&mut self, bus: &B) -> u16 {
         let value = bus.read_word(self.reg.sp);
         self.reg.sp += 2;
         value

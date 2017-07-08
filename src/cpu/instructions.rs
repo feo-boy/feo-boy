@@ -7,7 +7,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
-use bus::Bus;
 use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 use memory::Addressable;
 
@@ -43,6 +42,15 @@ pub struct Instruction {
 
     /// Vector containing the operands of the instruction. May be empty.
     operands: SmallVec<[u8; 2]>,
+}
+
+impl Default for Instruction {
+    fn default() -> Instruction {
+        Instruction {
+            def: INSTRUCTIONS[0x00].as_ref().unwrap(),
+            operands: Default::default(),
+        }
+    }
 }
 
 impl Display for Instruction {
@@ -95,7 +103,7 @@ macro_rules! instructions {
 
 impl super::Cpu {
     /// Decodes the next instruction.
-    pub fn fetch(&self, bus: &Bus) -> Instruction {
+    pub fn fetch<B: Addressable>(&self, bus: &B) -> Instruction {
         let byte = bus.read_byte(self.reg.pc);
 
         let def = INSTRUCTIONS[byte as usize].as_ref().expect(&format!(
@@ -119,7 +127,7 @@ impl super::Cpu {
     /// registers, and CPU clock.
     ///
     /// Returns the number of clock cycles the instruction takes.
-    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) -> u32 {
+    pub fn execute<B: Addressable>(&mut self, instruction: Instruction, bus: &mut B) -> u32 {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -1215,7 +1223,7 @@ impl super::Cpu {
     ///
     /// The current value of the program counter is assumed to be the address of the next
     /// instruction.
-    fn rst(&mut self, addr: u16, bus: &mut Bus) {
+    fn rst<B: Addressable>(&mut self, addr: u16, bus: &mut B) {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = addr;
@@ -1242,14 +1250,14 @@ impl super::Cpu {
     }
 
     /// Performs a CALL operation. Does not modify any flags.
-    fn call(&mut self, address: u16, bus: &mut Bus) {
+    fn call<B: Addressable>(&mut self, address: u16, bus: &mut B) {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = address;
     }
 
     /// Performs a RET operation. Does not modify any flags.
-    fn ret(&mut self, bus: &Bus) {
+    fn ret<B: Addressable>(&mut self, bus: &B) {
         self.reg.pc = self.pop(bus);
     }
 
@@ -1700,7 +1708,6 @@ lazy_static! {
 mod tests {
     use smallvec::SmallVec;
 
-    use bus::Bus;
     use cpu::Cpu;
     use memory::Addressable;
 
@@ -1759,11 +1766,10 @@ mod tests {
 
     #[test]
     fn fetch_nop() {
-        let bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let cpu = Cpu::new();
 
-        // FIXME: This test works because memory will be empty initially (that is, full of NOPs).
-        // However, this is fragile.
+        bus.write_byte(0x00, 0x00);
         let nop = cpu.fetch(&bus);
 
         assert_eq!(nop.def.byte, 0x00);
@@ -1773,7 +1779,7 @@ mod tests {
 
     #[test]
     fn rst() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
@@ -1791,7 +1797,7 @@ mod tests {
 
     #[test]
     fn jr_nz() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.pc = 0;
@@ -1830,7 +1836,7 @@ mod tests {
 
     #[test]
     fn ld_addr_c_a() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.c = 0x11;
@@ -1841,16 +1847,28 @@ mod tests {
             operands: Default::default(),
         };
         cpu.execute(instruction, &mut bus);
-        // FIXME: We can't actually test this until the I/O memory
-        // is implemented.
-        // assert_eq!(cpu.bus.read_byte(0xFF11), 0xab);
+        assert_eq!(bus.read_byte(0xFF11), 0xab);
     }
 
-    // FIXME: Add test for 0xf2 after I/O memory is implemented.
+    #[test]
+    fn ldh() {
+        let mut bus = [0u8; 0x10000];
+        let mut cpu = Cpu::new();
+
+        cpu.reg.c = 0x23;
+        bus[0xFF23] = 0xBE;
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xf2].as_ref().unwrap(),
+            ..Default::default()
+        };
+        cpu.execute(instruction, &mut bus);
+        assert_eq!(cpu.reg.a, 0xBE);
+    }
 
     #[test]
     fn ld_addr_a16_a() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.a = 0x11;
@@ -1866,7 +1884,7 @@ mod tests {
 
     #[test]
     fn ld_a_addr_a16() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         bus.write_byte(0xc000, 0xaa);
@@ -1882,7 +1900,7 @@ mod tests {
 
     #[test]
     fn call() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
@@ -1895,7 +1913,7 @@ mod tests {
 
     #[test]
     fn ret() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
