@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
-use cpu::{Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+use cpu::{self, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 use memory::Addressable;
 
 lazy_static! {
@@ -1231,7 +1231,7 @@ impl super::Cpu {
 
     /// Increments a byte by 1 and sets the flags appropriately.
     fn inc(byte: &mut u8, flags: &mut Flags) {
-        flags.set(HALF_CARRY, is_half_carry_add(*byte, 1));
+        flags.set(HALF_CARRY, cpu::is_half_carry_add(*byte, 1));
 
         *byte = byte.wrapping_add(1);
 
@@ -1241,7 +1241,7 @@ impl super::Cpu {
 
     /// Decrements a byte by 1 and sets the flags appropriately.
     fn dec(byte: &mut u8, flags: &mut Flags) {
-        flags.set(HALF_CARRY, is_half_carry_sub(*byte, 1));
+        flags.set(HALF_CARRY, cpu::is_half_carry_sub(*byte, 1));
 
         *byte = byte.wrapping_sub(1);
 
@@ -1266,198 +1266,6 @@ impl super::Cpu {
         let pc = self.reg.pc as i16;
         self.reg.pc = (pc + jump as i16) as u16;
     }
-}
-
-impl super::Registers {
-    /// Bitwise ANDs a byte with the accumulator and sets the flags appropriately.
-    fn and(&mut self, rhs: u8) {
-        self.a &= rhs;
-
-        self.f.remove(SUBTRACT | CARRY);
-        self.f.insert(HALF_CARRY);
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Compares a byte with the accumulator.
-    ///
-    /// Performs a subtraction with the accumulator without actually setting the accumulator to the
-    /// new value. Only the flags are set.
-    fn cp(&mut self, rhs: u8) {
-        self.f.set(ZERO, self.a == rhs);
-        self.f.insert(SUBTRACT);
-        self.f.set(HALF_CARRY, is_half_carry_sub(self.a, rhs));
-        self.f.set(CARRY, is_carry_sub(self.a, rhs));
-    }
-
-    /// Adds a byte to the accumulator and sets the flags appropriately.
-    fn add(&mut self, rhs: u8) {
-        self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, is_half_carry_add(self.a, rhs));
-        self.f.set(CARRY, is_carry_add(self.a, rhs));
-
-        self.a = self.a.wrapping_add(rhs);
-
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Adds a byte and the value of the carry to the accumulator and sets the flags appropriately.
-    fn adc(&mut self, rhs: u8) {
-        let carry = if self.f.contains(CARRY) { 1 } else { 0 };
-
-        let c = is_carry_add(self.a, rhs) || is_carry_add(self.a.wrapping_add(rhs), carry);
-        let hc = is_half_carry_add(self.a, rhs) ||
-            is_half_carry_add(self.a.wrapping_add(rhs), carry);
-
-        self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, hc);
-        self.f.set(CARRY, c);
-
-        self.a = self.a.wrapping_add(rhs).wrapping_add(carry);
-
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Adds a 16-bit number to the HL register pair and sets the flags appropriately.
-    fn add_hl(&mut self, rhs: u16) {
-        let hl = self.hl();
-
-        self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, is_half_carry_add_16(hl, rhs));
-        self.f.set(CARRY, is_carry_add_16(hl, rhs));
-
-        self.hl_mut().add_assign(rhs);
-    }
-
-    /// Adds a signed byte to the stack pointer, SP, and sets the flags appropriately.
-    fn add_sp(&mut self, rhs: i8) {
-        self.set_sp_r8_flags(rhs);
-
-        let sp = self.sp as i16;
-        self.sp = (sp + rhs as i16) as u16;
-    }
-
-    /// Places the result of adding a signed byte to the stack pointer, SP, in the register pair
-    /// HL, and sets the flags appropriately.
-    fn ld_hl_sp_r8(&mut self, rhs: i8) {
-        self.set_sp_r8_flags(rhs);
-
-        let sp = self.sp as i16;
-        self.hl_mut().write((sp + rhs as i16) as u16);
-    }
-
-    /// Sets the flags appropriately for adding a signed byte to the stack pointer, SP. Note that
-    /// the carry and half-carry flags are set as if the signed byte is unsigned and is being added
-    /// to the low byte of SP.
-    fn set_sp_r8_flags(&mut self, rhs: i8) {
-        let low_byte = self.sp as u8;
-
-        self.f.remove(ZERO);
-        self.f.remove(SUBTRACT);
-        self.f.set(
-            HALF_CARRY,
-            is_half_carry_add(low_byte, rhs as u8),
-        );
-        self.f.set(CARRY, is_carry_add(low_byte, rhs as u8));
-    }
-
-    /// Subtracts a byte from the accumulator and sets the flags appropriately.
-    fn sub(&mut self, rhs: u8) {
-        self.cp(rhs);
-        self.a = self.a.wrapping_sub(rhs);
-    }
-
-    /// Subtracts a byte and the carry flag from the accumulator and sets the flags appropriately.
-    fn sbc(&mut self, rhs: u8) {
-        let carry = if self.f.contains(CARRY) { 1 } else { 0 };
-
-        let c = is_carry_sub(self.a, rhs) || is_carry_sub(self.a.wrapping_sub(rhs), carry);
-        let hc = is_half_carry_sub(self.a, rhs) ||
-            is_half_carry_sub(self.a.wrapping_sub(rhs), carry);
-
-        self.f.insert(SUBTRACT);
-        self.f.set(HALF_CARRY, hc);
-        self.f.set(CARRY, c);
-
-        self.a = self.a.wrapping_sub(rhs).wrapping_sub(carry);
-
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately. Unsets
-    /// the other flags.
-    fn xor(&mut self, rhs: u8) {
-        self.a ^= rhs;
-        self.f = Flags::empty();
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Peforms an OR with the accumulator and sets the zero flag appropriately. Unsets the other
-    /// flags.
-    fn or(&mut self, rhs: u8) {
-        self.a |= rhs;
-        self.f = Flags::empty();
-        self.f.set(ZERO, self.a == 0);
-    }
-
-    /// Performs a decimal adjust (DAA) operation on register A so that the correct representation
-    /// of Binary Coded Decimal (BCD) is obtained.
-    fn daa(&mut self) {
-        let mut correction = 0;
-        let a = self.a;
-
-        if self.a > 0x99 || self.f.contains(CARRY) {
-            correction += 0x60;
-            self.f.insert(CARRY);
-        }
-
-        if (self.a & 0xf) > 0x9 || self.f.contains(HALF_CARRY) {
-            correction += 0x6;
-        }
-
-        if self.f.contains(SUBTRACT) {
-            self.a = self.a.wrapping_sub(correction);
-        } else {
-            self.a = self.a.wrapping_add(correction);
-        }
-
-        // Set the half carry flag if there has been a carry/borrow between bits 3 and 4
-        self.f.set(HALF_CARRY, ((a & 0x10) ^ (self.a & 0x10)) == 0);
-        self.f.set(ZERO, self.a == 0);
-    }
-}
-
-/// Returns `true` if the addition of two bytes requires a carry.
-fn is_carry_add(a: u8, b: u8) -> bool {
-    a.wrapping_add(b) < a
-}
-
-/// Returns `true` if the addition of two 16-bit numbers requires a carry.
-fn is_carry_add_16(a: u16, b: u16) -> bool {
-    a.wrapping_add(b) < a
-}
-
-/// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
-/// nibble to the high nibble).
-fn is_half_carry_add(a: u8, b: u8) -> bool {
-    (((a & 0xf).wrapping_add(b & 0xf)) & 0x10) == 0x10
-}
-
-/// Returns `true` if the addition of two 16-bit numbers would require a half carry (a carry from
-/// bit 11 to 12, zero-indexed).
-fn is_half_carry_add_16(a: u16, b: u16) -> bool {
-    (((a & 0xfff).wrapping_add(b & 0xfff)) & 0x1000) == 0x1000
-}
-
-/// Returns `true` if the subtraction of two bytes would not require a carry from the most
-/// significant bit.
-fn is_carry_sub(a: u8, b: u8) -> bool {
-    a > b
-}
-
-/// Returns `true` if the subtraction of two bytes would not require a half carry (a borrow from
-/// the high nibble to the low nibble).
-fn is_half_carry_sub(a: u8, b: u8) -> bool {
-    (a & 0xf) > (b & 0xf)
 }
 
 lazy_static! {
@@ -1714,33 +1522,6 @@ mod tests {
     use super::{INSTRUCTIONS, Instruction};
 
     #[test]
-    fn half_carry() {
-        assert!(super::is_half_carry_add(0x0f, 0x01));
-        assert!(!super::is_half_carry_add(0x37, 0x44));
-
-        assert!(super::is_half_carry_add_16(0x0fff, 0x0fff));
-        assert!(super::is_half_carry_add_16(0x0fff, 0x0001));
-        assert!(!super::is_half_carry_add_16(0x0000, 0x0001));
-
-        assert!(!super::is_half_carry_sub(0xf0, 0x01));
-        assert!(super::is_half_carry_sub(0xff, 0xf0));
-    }
-
-    #[test]
-    fn carry() {
-        assert!(super::is_carry_add(0xff, 0xff));
-        assert!(super::is_carry_add(0xff, 0x01));
-        assert!(!super::is_carry_add(0x00, 0x01));
-
-        assert!(super::is_carry_add_16(0xffff, 0xffff));
-        assert!(super::is_carry_add_16(0xffff, 0x0001));
-        assert!(!super::is_carry_add_16(0x0000, 0x0001));
-
-        assert!(!super::is_carry_sub(0x00, 0x01));
-        assert!(super::is_carry_sub(0xff, 0x0f));
-    }
-
-    #[test]
     fn instruction_display() {
         let nop = Instruction {
             def: INSTRUCTIONS[0x00].as_ref().unwrap(),
@@ -1923,6 +1704,4 @@ mod tests {
         assert_eq!(cpu.reg.sp, 0xffff);
         assert_eq!(cpu.reg.pc, 5);
     }
-
-    // FIXME: daa needs tests
 }
