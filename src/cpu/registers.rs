@@ -219,10 +219,9 @@ impl Registers {
     /// Performs a subtraction with the accumulator without actually setting the accumulator to the
     /// new value. Only the flags are set.
     pub fn cp(&mut self, rhs: u8) {
-        self.f.set(ZERO, self.a == rhs);
-        self.f.insert(SUBTRACT);
-        self.f.set(HALF_CARRY, cpu::is_half_carry_sub(self.a, rhs));
-        self.f.set(CARRY, cpu::is_carry_sub(self.a, rhs));
+        let a = self.a;
+        self.sub(rhs);
+        self.a = a;
     }
 
     /// Adds a byte to the accumulator and sets the flags appropriately.
@@ -284,24 +283,27 @@ impl Registers {
 
     /// Subtracts a byte from the accumulator and sets the flags appropriately.
     pub fn sub(&mut self, rhs: u8) {
-        self.cp(rhs);
-        self.a = self.a.wrapping_sub(rhs);
+        self.f.remove(CARRY);
+        self.sbc(rhs);
     }
 
     /// Subtracts a byte and the carry flag from the accumulator and sets the flags appropriately.
     pub fn sbc(&mut self, rhs: u8) {
-        let carry = if self.f.contains(CARRY) { 1 } else { 0 };
-
-        let c = cpu::is_carry_sub(self.a, rhs) ||
-            cpu::is_carry_sub(self.a.wrapping_sub(rhs), carry);
-        let hc = cpu::is_half_carry_sub(self.a, rhs) ||
-            cpu::is_half_carry_sub(self.a.wrapping_sub(rhs), carry);
-
         self.f.insert(SUBTRACT);
-        self.f.set(HALF_CARRY, hc);
-        self.f.set(CARRY, c);
 
-        self.a = self.a.wrapping_sub(rhs).wrapping_sub(carry);
+        let carry_bit = if self.f.contains(CARRY) { 1 } else { 0 };
+
+        let is_half_carry = cpu::is_half_carry_sub(self.a, rhs) ||
+            cpu::is_half_carry_sub(self.a.wrapping_sub(rhs), carry_bit);
+        self.f.set(HALF_CARRY, is_half_carry);
+
+        let (a, carry) = {
+            let (a, rhs_carry) = self.a.overflowing_sub(rhs);
+            let (a, bit_carry) = a.overflowing_sub(carry_bit);
+            (a, rhs_carry || bit_carry)
+        };
+        self.a = a;
+        self.f.set(CARRY, carry);
 
         self.f.set(ZERO, self.a == 0);
     }
@@ -385,7 +387,7 @@ impl fmt::Display for Registers {
 mod tests {
     use std::ops::SubAssign;
 
-    use super::{Registers, Flags, ZERO, HALF_CARRY, CARRY};
+    use super::{Registers, Flags, ZERO, HALF_CARRY, SUBTRACT, CARRY};
 
     #[test]
     fn add() {
@@ -500,6 +502,84 @@ mod tests {
         assert_eq!(reg.hl(), 0xFFFA);
         assert_eq!(reg.sp, 0xFFF8);
         assert_eq!(reg.f, Flags::empty());
+    }
+
+    #[test]
+    fn sub() {
+        let mut reg = Registers::default();
+        reg.a = 0x3E;
+        reg.sub(0x3E);
+        assert_eq!(reg.a, 0);
+        assert_eq!(reg.f, SUBTRACT | ZERO);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3E;
+        reg.sub(0x0F);
+        assert_eq!(reg.a, 0x2F);
+        assert_eq!(reg.f, SUBTRACT | HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3E;
+        reg.sub(0x40);
+        assert_eq!(reg.a, 0xFE);
+        assert_eq!(reg.f, SUBTRACT | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x00;
+        reg.sub(0x01);
+        assert_eq!(reg.a, 0xFF);
+        assert_eq!(reg.f, SUBTRACT | HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0xFF;
+        reg.sub(0x0F);
+        assert_eq!(reg.a, 0xF0);
+        assert_eq!(reg.f, SUBTRACT);
+    }
+
+    #[test]
+    fn sbc() {
+        let mut reg = Registers::default();
+        reg.a = 0x3B;
+        reg.f.insert(CARRY);
+        reg.sbc(0x2A);
+        assert_eq!(reg.a, 0x10);
+        assert_eq!(reg.f, SUBTRACT);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3B;
+        reg.f.insert(CARRY);
+        reg.sbc(0x3A);
+        assert_eq!(reg.a, 0);
+        assert_eq!(reg.f, SUBTRACT | ZERO);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3B;
+        reg.f.insert(CARRY);
+        reg.sbc(0x4F);
+        assert_eq!(reg.a, 0xEB);
+        assert_eq!(reg.f, SUBTRACT | HALF_CARRY | CARRY);
+    }
+
+    #[test]
+    fn cp() {
+        let mut reg = Registers::default();
+        reg.a = 0x3C;
+        reg.cp(0x2F);
+        assert_eq!(reg.a, 0x3C);
+        assert_eq!(reg.f, SUBTRACT | HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3C;
+        reg.cp(0x3C);
+        assert_eq!(reg.a, 0x3C);
+        assert_eq!(reg.f, SUBTRACT | ZERO);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3C;
+        reg.cp(0x40);
+        assert_eq!(reg.a, 0x3C);
+        assert_eq!(reg.f, SUBTRACT | CARRY);
     }
 
     #[test]

@@ -118,16 +118,10 @@ pub fn is_half_carry_add_16(a: u16, b: u16) -> bool {
     (((a & 0xfff).wrapping_add(b & 0xfff)) & 0x1000) == 0x1000
 }
 
-/// Returns `true` if the subtraction of two bytes would not require a carry from the most
-/// significant bit.
-pub fn is_carry_sub(a: u8, b: u8) -> bool {
-    a > b
-}
-
-/// Returns `true` if the subtraction of two bytes would not require a half carry (a borrow from
-/// the high nibble to the low nibble).
+/// Returns `true` if the subtraction of `b` from `a` requires a borrow from the high nibble to the
+/// low nibble.
 pub fn is_half_carry_sub(a: u8, b: u8) -> bool {
-    (a & 0xf) > (b & 0xf)
+    (a & 0xf) < (b & 0xf)
 }
 
 #[cfg(test)]
@@ -145,16 +139,10 @@ mod tests {
         assert!(super::is_half_carry_add_16(0x0fff, 0x0001));
         assert!(!super::is_half_carry_add_16(0x0000, 0x0001));
 
-        assert!(!super::is_half_carry_sub(0xf0, 0x01));
-        assert!(super::is_half_carry_sub(0xff, 0xf0));
+        assert!(super::is_half_carry_sub(0xf0, 0x01));
+        assert!(!super::is_half_carry_sub(0xff, 0xf0));
+        assert!(super::is_half_carry_sub(0x3e, 0x0f));
     }
-
-    #[test]
-    fn carry() {
-        assert!(!super::is_carry_sub(0x00, 0x01));
-        assert!(super::is_carry_sub(0xff, 0x0f));
-    }
-
 
     #[test]
     fn skip_bios() {
