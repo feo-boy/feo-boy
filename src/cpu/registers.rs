@@ -227,29 +227,28 @@ impl Registers {
 
     /// Adds a byte to the accumulator and sets the flags appropriately.
     pub fn add(&mut self, rhs: u8) {
-        self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, cpu::is_half_carry_add(self.a, rhs));
-        self.f.set(CARRY, cpu::is_carry_add(self.a, rhs));
-
-        self.a = self.a.wrapping_add(rhs);
-
-        self.f.set(ZERO, self.a == 0);
+        self.f.remove(CARRY);
+        self.adc(rhs);
     }
 
     /// Adds a byte and the value of the carry to the accumulator and sets the flags appropriately.
     pub fn adc(&mut self, rhs: u8) {
-        let carry = if self.f.contains(CARRY) { 1 } else { 0 };
-
-        let c = cpu::is_carry_add(self.a, rhs) ||
-            cpu::is_carry_add(self.a.wrapping_add(rhs), carry);
-        let hc = cpu::is_half_carry_add(self.a, rhs) ||
-            cpu::is_half_carry_add(self.a.wrapping_add(rhs), carry);
-
         self.f.remove(SUBTRACT);
-        self.f.set(HALF_CARRY, hc);
-        self.f.set(CARRY, c);
 
-        self.a = self.a.wrapping_add(rhs).wrapping_add(carry);
+        let carry_bit = if self.f.contains(CARRY) { 1 } else { 0 };
+
+        let is_half_carry = cpu::is_half_carry_add(self.a, rhs) ||
+            cpu::is_half_carry_add(self.a.wrapping_add(rhs), carry_bit);
+        self.f.set(HALF_CARRY, is_half_carry);
+
+        let (a, carry) = {
+            let (a, rhs_carry) = self.a.overflowing_add(rhs);
+            let (a, bit_carry) = a.overflowing_add(carry_bit);
+
+            (a, rhs_carry || bit_carry)
+        };
+        self.a = a;
+        self.f.set(CARRY, carry);
 
         self.f.set(ZERO, self.a == 0);
     }
@@ -260,9 +259,10 @@ impl Registers {
 
         self.f.remove(SUBTRACT);
         self.f.set(HALF_CARRY, cpu::is_half_carry_add_16(hl, rhs));
-        self.f.set(CARRY, cpu::is_carry_add_16(hl, rhs));
 
-        self.hl_mut().add_assign(rhs);
+        let (a, carry) = hl.overflowing_add(rhs);
+        self.f.set(CARRY, carry);
+        self.hl_mut().write(a);
     }
 
     /// Adds a signed byte to the stack pointer, SP, and sets the flags appropriately.
@@ -360,7 +360,7 @@ impl Registers {
             HALF_CARRY,
             cpu::is_half_carry_add(low_byte, rhs as u8),
         );
-        self.f.set(CARRY, cpu::is_carry_add(low_byte, rhs as u8));
+        self.f.set(CARRY, low_byte.checked_add(rhs as u8).is_none());
     }
 }
 
@@ -385,7 +385,122 @@ impl fmt::Display for Registers {
 mod tests {
     use std::ops::SubAssign;
 
-    use super::Registers;
+    use super::{Registers, Flags, ZERO, HALF_CARRY, CARRY};
+
+    #[test]
+    fn add() {
+        let mut reg = Registers::default();
+        reg.a = 0xFF;
+        reg.add(0xFF);
+        assert_eq!(reg.a, 0xFE);
+        assert_eq!(reg.f, HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0xFF;
+        reg.add(0x01);
+        assert_eq!(reg.a, 0x00);
+        assert_eq!(reg.f, ZERO | HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x00;
+        reg.add(0x01);
+        assert_eq!(reg.a, 0x01);
+        assert_eq!(reg.f, Flags::empty());
+
+        let mut reg = Registers::default();
+        reg.a = 0x3A;
+        reg.add(0xC6);
+        assert_eq!(reg.a, 0);
+        assert_eq!(reg.f, ZERO | HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3C;
+        reg.add(0xFF);
+        assert_eq!(reg.a, 0x3B);
+        assert_eq!(reg.f, HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x3C;
+        reg.add(0x12);
+        assert_eq!(reg.a, 0x4E);
+        assert_eq!(reg.f, Flags::empty());
+    }
+
+    #[test]
+    fn adc() {
+        let mut reg = Registers::default();
+        reg.a = 0xE1;
+        reg.f.insert(CARRY);
+        reg.adc(0x0F);
+        assert_eq!(reg.a, 0xF1);
+        assert_eq!(reg.f, HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0xE1;
+        reg.f.insert(CARRY);
+        reg.adc(0x3B);
+        assert_eq!(reg.a, 0x1D);
+        assert_eq!(reg.f, CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0xE1;
+        reg.f.insert(CARRY);
+        reg.adc(0x1E);
+        assert_eq!(reg.a, 0x00);
+        assert_eq!(reg.f, ZERO | HALF_CARRY | CARRY);
+    }
+
+    #[test]
+    fn add_hl() {
+        let mut reg = Registers::default();
+        reg.hl_mut().write(0xFFFF);
+        reg.add_hl(0xFFFF);
+        assert_eq!(reg.hl(), 0xFFFE);
+        assert_eq!(reg.f, HALF_CARRY | CARRY);
+
+        let mut reg = Registers::default();
+        reg.hl_mut().write(0xFFFF);
+        reg.add_hl(0x0001);
+        assert_eq!(reg.hl(), 0);
+        assert_eq!(reg.f, HALF_CARRY | CARRY); // ZERO flag is preserved
+
+        let mut reg = Registers::default();
+        reg.hl_mut().write(0x0000);
+        reg.add_hl(0x0001);
+        assert_eq!(reg.hl(), 1);
+        assert_eq!(reg.f, Flags::empty());
+
+        let mut reg = Registers::default();
+        reg.hl_mut().write(0x8A23);
+        reg.add_hl(0x0605);
+        assert_eq!(reg.hl(), 0x9028);
+        assert_eq!(reg.f, HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.hl_mut().write(0x8A23);
+        reg.add_hl(0x8A23);
+        assert_eq!(reg.hl(), 0x1446);
+        assert_eq!(reg.f, HALF_CARRY | CARRY);
+    }
+
+    #[test]
+    fn add_sp() {
+        let mut reg = Registers::default();
+        reg.sp = 0xFFF8;
+        reg.add_sp(2);
+        assert_eq!(reg.sp, 0xFFFA);
+        assert_eq!(reg.f, Flags::empty());
+    }
+
+    #[test]
+    fn ld_hl_sp_r8() {
+        let mut reg = Registers::default();
+        reg.sp = 0xFFF8;
+        reg.ld_hl_sp_r8(2);
+        assert_eq!(reg.hl(), 0xFFFA);
+        assert_eq!(reg.sp, 0xFFF8);
+        assert_eq!(reg.f, Flags::empty());
+    }
 
     #[test]
     fn wrap_pair() {

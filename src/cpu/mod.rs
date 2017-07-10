@@ -106,16 +106,6 @@ impl fmt::Display for Cpu {
     }
 }
 
-/// Returns `true` if the addition of two bytes requires a carry.
-pub fn is_carry_add(a: u8, b: u8) -> bool {
-    a.wrapping_add(b) < a
-}
-
-/// Returns `true` if the addition of two 16-bit numbers requires a carry.
-pub fn is_carry_add_16(a: u16, b: u16) -> bool {
-    a.wrapping_add(b) < a
-}
-
 /// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
 /// nibble to the high nibble).
 pub fn is_half_carry_add(a: u8, b: u8) -> bool {
@@ -161,14 +151,6 @@ mod tests {
 
     #[test]
     fn carry() {
-        assert!(super::is_carry_add(0xff, 0xff));
-        assert!(super::is_carry_add(0xff, 0x01));
-        assert!(!super::is_carry_add(0x00, 0x01));
-
-        assert!(super::is_carry_add_16(0xffff, 0xffff));
-        assert!(super::is_carry_add_16(0xffff, 0x0001));
-        assert!(!super::is_carry_add_16(0x0000, 0x0001));
-
         assert!(!super::is_carry_sub(0x00, 0x01));
         assert!(super::is_carry_sub(0xff, 0x0f));
     }
