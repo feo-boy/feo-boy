@@ -96,6 +96,12 @@ macro_rules! instructions {
                 });
             )*
 
+            for (i, instruction) in instructions.iter().enumerate() {
+                if instruction.is_none() {
+                    warn!("missing data for instruction {:#04x}", i);
+                }
+            }
+
             instructions
         }
     }
