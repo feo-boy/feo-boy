@@ -592,6 +592,54 @@ mod tests {
     }
 
     #[test]
+    fn and() {
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.and(0x3F);
+        assert_eq!(reg.a, 0x1A);
+        assert_eq!(reg.f, HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.and(0x38);
+        assert_eq!(reg.a, 0x18);
+        assert_eq!(reg.f, HALF_CARRY);
+
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.and(0x00);
+        assert_eq!(reg.a, 0);
+        assert_eq!(reg.f, ZERO | HALF_CARRY);
+    }
+
+    #[test]
+    fn or() {
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.or(0x5A);
+        assert_eq!(reg.a, 0x5A);
+        assert!(reg.f.is_empty());
+
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.or(3);
+        assert_eq!(reg.a, 0x5B);
+        assert!(reg.f.is_empty());
+
+        let mut reg = Registers::default();
+        reg.a = 0x5A;
+        reg.or(0x0F);
+        assert_eq!(reg.a, 0x5F);
+        assert!(reg.f.is_empty());
+
+        let mut reg = Registers::default();
+        reg.a = 0;
+        reg.or(0);
+        assert_eq!(reg.a, 0);
+        assert_eq!(reg.f, ZERO);
+    }
+
+    #[test]
     fn cp() {
         let mut reg = Registers::default();
         reg.a = 0x3C;
