@@ -56,6 +56,11 @@ pub struct Cpu {
 
     /// True if the CPU is halted.
     halted: bool,
+
+    /// True if the CPU is locked.
+    ///
+    /// This state is caused by executing an unused instruction.
+    locked: bool,
 }
 
 impl Cpu {
@@ -67,6 +72,10 @@ impl Cpu {
     ///
     /// Returns the number of cycles the instruction takes.
     pub fn step<B: Addressable>(&mut self, bus: &mut B) -> u32 {
+        if self.locked {
+            return 0;
+        }
+
         let instruction = self.fetch(bus);
         self.execute(instruction, bus)
     }

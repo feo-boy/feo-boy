@@ -458,6 +458,12 @@ impl super::Cpu {
             // JP a16
             0xc3 => self.reg.pc = LittleEndian::read_u16(&instruction.operands),
 
+            // UNUSED
+            // 0xd3
+
+            // UNUSED
+            // 0xe3
+
             // DI
             0xf3 => self.interrupts = false,
 
@@ -530,6 +536,12 @@ impl super::Cpu {
                     cycles += 12;
                 }
             }
+
+            // UNUSED
+            // 0xe4
+
+            // UNUSED
+            // 0xf4
 
             // DEC B
             0x05 => Self::dec(&mut self.reg.b, &mut self.reg.f),
@@ -990,10 +1002,17 @@ impl super::Cpu {
                 self.reg.cp(e);
             }
 
+            // PREFIX CB
             0xcb => {
                 error!("unimplemented prefix instruction");
                 self.reg.pc += 1;
             }
+
+            // UNUSED
+            // 0xdb
+
+            // UNUSED
+            // 0xeb
 
             // EI
             0xfb => self.interrupts = true,
@@ -1064,6 +1083,12 @@ impl super::Cpu {
                 }
             }
 
+            // UNUSED
+            // 0xec
+
+            // UNUSED
+            // 0xfc
+
             // DEC C
             0x0d => Self::dec(&mut self.reg.c, &mut self.reg.f),
 
@@ -1117,6 +1142,15 @@ impl super::Cpu {
                 let address = LittleEndian::read_u16(&instruction.operands);
                 self.call(address, bus);
             }
+
+            // UNUSED
+            // 0xdd
+
+            // UNUSED
+            // 0xed
+
+            // UNUSED
+            // 0xfd
 
             // LD C,d8
             0x0e => self.reg.c = instruction.operands[0],
@@ -1229,6 +1263,11 @@ impl super::Cpu {
 
             // RST 38H
             0xff => self.rst(0x0038, bus),
+
+            // Unused instructions
+            0xe3 | 0xd3 | 0xf4 | 0xe4 | 0xeb | 0xdb | 0xfc | 0xec | 0xdd | 0xed | 0xfd => {
+                self.locked = true;
+            }
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
@@ -1359,6 +1398,8 @@ lazy_static! {
         0xa3,       "AND E",        4;
         0xb3,       "OR E",         4;
         0xc3,       "JP a16",       16;
+        0xd3,       "UNUSED",       0;
+        0xe3,       "UNUSED",       0;
         0xf3,       "DI",           4;
         0x04,       "INC B",        4;
         0x14,       "INC D",        4;
@@ -1374,6 +1415,8 @@ lazy_static! {
         0xb4,       "OR H",         4;
         0xc4,       "CALL NZ,a16",  12;
         0xd4,       "CALL NC,a16",  12;
+        0xe4,       "UNUSED",       0;
+        0xf4,       "UNUSED",       0;
         0x05,       "DEC B",        4;
         0x15,       "DEC D",        4;
         0x25,       "DEC H",        4;
@@ -1477,6 +1520,8 @@ lazy_static! {
         0xab,       "XOR E",        4;
         0xbb,       "CP E",         4;
         0xcb,       "PREFIX CB",    0;
+        0xdb,       "UNUSED",       0;
+        0xeb,       "UNUSED",       0;
         0xfb,       "EI",           4;
         0x0c,       "INC C",        4;
         0x1c,       "INC E",        4;
@@ -1492,6 +1537,8 @@ lazy_static! {
         0xbc,       "CP H",         4;
         0xcc,       "CALL Z,a16",   12;
         0xdc,       "CALL C,a16",   12;
+        0xec,       "UNUSED",       0;
+        0xfc,       "UNUSED",       0;
         0x0d,       "DEC C",        4;
         0x1d,       "DEC E",        4;
         0x2d,       "DEC L",        4;
@@ -1505,6 +1552,9 @@ lazy_static! {
         0xad,       "XOR L",        4;
         0xbd,       "CP L",         4;
         0xcd,       "CALL a16",     24;
+        0xdd,       "UNUSED",       0;
+        0xed,       "UNUSED",       0;
+        0xfd,       "UNUSED",       0;
         0x0e,       "LD C,d8",      8;
         0x1e,       "LD E,d8",      8;
         0x2e,       "LD L,d8",      8;
