@@ -664,6 +664,12 @@ impl super::Cpu {
             // OR d8
             0xf6 => self.reg.or(instruction.operands[0]),
 
+            // RLCA
+            0x07 => self.reg.rlc(),
+
+            // RLA
+            0x17 => self.reg.rl(),
+
             // DAA
             0x27 => self.reg.daa(),
 
@@ -1390,6 +1396,8 @@ lazy_static! {
         0xd6,       "SUB d8",       8;
         0xe6,       "AND d8",       8;
         0xf6,       "OR d8",        8;
+        0x07,       "RLCA",         4;
+        0x17,       "RLA",          4;
         0x27,       "DAA",          4;
         0x47,       "LD B,A",       4;
         0x57,       "LD D,A",       4;

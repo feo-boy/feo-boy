@@ -7,6 +7,7 @@ use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, BigEndian};
 
+use bytes::ByteExt;
 use cpu;
 
 bitflags! {
@@ -350,6 +351,29 @@ impl Registers {
         self.f.set(ZERO, self.a == 0);
     }
 
+    /// Rotates register A left one bit, through the carry bit.
+    ///
+    /// The carry bit is set to the leaving bit on the left, and bit 0 is set to the old value of
+    /// the carry bit.
+    pub fn rl(&mut self) {
+        let old_carry = self.f.contains(CARRY);
+        let new_carry = self.a.has_bit_set(7);
+
+        self.f = Flags::empty();
+        self.a <<= 1;
+        self.a.set_bit(0, old_carry);
+        self.f.set(CARRY, new_carry);
+    }
+
+    /// Rotates register A left one bit and sets the flags appropriately.
+    ///
+    /// The leaving bit on the left is copied into the carry bit.
+    pub fn rlc(&mut self) {
+        self.f = Flags::empty();
+        self.a = self.a.rotate_left(1);
+        self.f.set(CARRY, self.a.has_bit_set(0));
+    }
+
     /// Sets the flags appropriately for adding a signed byte to the stack pointer, SP. Note that
     /// the carry and half-carry flags are set as if the signed byte is unsigned and is being added
     /// to the low byte of SP.
@@ -580,6 +604,28 @@ mod tests {
         reg.cp(0x40);
         assert_eq!(reg.a, 0x3C);
         assert_eq!(reg.f, SUBTRACT | CARRY);
+    }
+
+    #[test]
+    fn rlc() {
+        let mut reg = Registers::default();
+        reg.a = 0x85;
+        reg.rlc();
+
+        // This is a different value than the GameBoy programming manual, which specifies `0x0A` as
+        // the correct result.
+        assert_eq!(reg.a, 0x0B);
+        assert_eq!(reg.f, CARRY);
+    }
+
+    #[test]
+    fn rl() {
+        let mut reg = Registers::default();
+        reg.a = 0x95;
+        reg.f.insert(CARRY);
+        reg.rl();
+        assert_eq!(reg.a, 0x2B);
+        assert_eq!(reg.f, CARRY);
     }
 
     #[test]
