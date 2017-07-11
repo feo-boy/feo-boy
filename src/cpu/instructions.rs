@@ -721,6 +721,12 @@ impl super::Cpu {
             // RST 30H
             0xf7 => self.rst(0x0030, bus),
 
+            // LD (a16),SP
+            0x08 => {
+                let address = LittleEndian::read_u16(&instruction.operands);
+                bus.write_word(address, self.reg.sp);
+            }
+
             // JR r8
             0x18 => self.jr(instruction.operands[0] as i8),
 
@@ -1411,6 +1417,7 @@ lazy_static! {
         0xd7,       "RST 10H",      16;
         0xe7,       "RST 20H",      16;
         0xf7,       "RST 30H",      16;
+        0x08,       "LD (a16),SP",  20;
         0x18,       "JR r8",        12;
         0x28,       "JR Z,r8",      8;
         0x38,       "JR C,r8",      8;
@@ -1691,6 +1698,23 @@ mod tests {
         cpu.execute(instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xaa);
+    }
+
+    #[test]
+    fn load_16() {
+        let mut bus = [0u8; 0x10000];
+        let mut cpu = Cpu::new();
+
+        cpu.reg.sp = 0xFFF8;
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0x08].as_ref().unwrap(),
+            operands: SmallVec::from_slice(&[0x00, 0xC1]),
+        };
+        cpu.execute(instruction, &mut bus);
+
+        assert_eq!(bus[0xC100], 0xF8);
+        assert_eq!(bus[0xC101], 0xFF);
     }
 
     #[test]
