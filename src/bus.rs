@@ -80,6 +80,12 @@ impl Bus {
                 register
             }
 
+            // SCY - Scroll Y
+            0xFF42 => ppu.bg_scroll.y,
+
+            // SCX - Scroll X
+            0xFF43 => ppu.bg_scroll.x,
+
             // LCDC Y-Coordinate
             0xFF44 => ppu.line,
 
