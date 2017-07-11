@@ -1178,6 +1178,9 @@ impl super::Cpu {
             // CP d8
             0xfe => self.reg.cp(instruction.operands[0]),
 
+            // CPL
+            0x2f => self.reg.cpl(),
+
             // LD C,A
             0x4f => self.reg.c = self.reg.a,
 
@@ -1518,6 +1521,7 @@ lazy_static! {
         0xde,       "SBC A,d8",     8;
         0xee,       "XOR d8",       8;
         0xfe,       "CP d8",        8;
+        0x2f,       "CPL",          4;
         0x4f,       "LD C,A",       4;
         0x5f,       "LD E,A",       4;
         0x6f,       "LD L,A",       4;

@@ -374,6 +374,12 @@ impl Registers {
         self.f.set(CARRY, self.a.has_bit_set(0));
     }
 
+    /// Inverts all bits in `A` and sets the flags appropriately.
+    pub fn cpl(&mut self) {
+        self.a = !self.a;
+        self.f.insert(SUBTRACT | HALF_CARRY);
+    }
+
     /// Sets the flags appropriately for adding a signed byte to the stack pointer, SP. Note that
     /// the carry and half-carry flags are set as if the signed byte is unsigned and is being added
     /// to the low byte of SP.
@@ -626,6 +632,15 @@ mod tests {
         reg.rl();
         assert_eq!(reg.a, 0x2B);
         assert_eq!(reg.f, CARRY);
+    }
+
+    #[test]
+    fn cpl() {
+        let mut reg = Registers::default();
+        reg.a = 0x35;
+        reg.cpl();
+        assert_eq!(reg.a, 0xCA);
+        assert_eq!(reg.f, SUBTRACT | HALF_CARRY);
     }
 
     #[test]
