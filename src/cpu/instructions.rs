@@ -176,7 +176,7 @@ impl super::Cpu {
             }
 
             // LD B,B
-            0x40 => (),
+            0x40 => self.reg.b = self.reg.b,
 
             // LD D,B
             0x50 => self.reg.d = self.reg.b,
@@ -345,7 +345,7 @@ impl super::Cpu {
             0x42 => self.reg.b = self.reg.d,
 
             // LD D,D
-            0x52 => (),
+            0x52 => self.reg.d = self.reg.d,
 
             // LD H,D
             0x62 => self.reg.h = self.reg.d,
@@ -490,7 +490,7 @@ impl super::Cpu {
             0x54 => self.reg.d = self.reg.h,
 
             // LD H,H
-            0x64 => (),
+            0x64 => self.reg.h = self.reg.h,
 
             // LD (HL),H
             0x74 => bus.write_byte(self.reg.hl(), self.reg.h),
@@ -661,7 +661,7 @@ impl super::Cpu {
             // OR (HL)
             0xb6 => {
                 let byte = bus.read_byte(self.reg.hl());
-                self.reg.and(byte);
+                self.reg.or(byte);
             }
 
             // ADD A,d8
@@ -842,7 +842,7 @@ impl super::Cpu {
             }
 
             // LD C,C
-            0x49 => (),
+            0x49 => self.reg.c = self.reg.c,
 
             // LD E,C
             0x59 => self.reg.e = self.reg.c,
@@ -970,7 +970,7 @@ impl super::Cpu {
             0x4b => self.reg.c = self.reg.e,
 
             // LD E,E
-            0x5b => (),
+            0x5b => self.reg.e = self.reg.e,
 
             // LD L,E
             0x6b => self.reg.l = self.reg.e,
@@ -1108,7 +1108,7 @@ impl super::Cpu {
             0x5d => self.reg.e = self.reg.l,
 
             // LD L,L
-            0x6d => (),
+            0x6d => self.reg.l = self.reg.l,
 
             // LD A,L
             0x7d => self.reg.a = self.reg.l,
@@ -1225,7 +1225,7 @@ impl super::Cpu {
             0x6f => self.reg.l = self.reg.a,
 
             // LD A,A
-            0x7f => (),
+            0x7f => self.reg.a = self.reg.a,
 
             // ADC A,A
             0x8f => {

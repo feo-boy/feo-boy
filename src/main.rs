@@ -26,7 +26,7 @@ struct Config {
 }
 
 fn parse_step(command: &str) -> Result<Option<i32>> {
-    let components = command.split(" ").collect::<Vec<_>>();
+    let components = command.split(' ').collect::<Vec<_>>();
 
     match components.len() {
         1 => return Ok(None),
@@ -42,7 +42,7 @@ fn parse_step(command: &str) -> Result<Option<i32>> {
 }
 
 fn parse_breakpoint(command: &str) -> Result<u16> {
-    let components = command.split(" ").collect::<Vec<_>>();
+    let components = command.split(' ').collect::<Vec<_>>();
 
     if components.len() != 2 {
         bail!("`b` takes a single argument");
@@ -62,14 +62,14 @@ fn parse_breakpoint(command: &str) -> Result<u16> {
 fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
     match &command[..1] {
         "s" => {
-            let step = parse_step(&command)?.unwrap_or_else(|| 1);
+            let step = parse_step(command)?.unwrap_or_else(|| 1);
 
             for _ in 0..step {
                 emulator.step();
             }
         }
         "b" => {
-            let breakpoint = parse_breakpoint(&command)?;
+            let breakpoint = parse_breakpoint(command)?;
             emulator.add_breakpoint(breakpoint);
         }
         "l" => {
