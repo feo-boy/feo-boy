@@ -663,5 +663,167 @@ mod tests {
         assert_eq!(registers.hl_mut().as_word(), registers.hl());
     }
 
-    // FIXME: daa needs tests
+    #[test]
+    fn daa() {
+        // FIXME: We should decide what to do in the undocumented cases,
+        // and maybe test them.
+
+        let mut registers = Registers::default();
+
+        // Test with no flags set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x90 && lo <= 0x9 {
+                assert_eq!(registers.a, i);
+                assert!(!registers.f.contains(CARRY));
+            } else if hi <= 0x80 && lo >= 0xa {
+                assert_eq!(registers.a, i.wrapping_add(0x6));
+                assert!(!registers.f.contains(CARRY));
+            } else if hi >= 0xa0 && lo <= 0x9 {
+                assert_eq!(registers.a, i.wrapping_add(0x60));
+                assert!(registers.f.contains(CARRY));
+            } else if hi >= 0x90 && lo >= 0xa {
+                assert_eq!(registers.a, i.wrapping_add(0x66));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with only carry flag set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x20 && lo <= 0x9 {
+                assert_eq!(registers.a, i.wrapping_add(0x60));
+                assert!(registers.f.contains(CARRY));
+            } else if hi <= 0x20 && lo >= 0xa {
+                assert_eq!(registers.a, i.wrapping_add(0x66));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+
+
+        // Test with only half-carry flag set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(HALF_CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x90 && lo <= 0x3 {
+                assert_eq!(registers.a, i.wrapping_add(0x6));
+                assert!(!registers.f.contains(CARRY));
+            } else if hi >= 0xa0 && lo <= 0x3 {
+                assert_eq!(registers.a, i.wrapping_add(0x66));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with carry and half-carry flags set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(CARRY);
+            registers.f.insert(HALF_CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x30 && lo <= 0x3 {
+                assert_eq!(registers.a, i.wrapping_add(0x66));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with only subtraction flag set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(SUBTRACT);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x90 && lo <= 0x9 {
+                assert_eq!(registers.a, i);
+                assert!(!registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with subtraction and carry flags set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(SUBTRACT);
+            registers.f.insert(CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi >= 0x70 && lo <= 0x9 {
+                assert_eq!(registers.a, i.wrapping_add(0xa0));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with subtraction and half-carry flags set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(SUBTRACT);
+            registers.f.insert(HALF_CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi <= 0x80 && lo >= 0x6 {
+                assert_eq!(registers.a, i.wrapping_add(0xfa));
+                assert!(!registers.f.contains(CARRY));
+            }
+        }
+
+        // Test with subtraction, carry, and half-carry flags set
+        for i in 0x00..0xff {
+            registers.a = i;
+            registers.f = Flags::empty();
+            registers.f.insert(SUBTRACT);
+            registers.f.insert(CARRY);
+            registers.f.insert(HALF_CARRY);
+
+            registers.daa();
+
+            let lo = i & 0x0f;
+            let hi = i & 0xf0;
+
+            if hi >= 0x60 && lo >= 0x6 {
+                assert_eq!(registers.a, i.wrapping_add(0x9a));
+                assert!(registers.f.contains(CARRY));
+            }
+        }
+    }
 }
