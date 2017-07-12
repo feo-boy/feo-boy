@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use bytes::ByteExt;
 use cpu;
-use graphics::Ppu;
+use graphics::{Ppu, Shade};
 use memory::{Addressable, Mmu};
 
 /// The "wires" of the emulator.
@@ -189,30 +189,10 @@ impl Bus {
             }
 
             // OBP0 - Object Palette 0 Data
-            0xFF48 => {
-                use graphics::Shade;
-
-                let mut palette = &mut ppu.sprite_palette[0];
-
-                palette[0] = Shade::Transparent;
-                for i in 1..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
+            0xFF48 => Self::set_sprite_palette(&mut ppu.sprite_palette[0], byte),
 
             // OBP1 - Object Palette 1 Data
-            0xFF49 => {
-                use graphics::Shade;
-
-                let mut palette = &mut ppu.sprite_palette[1];
-
-                palette[0] = Shade::Transparent;
-                for i in 1..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
+            0xFF49 => Self::set_sprite_palette(&mut ppu.sprite_palette[1], byte),
 
             // Unmap BIOS
             0xFF50 => {
@@ -230,6 +210,14 @@ impl Bus {
             }
 
             _ => error!("write to unimplemented I/O register {:#02x}", address),
+        }
+    }
+
+    fn set_sprite_palette(palette: &mut [Shade], shades: u8) {
+        palette[0] = Shade::Transparent;
+        for i in 1..4 {
+            let shade = (shades >> (i * 2)) & 0x3;
+            palette[i] = shade.into();
         }
     }
 }
