@@ -895,6 +895,9 @@ impl super::Cpu {
                 self.interrupts = true;
             }
 
+            // JP (HL)
+            0xe9 => self.reg.pc = self.reg.hl(),
+
             // LD A,(BC)
             0x0a => self.reg.a = bus.read_byte(self.reg.bc()),
 
@@ -1501,6 +1504,7 @@ lazy_static! {
         0xb9,       "CP C",         4;
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
+        0xe9,       "JP (HL)",      4;
         0x0a,       "LD A,(BC)",    8;
         0x1a,       "LD A,(DE)",    8;
         0x2a,       "LD A,(HL+)",   8;      // AKA LD A,(HLI) or LDI A,(HL)
@@ -1803,5 +1807,22 @@ mod tests {
 
         assert_eq!(cpu.reg.sp, 0xffff);
         assert_eq!(cpu.reg.pc, 5);
+    }
+
+    #[test]
+    fn jp_hl() {
+        let mut bus = [0u8; 0x10000];
+        let mut cpu = Cpu::new();
+
+        cpu.reg.pc = 0;
+        cpu.reg.hl_mut().write(0xbeef);
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xe9].as_ref().unwrap(),
+            operands: SmallVec::new(),
+        };
+        cpu.execute(instruction, &mut bus);
+
+        assert_eq!(cpu.reg.pc, 0xbeef);
     }
 }
