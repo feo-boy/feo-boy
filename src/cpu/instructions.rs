@@ -1447,7 +1447,7 @@ lazy_static! {
         0xe5,       "PUSH HL",      16;
         0xf5,       "PUSH AF",      16;
         0x06,       "LD B,d8",      8;
-       0x15,       "LD D,d8",      8;
+        0x16,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
         0x36,       "LD (HL),d8",   12;
         0x46,       "LD B,(HL)",    8;
