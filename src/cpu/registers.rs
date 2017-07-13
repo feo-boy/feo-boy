@@ -403,6 +403,13 @@ impl Registers {
         self.f.insert(SUBTRACT | HALF_CARRY);
     }
 
+    /// Complements the carry flag and resets all other flags.
+    pub fn ccf(&mut self) {
+        let old_carry = self.f.contains(CARRY);
+        self.f.remove(SUBTRACT | HALF_CARRY);
+        self.f.set(CARRY, !old_carry);
+    }
+
     /// Sets the flags appropriately for adding a signed byte to the stack pointer, SP. Note that
     /// the carry and half-carry flags are set as if the signed byte is unsigned and is being added
     /// to the low byte of SP.
@@ -745,6 +752,75 @@ mod tests {
         reg.cpl();
         assert_eq!(reg.a, 0xCA);
         assert_eq!(reg.f, SUBTRACT | HALF_CARRY);
+    }
+
+    #[test]
+    fn ccf() {
+        let mut reg = Registers::default();
+
+        reg.f = Flags::empty();
+        reg.ccf();
+        assert_eq!(reg.f, CARRY);
+
+        reg.f = ZERO;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO | CARRY);
+
+        reg.f = SUBTRACT;
+        reg.ccf();
+        assert_eq!(reg.f, CARRY);
+
+        reg.f = HALF_CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, CARRY);
+
+        reg.f = ZERO | SUBTRACT;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO | CARRY);
+
+        reg.f = ZERO | HALF_CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO | CARRY);
+
+        reg.f = SUBTRACT | HALF_CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, CARRY);
+
+        reg.f = ZERO | SUBTRACT | HALF_CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO | CARRY);
+
+        reg.f = CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, Flags::empty());
+
+        reg.f = ZERO | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO);
+
+        reg.f = SUBTRACT | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, Flags::empty());
+
+        reg.f = HALF_CARRY | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, Flags::empty());
+
+        reg.f = ZERO | SUBTRACT | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO);
+
+        reg.f = ZERO | HALF_CARRY | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO);
+
+        reg.f = SUBTRACT | HALF_CARRY | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, Flags::empty());
+
+        reg.f = ZERO | SUBTRACT | HALF_CARRY | CARRY;
+        reg.ccf();
+        assert_eq!(reg.f, ZERO);
     }
 
     #[test]

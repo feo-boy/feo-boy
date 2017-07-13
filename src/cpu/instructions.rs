@@ -1254,6 +1254,9 @@ impl super::Cpu {
             // CPL
             0x2f => self.reg.cpl(),
 
+            // CCF
+            0x3f => self.reg.ccf(),
+
             // LD C,A
             0x4f => self.reg.c = self.reg.a,
 
@@ -1618,6 +1621,7 @@ lazy_static! {
         0x0f,       "RRCA",         4;
         0x1f,       "RRA",          4;
         0x2f,       "CPL",          4;
+        0x3f,       "CCF",          4;
         0x4f,       "LD C,A",       4;
         0x5f,       "LD E,A",       4;
         0x6f,       "LD L,A",       4;
