@@ -1853,22 +1853,19 @@ mod tests {
         let mut cpu = Cpu::new();
 
         cpu.reg.f = Flags::empty();
-        let mut result = Flags::empty();
-        result.insert(CARRY);
 
-        let instruction = Instruction {
+        let instruction_1 = Instruction {
             def: INSTRUCTIONS[0x37].as_ref().unwrap(),
             operands: SmallVec::new(),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(instruction_1, &mut bus);
 
-        assert_eq!(cpu.reg.f, result);
+        assert_eq!(cpu.reg.f, CARRY);
 
         cpu.reg.f.insert(ZERO);
         cpu.reg.f.insert(SUBTRACT);
         cpu.reg.f.insert(HALF_CARRY);
         cpu.reg.f.insert(CARRY);
-        result.insert(ZERO);
 
         let instruction_2 = Instruction {
             def: INSTRUCTIONS[0x37].as_ref().unwrap(),
@@ -1876,7 +1873,7 @@ mod tests {
         };
         cpu.execute(instruction_2, &mut bus);
 
-        assert_eq!(cpu.reg.f, result);
+        assert_eq!(cpu.reg.f, ZERO | CARRY);
     }
 
     #[test]
