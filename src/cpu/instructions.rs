@@ -898,6 +898,9 @@ impl super::Cpu {
             // JP (HL)
             0xe9 => self.reg.pc = self.reg.hl(),
 
+            // LD SP,HL
+            0xf9 => self.reg.sp = self.reg.hl(),
+
             // LD A,(BC)
             0x0a => self.reg.a = bus.read_byte(self.reg.bc()),
 
@@ -1505,6 +1508,7 @@ lazy_static! {
         0xc9,       "RET",          16;
         0xd9,       "RETI",         16;
         0xe9,       "JP (HL)",      4;
+        0xf9,       "LD SP,HL",     8;
         0x0a,       "LD A,(BC)",    8;
         0x1a,       "LD A,(DE)",    8;
         0x2a,       "LD A,(HL+)",   8;      // AKA LD A,(HLI) or LDI A,(HL)
@@ -1603,7 +1607,7 @@ lazy_static! {
 mod tests {
     use smallvec::SmallVec;
 
-    use cpu::Cpu;
+    use cpu::{Cpu, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
     use memory::Addressable;
 
     use super::{INSTRUCTIONS, Instruction};
@@ -1810,6 +1814,38 @@ mod tests {
     }
 
     #[test]
+    fn scf() {
+        let mut bus = [0u8; 0x10000];
+        let mut cpu = Cpu::new();
+
+        cpu.reg.f = Flags::empty();
+        let mut result = Flags::empty();
+        result.insert(CARRY);
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0x37].as_ref().unwrap(),
+            operands: SmallVec::new(),
+        };
+        cpu.execute(instruction, &mut bus);
+
+        assert_eq!(cpu.reg.f, result);
+
+        cpu.reg.f.insert(ZERO);
+        cpu.reg.f.insert(SUBTRACT);
+        cpu.reg.f.insert(HALF_CARRY);
+        cpu.reg.f.insert(CARRY);
+        result.insert(ZERO);
+
+        let instruction_2 = Instruction {
+            def: INSTRUCTIONS[0x37].as_ref().unwrap(),
+            operands: SmallVec::new(),
+        };
+        cpu.execute(instruction_2, &mut bus);
+
+        assert_eq!(cpu.reg.f, result);
+    }
+
+    #[test]
     fn jp_hl() {
         let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
@@ -1824,5 +1860,22 @@ mod tests {
         cpu.execute(instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0xbeef);
+    }
+
+    #[test]
+    fn ld_sp_hl() {
+        let mut bus = [0u8; 0x10000];
+        let mut cpu = Cpu::new();
+
+        cpu.reg.sp = 0;
+        cpu.reg.hl_mut().write(0xbeef);
+
+        let instruction = Instruction {
+            def: INSTRUCTIONS[0xf9].as_ref().unwrap(),
+            operands: SmallVec::new(),
+        };
+        cpu.execute(instruction, &mut bus);
+
+        assert_eq!(cpu.reg.sp, 0xbeef);
     }
 }
