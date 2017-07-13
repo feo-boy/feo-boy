@@ -685,6 +685,13 @@ impl super::Cpu {
             // DAA
             0x27 => self.reg.daa(),
 
+            // SCF
+            0x37 => {
+                self.reg.f.remove(SUBTRACT);
+                self.reg.f.remove(HALF_CARRY);
+                self.reg.f.insert(CARRY);
+            }
+
             // LD B,A
             0x47 => self.reg.b = self.reg.a,
 
@@ -1434,7 +1441,7 @@ lazy_static! {
         0xe5,       "PUSH HL",      16;
         0xf5,       "PUSH AF",      16;
         0x06,       "LD B,d8",      8;
-        0x16,       "LD D,d8",      8;
+       0x15,       "LD D,d8",      8;
         0x26,       "LD H,d8",      8;
         0x36,       "LD (HL),d8",   12;
         0x46,       "LD B,(HL)",    8;
@@ -1451,6 +1458,7 @@ lazy_static! {
         0x07,       "RLCA",         4;
         0x17,       "RLA",          4;
         0x27,       "DAA",          4;
+        0x37,       "SCF",          4;
         0x47,       "LD B,A",       4;
         0x57,       "LD D,A",       4;
         0x67,       "LD H,A",       4;
