@@ -955,6 +955,26 @@ impl super::Cpu {
                 self.reg.cp(d);
             }
 
+            // JP Z,a16
+            0xca => {
+                if self.reg.f.contains(ZERO) {
+                    let address = LittleEndian::read_u16(&instruction.operands);
+                    self.reg.pc = address;
+
+                    cycles += 4;
+                }
+            }
+
+            // JP C,a16
+            0xda => {
+                if self.reg.f.contains(CARRY) {
+                    let address = LittleEndian::read_u16(&instruction.operands);
+                    self.reg.pc = address;
+
+                    cycles += 4;
+                }
+            }
+
             // LD (a16),A
             0xea => {
                 let address = LittleEndian::read_u16(&instruction.operands);
@@ -1521,6 +1541,8 @@ lazy_static! {
         0x9a,       "SBC A,D",      4;
         0xaa,       "XOR D",        4;
         0xba,       "CP D",         4;
+        0xca,       "JP Z,a16",     12;
+        0xda,       "JP C,a16",     12;
         0xea,       "LD (a16),A",   16;
         0xfa,       "LD A,(a16)",   16;
         0x0b,       "DEC BC",       8;
