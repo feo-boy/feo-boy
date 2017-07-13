@@ -374,6 +374,29 @@ impl Registers {
         self.f.set(CARRY, self.a.has_bit_set(0));
     }
 
+    /// Rotates register A right one bit, through the carry bit.
+    ///
+    /// The carry bit is set to the leaving bit on the right, and bit 7 is set to the old value of
+    /// the carry bit.
+    pub fn rr(&mut self) {
+        let old_carry = self.f.contains(CARRY);
+        let new_carry = self.a.has_bit_set(0);
+
+        self.f = Flags::empty();
+        self.a >>= 1;
+        self.a.set_bit(7, old_carry);
+        self.f.set(CARRY, new_carry);
+    }
+
+    /// Rotates register A right one bit and sets the flags appropriately.
+    ///
+    /// The leaving bit on the right is copied into the carry bit. Other flags are reset.
+    pub fn rrc(&mut self) {
+        self.f = Flags::empty();
+        self.f.set(CARRY, self.a.has_bit_set(0));
+        self.a = self.a.rotate_right(1);
+    }
+
     /// Inverts all bits in `A` and sets the flags appropriately.
     pub fn cpl(&mut self) {
         self.a = !self.a;
@@ -680,6 +703,39 @@ mod tests {
         reg.rl();
         assert_eq!(reg.a, 0x2B);
         assert_eq!(reg.f, CARRY);
+    }
+
+    #[test]
+    fn rrc() {
+        let mut reg = Registers::default();
+        reg.a = 0x11;
+        reg.rrc();
+
+        assert_eq!(reg.a, 0x88);
+        assert_eq!(reg.f, CARRY);
+
+        reg.a = 0x10;
+        reg.rrc();
+
+        assert_eq!(reg.a, 0x08);
+        assert_eq!(reg.f, Flags::empty());
+    }
+
+    #[test]
+    fn rr() {
+        let mut reg = Registers::default();
+        reg.a = 0x11;
+        reg.rr();
+
+        assert_eq!(reg.a, 0x08);
+        assert_eq!(reg.f, CARRY);
+
+        reg.a = 0x10;
+        reg.f = CARRY;
+        reg.rr();
+
+        assert_eq!(reg.a, 0x88);
+        assert_eq!(reg.f, Flags::empty());
     }
 
     #[test]
