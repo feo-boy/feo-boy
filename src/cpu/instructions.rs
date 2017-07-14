@@ -1,7 +1,9 @@
 //! CPU instruction definition.
 
 use std::fmt::{self, Display};
+use std::mem;
 use std::ops::{AddAssign, SubAssign};
+use std::ptr;
 
 use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
@@ -47,7 +49,7 @@ pub struct Instruction {
 impl Default for Instruction {
     fn default() -> Instruction {
         Instruction {
-            def: INSTRUCTIONS[0x00].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x00],
             operands: Default::default(),
         }
     }
@@ -77,7 +79,7 @@ impl Display for Instruction {
 macro_rules! instructions {
     ( $( $byte:expr, $description:expr, $cycles:expr ; )* ) => {
         {
-            let mut instructions = vec![None; 0x100];
+            let mut instruction_data = vec![None; 0x100];
 
             $(
                 let num_operands = DATA_RE.find($description).map(|mat| {
@@ -88,7 +90,7 @@ macro_rules! instructions {
                     }
                 }).unwrap_or_default();
 
-                instructions[$byte] = Some(InstructionDef {
+                instruction_data[$byte] = Some(InstructionDef {
                     byte: $byte,
                     description: $description,
                     cycles: $cycles,
@@ -96,13 +98,29 @@ macro_rules! instructions {
                 });
             )*
 
-            for (i, instruction) in instructions.iter().enumerate() {
-                if instruction.is_none() {
-                    warn!("missing data for instruction {:#04x}", i);
-                }
-            }
+            let instruction_data = instruction_data
+                .into_iter()
+                .enumerate()
+                .map(|(i, data)| {
+                    data.expect(&format!("missing data for instruction {:#04x}", i))
+                })
+                .collect::<Vec<_>>();
 
-            instructions
+            // We need to initialize a large array of a non-copy type here. Unfortunately, Default
+            // is only implemented for arrays of length up to 32.
+            //
+            // Just another use case that const generics would help with.
+            //
+            // This block is unsafe because if we got a panic while constructing this array, we
+            // would get undefined behavior while trying to run the destructor for the instructions
+            // array. However, this code cannot panic, so the abstraction is safe.
+            unsafe {
+                let mut instructions: [_; 0x100] = mem::uninitialized();
+                for (i, instruction) in instruction_data.into_iter().enumerate() {
+                    ptr::write(&mut instructions[i], instruction);
+                }
+                instructions
+            }
         }
     }
 }
@@ -112,10 +130,7 @@ impl super::Cpu {
     pub fn fetch<B: Addressable>(&self, bus: &B) -> Instruction {
         let byte = bus.read_byte(self.reg.pc);
 
-        let def = INSTRUCTIONS[byte as usize].as_ref().expect(&format!(
-            "could not find data for instruction {:#04x}",
-            byte
-        ));
+        let def = &INSTRUCTIONS[byte as usize];
 
         let operands = (0..def.num_operands)
             .map(|i| bus.read_byte(self.reg.pc + 1 + i as u16))
@@ -1379,8 +1394,7 @@ lazy_static! {
     /// Timings and other information taken from [here].
     ///
     /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
-    // FIXME: This should be `[Instruction; 0x100]` once all instructions are implemented.
-    static ref INSTRUCTIONS: Vec<Option<InstructionDef>> = instructions! {
+    static ref INSTRUCTIONS: [InstructionDef; 0x100] = instructions! {
         // byte     description     cycles
         0x00,       "NOP",          4;
         0x10,       "STOP",         4;
@@ -1653,21 +1667,21 @@ mod tests {
     #[test]
     fn instruction_display() {
         let nop = Instruction {
-            def: INSTRUCTIONS[0x00].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x00],
             operands: Default::default(),
         };
 
         assert_eq!(&nop.to_string(), "NOP");
 
         let jr_nz_r8 = Instruction {
-            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0xfe]),
         };
 
         assert_eq!(&jr_nz_r8.to_string(), "JR NZ,$0xfe");
 
         let ld_hl_d16 = Instruction {
-            def: INSTRUCTIONS[0x21].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x21],
             operands: SmallVec::from_slice(&[0xef, 0xbe]),
         };
 
@@ -1696,7 +1710,7 @@ mod tests {
         cpu.reg.pc = 0xAB;
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xff].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xff],
             operands: Default::default(),
         };
         cpu.execute(instruction, &mut bus);
@@ -1714,7 +1728,7 @@ mod tests {
 
         // Move forward 10
         let instruction = Instruction {
-            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
         cpu.execute(instruction, &mut bus);
@@ -1722,7 +1736,7 @@ mod tests {
 
         // Move backward 10
         let instruction = Instruction {
-            def: INSTRUCTIONS[0x20].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
         cpu.execute(instruction, &mut bus);
@@ -1753,7 +1767,7 @@ mod tests {
         cpu.reg.a = 0xab;
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xe2].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xe2],
             operands: Default::default(),
         };
         cpu.execute(instruction, &mut bus);
@@ -1769,7 +1783,7 @@ mod tests {
         bus[0xFF23] = 0xBE;
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xf2].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xf2],
             ..Default::default()
         };
         cpu.execute(instruction, &mut bus);
@@ -1784,7 +1798,7 @@ mod tests {
         cpu.reg.a = 0x11;
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xea].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xea],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
         cpu.execute(instruction, &mut bus);
@@ -1800,7 +1814,7 @@ mod tests {
         bus.write_byte(0xc000, 0xaa);
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xfa].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xfa],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
         cpu.execute(instruction, &mut bus);
@@ -1816,7 +1830,7 @@ mod tests {
         cpu.reg.sp = 0xFFF8;
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0x08].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x08],
             operands: SmallVec::from_slice(&[0x00, 0xC1]),
         };
         cpu.execute(instruction, &mut bus);
@@ -1859,7 +1873,7 @@ mod tests {
         cpu.reg.f = Flags::empty();
 
         let instruction_1 = Instruction {
-            def: INSTRUCTIONS[0x37].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
         cpu.execute(instruction_1, &mut bus);
@@ -1872,7 +1886,7 @@ mod tests {
         cpu.reg.f.insert(CARRY);
 
         let instruction_2 = Instruction {
-            def: INSTRUCTIONS[0x37].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
         cpu.execute(instruction_2, &mut bus);
@@ -1889,7 +1903,7 @@ mod tests {
         cpu.reg.hl_mut().write(0xbeef);
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xe9].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xe9],
             operands: SmallVec::new(),
         };
         cpu.execute(instruction, &mut bus);
@@ -1906,7 +1920,7 @@ mod tests {
         cpu.reg.hl_mut().write(0xbeef);
 
         let instruction = Instruction {
-            def: INSTRUCTIONS[0xf9].as_ref().unwrap(),
+            def: &INSTRUCTIONS[0xf9],
             operands: SmallVec::new(),
         };
         cpu.execute(instruction, &mut bus);
