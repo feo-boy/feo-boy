@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
-use cpu::{self, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+use cpu::{self, State, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 use memory::Addressable;
 
 lazy_static! {
@@ -157,7 +157,7 @@ impl super::Cpu {
             0x00 => (),
 
             // STOP
-            0x10 => self.halted = true,
+            0x10 => self.state = State::Stopped,
 
             // JR NZ,r8
             0x20 => {
@@ -639,6 +639,9 @@ impl super::Cpu {
 
             // LD H,(HL)
             0x66 => self.reg.h = bus.read_byte(self.reg.hl()),
+
+            // HALT
+            0x76 => self.state = State::Halted,
 
             // ADD A,(HL)
             0x86 => {
@@ -1308,7 +1311,7 @@ impl super::Cpu {
 
             // Unused instructions
             0xe3 | 0xd3 | 0xf4 | 0xe4 | 0xeb | 0xdb | 0xfc | 0xec | 0xdd | 0xed | 0xfd => {
-                self.locked = true;
+                self.state = State::Locked;
             }
 
             _ => panic!("unimplemented instruction: {:?}", instruction),
@@ -1482,6 +1485,7 @@ lazy_static! {
         0x46,       "LD B,(HL)",    8;
         0x56,       "LD D,(HL)",    8;
         0x66,       "LD H,(HL)",    8;
+        0x76,       "HALT",         4;
         0x86,       "ADD A,(HL)",   8;
         0x96,       "SUB (HL)",     8;
         0xa6,       "AND (HL)",     8;

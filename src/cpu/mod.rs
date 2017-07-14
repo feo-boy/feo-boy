@@ -13,6 +13,28 @@ use memory::{Addressable, Mmu};
 pub use self::instructions::Instruction;
 pub use self::registers::{Registers, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 
+/// Current state of the CPU.
+#[derive(Debug)]
+pub enum State {
+    /// The CPU is executing code.
+    Running,
+
+    /// The CPU is paused while waiting for an interrupt or reset.
+    Halted,
+
+    /// The CPU is paused while waiting for a button press or reset.
+    Stopped,
+
+    /// The CPU executed an illegal instruction and requires a reset.
+    Locked,
+}
+
+impl Default for State {
+    fn default() -> State {
+        State::Running
+    }
+}
+
 /// The clock.
 #[derive(Debug, Default)]
 pub struct Clock {
@@ -54,13 +76,8 @@ pub struct Cpu {
     /// True if interrupts are enabled.
     interrupts: bool,
 
-    /// True if the CPU is halted.
-    halted: bool,
-
-    /// True if the CPU is locked.
-    ///
-    /// This state is caused by executing an unused instruction.
-    locked: bool,
+    /// The state of execution.
+    state: State,
 }
 
 impl Cpu {
@@ -72,8 +89,9 @@ impl Cpu {
     ///
     /// Returns the number of cycles the instruction takes.
     pub fn step<B: Addressable>(&mut self, bus: &mut B) -> u32 {
-        if self.locked {
-            return 0;
+        match self.state {
+            State::Running => (),
+            _ => return 0,
         }
 
         let instruction = self.fetch(bus);
@@ -106,6 +124,8 @@ impl Cpu {
         } else {
             0x00
         };
+
+        self.state = State::Running;
     }
 }
 
