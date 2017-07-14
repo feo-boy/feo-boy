@@ -225,6 +225,11 @@ impl Ppu {
         }
     }
 
+    /// Reads a byte of graphics memory.
+    ///
+    /// # Panics
+    ///
+    /// Panics if reading memory that is not managed by the PPU.
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000...0x9FFF => {
@@ -241,6 +246,11 @@ impl Ppu {
         }
     }
 
+    /// Writes a byte of graphics memory.
+    ///
+    /// # Panics
+    ///
+    /// Panics if writing memory that is not managed by the PPU.
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000...0x9FFF => {

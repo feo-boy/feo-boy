@@ -10,6 +10,7 @@ use byteorder::{BigEndian, LittleEndian, ByteOrder};
 
 use errors::*;
 
+/// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
 /// Operations for memory-like structs.
@@ -287,11 +288,18 @@ impl Mmu {
         self.bios_mapped = true;
     }
 
+    /// Unmaps the BIOS from the memory map, meaning that bytes `0x00`-`0x100` will read as
+    /// cartridge ROM.
     pub fn unmap_bios(&mut self) {
         info!("unmapping BIOS");
         self.bios_mapped = false;
     }
 
+    /// Reads a byte from memory.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempting to read memory managed by a different component, such as the `PPU`.
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
@@ -338,6 +346,11 @@ impl Mmu {
         }
     }
 
+    /// Writes a byte to memory.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempting to write memory managed by a different component, such as the `PPU`.
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             // BIOS and ROM Banks

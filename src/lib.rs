@@ -34,14 +34,20 @@ use errors::*;
 use graphics::Ppu;
 use memory::Mmu;
 
+/// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug, Default)]
 pub struct Emulator {
+    /// The CPU.
     pub cpu: Cpu,
+
+    /// Other components of the emulator.
     pub bus: Bus,
+
     debug: Option<Debugger>,
 }
 
 impl Emulator {
+    /// Create a new emulator.
     pub fn new() -> Self {
         let cpu = Cpu::new();
         let bus = Bus {
@@ -57,6 +63,7 @@ impl Emulator {
         }
     }
 
+    /// Create a new emulator with the debugger enabled.
     pub fn new_with_debug() -> Self {
         let mut emulator = Emulator::new();
         emulator.debug = Some(Debugger::new());
@@ -69,6 +76,7 @@ impl Emulator {
         self.cpu.reset(&self.bus.mmu);
     }
 
+    /// Load a BIOS dump into the emulator from a file.
     pub fn load_bios<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         info!("loading BIOS from file '{}'", path.as_ref().display());
 
@@ -84,6 +92,7 @@ impl Emulator {
         Ok(())
     }
 
+    /// Load a cartridge ROM into the emulator from a file.
     pub fn load_rom<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         info!("loading ROM from file '{}'", path.as_ref().display());
 

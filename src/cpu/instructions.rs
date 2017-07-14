@@ -47,6 +47,7 @@ pub struct Instruction {
 }
 
 impl Default for Instruction {
+    /// Returns the `NOP` instruction.
     fn default() -> Instruction {
         Instruction {
             def: &INSTRUCTIONS[0x00],
@@ -56,6 +57,7 @@ impl Default for Instruction {
 }
 
 impl Display for Instruction {
+    /// Prints the instruction in assembly syntax, including the operands.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let instruction = if let Some(mat) = DATA_RE.find(self.def.description) {
             let replacement = match mat.as_str() {

@@ -83,12 +83,40 @@ impl<'a> SubAssign<u16> for RegisterPairMut<'a> {
     }
 }
 
-/// The registers.
+/// The registers. High speed data storage for the CPU.
 ///
-/// # Examples
+/// 8-bit registers (`A`, `F`, `B`, `C`, `D`, `E`, `H`, and `L`), as well as the stack pointer and
+/// the program counter may be accessed by their individual fields.
 ///
-/// Registers are often operated on in pairs. For convenience, assigning addition and subtraction
-/// may be performed on each pair.
+/// This struct also provides a number of methods for performing instructions. Many instructions
+/// modify register `A` and set the flags as necessary.
+///
+/// Note that the flag register contains some additional methods to assist in setting flags, and is
+/// not actually a `u8`. To access it as a `u8`, you must use the `bits` method. See the [`Flags`]
+/// struct for more detail.
+///
+/// ```
+/// use feo_boy::cpu::{Registers, ZERO, HALF_CARRY};
+///
+/// let mut registers = Registers::new();
+/// registers.f.insert(ZERO | HALF_CARRY);
+/// assert_eq!(registers.f.bits(), 0b10100000);
+/// ```
+///
+/// In many instructions, registers may be accessed as a word pair (16 bits). The left register is
+/// the high byte, and the right register is the low byte. The `Registers` struct provides methods
+/// for accessing these pairs mutably and immutably.
+///
+/// ```
+/// use feo_boy::cpu::Registers;
+///
+/// let mut registers = Registers::new();
+/// registers.b = 0xAB;
+/// registers.c = 0xCD;
+/// assert_eq!(registers.bc(), 0xABCD);
+/// ```
+///
+/// For convenience, assigning addition and subtraction may be performed on each pair.
 ///
 /// ```
 /// use feo_boy::cpu::Registers;
@@ -132,40 +160,53 @@ impl<'a> SubAssign<u16> for RegisterPairMut<'a> {
 ///
 /// assert_eq!(registers.bc(), 0x00FF);
 /// ```
+///
+/// [`Flags`]: ./struct.Flags.html
 #[derive(Debug, Default)]
 pub struct Registers {
-    /// Accumulator
+    /// Accumulator.
     pub a: u8,
 
-    /// Status flags
+    /// Status flags.
     pub f: Flags,
 
-    // General registers
+    /// General purpose register `B`.
     pub b: u8,
+
+    /// General purpose register `C`.
     pub c: u8,
 
+    /// General purpose register `D`.
     pub d: u8,
+
+    /// General purpose register `E`.
     pub e: u8,
 
+    /// General purpose register `H`.
     pub h: u8,
+
+    /// General purpose register `L`.
     pub l: u8,
 
-    /// Program counter
+    /// Program counter.
     pub pc: u16,
 
-    /// Stack pointer
+    /// Stack pointer.
     pub sp: u16,
 }
 
 impl Registers {
+    /// Create a new register set.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Returns register pair `AF`.
     pub fn af(&self) -> u16 {
         BigEndian::read_u16(&[self.a, self.f.bits])
     }
 
+    /// Returns a mutable reference to register pair `AF`.
     pub fn af_mut(&mut self) -> RegisterPairMut {
         RegisterPairMut {
             hi: &mut self.a,
@@ -173,10 +214,12 @@ impl Registers {
         }
     }
 
+    /// Returns register pair `BC`.
     pub fn bc(&self) -> u16 {
         BigEndian::read_u16(&[self.b, self.c])
     }
 
+    /// Returns a mutable reference to register pair `BC`.
     pub fn bc_mut(&mut self) -> RegisterPairMut {
         RegisterPairMut {
             hi: &mut self.b,
@@ -184,10 +227,12 @@ impl Registers {
         }
     }
 
+    /// Returns register pair `DE`.
     pub fn de(&self) -> u16 {
         BigEndian::read_u16(&[self.d, self.e])
     }
 
+    /// Returns a mutable reference to register pair `DE`.
     pub fn de_mut(&mut self) -> RegisterPairMut {
         RegisterPairMut {
             hi: &mut self.d,
@@ -195,10 +240,12 @@ impl Registers {
         }
     }
 
+    /// Returns register pair `HL`.
     pub fn hl(&self) -> u16 {
         BigEndian::read_u16(&[self.h, self.l])
     }
 
+    /// Returns a mutable reference to register pair `HL`.
     pub fn hl_mut(&mut self) -> RegisterPairMut {
         RegisterPairMut {
             hi: &mut self.h,
