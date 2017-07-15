@@ -102,7 +102,7 @@ impl Cpu {
     ///
     /// Uses the current value of `SP`, and decrements it.
     pub fn push<B: Addressable>(&mut self, value: u16, bus: &mut B) {
-        self.reg.sp -= 2;
+        self.reg.sp = self.reg.sp.wrapping_sub(2);
         bus.write_word(self.reg.sp, value);
     }
 
@@ -111,7 +111,7 @@ impl Cpu {
     /// Uses the current value of `SP`, and increments it.
     pub fn pop<B: Addressable>(&mut self, bus: &B) -> u16 {
         let value = bus.read_word(self.reg.sp);
-        self.reg.sp += 2;
+        self.reg.sp = self.reg.sp.wrapping_add(2);
         value
     }
 
@@ -193,12 +193,16 @@ mod tests {
 
     #[test]
     fn push_pop() {
-        let mut bus = Bus::default();
+        let mut bus = [0u8; 0x10000];
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
 
         cpu.push(0xcafe, &mut bus);
         assert_eq!(cpu.pop(&bus), 0xcafe);
+
+        cpu.reg.sp = 0;
+        cpu.push(0xbeef, &mut bus);
+        assert_eq!(cpu.pop(&bus), 0xbeef);
     }
 }
