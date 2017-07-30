@@ -126,16 +126,13 @@ impl Emulator {
         }
     }
 
-    /// Updates the emulator per-frame.
-    pub fn update(&mut self, _args: &UpdateArgs) {
-        let frame_clock = self.cpu.clock.t.wrapping_add(CYCLES_PER_FRAME);
+    /// Render a frame of emulation.
+    pub fn render(&mut self, args: &RenderArgs) {
+        let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
         while self.cpu.clock.t < frame_clock {
             self.step();
         }
     }
-
-    /// Renders a single frame.
-    pub fn render(&mut self, args: &RenderArgs) {}
 
     /// Resume execution after pausing.
     pub fn resume(&mut self) {
