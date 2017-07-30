@@ -29,11 +29,15 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
+use piston_window::*;
+
 use bus::Bus;
 use cpu::{Cpu, Instruction};
 use errors::*;
 use graphics::Ppu;
 use memory::Mmu;
+
+const CYCLES_PER_FRAME: u32 = 70224;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug, Default)]
@@ -121,6 +125,17 @@ impl Emulator {
             }
         }
     }
+
+    /// Updates the emulator per-frame.
+    pub fn update(&mut self, _args: &UpdateArgs) {
+        let frame_clock = self.cpu.clock.t.wrapping_add(CYCLES_PER_FRAME);
+        while self.cpu.clock.t < frame_clock {
+            self.step();
+        }
+    }
+
+    /// Renders a single frame.
+    pub fn render(&mut self, args: &RenderArgs) {}
 
     /// Resume execution after pausing.
     pub fn resume(&mut self) {

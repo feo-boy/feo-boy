@@ -6,6 +6,7 @@ extern crate clap;
 #[macro_use]
 extern crate error_chain;
 
+extern crate piston_window;
 extern crate pretty_env_logger;
 
 use std::io::prelude::*;
@@ -14,6 +15,7 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::{App, AppSettings, Arg};
+use piston_window::*;
 
 use feo_boy::Emulator;
 use feo_boy::errors::*;
@@ -124,22 +126,19 @@ fn start_emulator(config: Config) -> Result<()> {
 
     emulator.reset();
 
-    let stdin = io::stdin();
-    let mut stdin = stdin.lock().lines();
+    let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
 
-    loop {
-        if emulator.is_paused() {
-            print!("feo debug [sblrpdcq?]: ");
-            io::stdout().flush()?;
+    while let Some(e) = window.next() {
+        if let Some(r) = e.render_args() {
+            emulator.render(&r);
+        }
 
-            if let Some(command) = stdin.next() {
-                let command = command?.as_str().to_owned();
-                parse_command(&mut emulator, &command)?;
-            }
-        } else {
-            emulator.step();
+        if let Some(u) = e.update_args() {
+            emulator.update(&u);
         }
     }
+
+    Ok(())
 }
 
 fn run() -> Result<()> {
