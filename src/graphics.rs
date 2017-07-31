@@ -38,8 +38,11 @@ impl From<u8> for Shade {
 
 /// Memory managed by the PPU.
 struct Memory {
-    /// Video RAM.
-    vram: [u8; 0x2000],
+    /// Background data
+    bg_map: [u8; 0x800],
+
+    /// Character RAM
+    chram: [u8; 0x1800],
 
     /// Object attribute memory (OAM).
     oam: [u8; 0xA0],
@@ -48,9 +51,22 @@ struct Memory {
 impl Default for Memory {
     fn default() -> Memory {
         Memory {
-            vram: [0; 0x2000],
+            bg_map: [0; 0x800],
+            chram: [0; 0x1800],
             oam: [0; 0xA0],
         }
+    }
+}
+
+impl Memory {
+    /// Return the first set of background map data from VRAM.
+    fn bg1_mut(&mut self) -> &mut [u8] {
+        &mut self.bg_map[0 .. 0x3FF]
+    }
+
+    /// Return the second set of background map data from VRAM.
+    fn bg2_mut(&mut self) -> &mut [u8] {
+        &mut self.bg_map[0x9C00 .. 0x9FFF]
     }
 }
 
@@ -217,12 +233,19 @@ impl Ppu {
                     self.modeclock = 0;
                     self.mode = 0;
 
+                    // Write a scanline to the framebuffer
+                    self.renderscan();
+
                     debug!("set graphics mode to {}", self.mode);
                 }
             }
 
             _ => panic!("unimplemented PPU mode: {:?}", self.mode),
         }
+    }
+
+    /// TODO: write
+    pub fn renderscan(&self) {
     }
 
     /// Reads a byte of graphics memory.
@@ -232,13 +255,18 @@ impl Ppu {
     /// Panics if reading memory that is not managed by the PPU.
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x8000...0x9FFF => {
-                let index = address & 0x1FFF;
-                self.mem.vram[index as usize]
+            0x8000...0x97FF => {
+                let index = address - 0x8000;
+                self.mem.chram[index as usize]
+            }
+
+            0x9800...0x9FFF => {
+                let index = address - 0x9800;
+                self.mem.bg_map[index as usize]
             }
 
             0xFE00...0xFE9F => {
-                let index = address & 0xFF;
+                let index = address - 0xFE00;
                 self.mem.oam[index as usize]
             }
 
@@ -253,9 +281,14 @@ impl Ppu {
     /// Panics if writing memory that is not managed by the PPU.
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
-            0x8000...0x9FFF => {
-                let index = address & 0x1FFF;
-                self.mem.vram[index as usize] = byte;
+            0x8000...0x97FF => {
+                let index = address - 0x8000;
+                self.mem.chram[index as usize] = byte;
+            }
+
+            0x9800...0x9FFF => {
+                let index = address - 0x9800;
+                self.mem.bg_map[index as usize] = byte;
             }
 
             0xFE00...0xFE9F => {
@@ -270,11 +303,13 @@ impl Ppu {
 
 impl fmt::Debug for Memory {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let vram: &[u8] = &self.vram;
+        let chram: &[u8] = &self.chram;
+        let bg_map: &[u8] = &self.bg_map;
         let oam: &[u8] = &self.oam;
 
         f.debug_struct("Memory")
-            .field("vram", &vram)
+            .field("chram", &chram)
+            .field("bg_map", &bg_map)
             .field("oam", &oam)
             .finish()
     }
@@ -285,14 +320,14 @@ mod tests {
     use super::Ppu;
 
     #[test]
-    fn vram() {
+    fn chram() {
         let mut ppu = Ppu::new();
 
-        ppu.mem.vram[0] = 1;
+        ppu.mem.chram[0] = 1;
         assert_eq!(ppu.read_byte(0x8000), 1);
 
-        ppu.mem.vram[0x1FFF] = 2;
-        assert_eq!(ppu.read_byte(0x9FFF), 2);
+        ppu.mem.chram[0x17FF] = 2;
+        assert_eq!(ppu.read_byte(0x97FF), 2);
     }
 
     #[test]
