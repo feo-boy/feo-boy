@@ -38,10 +38,17 @@ impl From<u8> for Shade {
 
 /// Memory managed by the PPU.
 struct Memory {
-    /// Background data
+    /// Background data, split into two overlapping 1024 byte maps.
+    ///
+    /// Each byte in the map represents an 8x8 pixel space on the display, referring to tile data
+    /// stored in the Character RAM. Each total map is 32x32 tiles.
     bg_map: [u8; 0x800],
 
-    /// Character RAM
+    /// Character RAM, storing 8x8 pixel tile data.
+    ///
+    /// Each pixel has two bits of color data, so each tile is 16 bytes long. This area is
+    /// divided into signed and unsigned tiles: unsigned are numbered 0-255 at $8000-$9000.
+    /// Signed tiles are numbered in two's complement from -127-128 at $87FF-$97FF.
     chram: [u8; 0x1800],
 
     /// Object attribute memory (OAM).
@@ -61,12 +68,12 @@ impl Default for Memory {
 impl Memory {
     /// Return the first set of background map data from VRAM.
     fn bg1_mut(&mut self) -> &mut [u8] {
-        &mut self.bg_map[0 .. 0x3FF]
+        &mut self.bg_map[0..0x3FF]
     }
 
     /// Return the second set of background map data from VRAM.
     fn bg2_mut(&mut self) -> &mut [u8] {
-        &mut self.bg_map[0x9C00 .. 0x9FFF]
+        &mut self.bg_map[0x9C00..0x9FFF]
     }
 }
 
@@ -161,6 +168,13 @@ pub struct Ppu {
 
     /// Contains whether PPU-related interrupts are enabled or disabled.
     pub interrupts: Interrupts,
+
+    /// Indicates which background map is in use. If `false`, the first map is in use, and if
+    /// `true`, the second map is in use.
+    pub use_second_bg_map: bool,
+
+    /// Indicates whether we are using the signed or unsigned tile mode.
+    pub signed_tile_mode: bool,
 }
 
 impl Ppu {
@@ -244,8 +258,32 @@ impl Ppu {
         }
     }
 
-    /// TODO: write
-    pub fn renderscan(&self) {
+    /// Renders the screen one line at a time. Move tile-by-tile through the line until it is
+    /// complete.
+    pub fn renderscan(&mut self) {
+        // Figure out which background map to use
+        let mut bg_map = if self.use_second_bg_map {
+            self.mem.bg2_mut()
+        } else {
+            self.mem.bg1_mut()
+        };
+
+        // Determine the index of the start of the tile line
+        let tile_line_index = (self.line + self.bg_scroll.y) / 8;
+        // Determine the index of the first tile within the line
+        let tile_line_offset = self.bg_scroll.x / 8;
+
+        // Get position in tile
+        let tile_y = (self.line + self.bg_scroll.y) % 8;
+        let tile_x = self.bg_scroll.x % 8;
+
+        // Finally, get the tile position value from the Background RAM
+        let tile = bg_map[(tile_line_index + tile_line_offset) as usize];
+
+        // Calculate the real index of the tile
+        let tile_index = tile_index(tile, self.signed_tile_mode);
+
+        // TODO: now write to the screen
     }
 
     /// Reads a byte of graphics memory.
@@ -315,6 +353,15 @@ impl fmt::Debug for Memory {
     }
 }
 
+/// Finds the index of a tile in the Character RAM.
+pub fn tile_index(tile: u8, signed_tile_mode: bool) -> usize {
+    if signed_tile_mode {
+        ((tile as i8) as i16 + 256) as usize
+    } else {
+        tile as usize
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Ppu;
@@ -339,5 +386,24 @@ mod tests {
 
         ppu.mem.oam[0x9F] = 2;
         assert_eq!(ppu.read_byte(0xFE9F), 2);
+    }
+
+    #[test]
+    fn tile_index_test() {
+        let mut j = -128;
+
+        let mut i_u8;
+        let mut j_u8;
+
+        for i in 0..256 {
+            // Annoying hack because rust doesn't support inclusive ranges yet
+            i_u8 = i as u8;
+            j_u8 = j as u8;
+
+            assert_eq!(super::tile_index(i_u8, false), i_u8 as usize);
+            assert_eq!(super::tile_index(j_u8, true), i_u8 as usize + 128);
+
+            j += 1;
+        }
     }
 }
