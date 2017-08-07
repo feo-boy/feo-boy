@@ -283,7 +283,22 @@ impl Ppu {
         // Calculate the real index of the tile
         let tile_index = tile_index(tile, self.signed_tile_mode);
 
-        // TODO: now write to the screen
+        for i in 0..160 {
+            // FIXME: Get lifetimes or whatever working for bg1 and bg2 above. I think the logic
+            // here is correct though.
+
+            // // Get the two bits used to represent the color number
+            // let color_lo_byte = self.mem.chram[tile_index * 16 + tile_y as usize * 2];
+            // let color_hi_byte = self.mem.chram[tile_index * 16 + tile_y as usize * 2 + 1];
+
+            // let color_lo_bit = color_lo_byte >> tile_x & 0x1;
+            // let color_hi_bit = color_hi_byte >> tile_x & 0x1;
+
+            // let color_num = (color_hi_bit << 1) | color_lo_bit;
+
+            // // Map the color number to the shade to display on the screen
+            // let shade = self.bg_palette[color_num as usize];
+        }
     }
 
     /// Reads a byte of graphics memory.
