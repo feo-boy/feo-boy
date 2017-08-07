@@ -266,36 +266,29 @@ impl Display for Bus {
 mod tests {
     use super::Bus;
 
+    use quickcheck::{TestResult, quickcheck};
+
     use graphics::Shade;
     use memory::{Addressable, BIOS_SIZE};
 
     #[test]
-    fn address_space() {
-        let mut bus = Bus::default();
-
-        // Attempt to write to all writable memory addresses.
-        //
-        // FIXME: Skipping 0x0000-0x7FFF here because ROM banking is not yet implemented.
-        for (i, address) in (0x8000..0x10000).enumerate() {
-            let address = address as u16;
-            let i = i as u8;
-
-            bus.write_byte(address, i);
+    fn read_write() {
+        fn prop(address: u16, value: u8) -> TestResult {
+            // Make sure the address is writable. Also, ignore I/O registers for now since they
+            // aren't implemented fully.
             match address {
-                0xA000...0xFDFF | 0xFF80...0xFFFE => {
-                    assert_eq!(bus.mmu.read_byte(address), i);
+                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFF7F | 0xFFFF => {
+                    return TestResult::discard();
                 }
-                0x8000...0x9FFF | 0xFE00...0xFE9F => {
-                    assert_eq!(bus.ppu.read_byte(address), i);
-                }
-                0xFEA0...0xFEFF | 0xFF00...0xFF7F | 0xFFFF => {
-                    // Unusable memory and I/O register values are not tested here. However,
-                    // reading them should not panic.
-                    bus.read_byte(address);
-                }
-                _ => unreachable!("exhaustive match was not exhaustive: {:#06x}", address),
+                _ => (),
             }
+
+            let mut bus = Bus::default();
+            bus.write_byte(address, value);
+            TestResult::from_bool(bus.read_byte(address) == value)
         }
+
+        quickcheck(prop as fn(u16, u8) -> TestResult);
     }
 
     #[test]

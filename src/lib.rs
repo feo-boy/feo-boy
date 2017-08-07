@@ -17,6 +17,9 @@ extern crate piston_window;
 extern crate regex;
 extern crate smallvec;
 
+#[cfg(test)]
+extern crate quickcheck;
+
 pub mod bus;
 pub mod bytes;
 pub mod cpu;
