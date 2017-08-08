@@ -4,6 +4,8 @@
 
 use std::fmt;
 
+use bytes::ByteExt;
+
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Shade {
@@ -67,13 +69,13 @@ impl Default for Memory {
 
 impl Memory {
     /// Return the first set of background map data from VRAM.
-    fn bg1_mut(&mut self) -> &mut [u8] {
-        &mut self.bg_map[0..0x3FF]
+    fn bg1(&self) -> &[u8] {
+        &self.bg_map[0..0x3FF]
     }
 
     /// Return the second set of background map data from VRAM.
-    fn bg2_mut(&mut self) -> &mut [u8] {
-        &mut self.bg_map[0x9C00..0x9FFF]
+    fn bg2(&self) -> &[u8] {
+        &self.bg_map[0x9C00..0x9FFF]
     }
 }
 
@@ -263,9 +265,9 @@ impl Ppu {
     pub fn renderscan(&mut self) {
         // Figure out which background map to use
         let mut bg_map = if self.use_second_bg_map {
-            self.mem.bg2_mut()
+            self.mem.bg2()
         } else {
-            self.mem.bg1_mut()
+            self.mem.bg1()
         };
 
         // Determine the index of the start of the tile line
@@ -273,35 +275,68 @@ impl Ppu {
         // Determine the index of the first tile within the line
         let tile_line_offset = self.bg_scroll.x / 8;
 
-        // Get position in tile
-        let tile_y = (self.line + self.bg_scroll.y) % 8;
-        let tile_x = self.bg_scroll.x % 8;
-
         // Finally, get the tile position value from the Background RAM
         let tile = bg_map[(tile_line_index + tile_line_offset) as usize];
 
         // Calculate the real index of the tile
-        let tile_index = tile_index(tile, self.signed_tile_mode);
+        let tile_index = self.tile_index(tile);
 
+        // Get position in tile
+        let tile_y = (self.line + self.bg_scroll.y) % 8;
+        let tile_x = self.bg_scroll.x % 8;
+
+        // Render the whole line
+        self.render_line(tile_index, tile_x, tile_y);
+    }
+
+    /// Renders the line starting from the given tile and (x,y) position in that tile.
+    pub fn render_line(&self, tile_index: usize, tile_x: u8, tile_y: u8) {
+        let mut current_tile_index = tile_index;
+        let mut current_tile_x = tile_x;
+
+        // Move across the full width of the screen
         for i in 0..160 {
-            // FIXME: Get lifetimes or whatever working for bg1 and bg2 above. I think the logic
-            // here is correct though.
+            let shade = self.shade(current_tile_index, current_tile_x, tile_y);
 
-            // // Get the two bits used to represent the color number
-            // let color_lo_byte = self.mem.chram[tile_index * 16 + tile_y as usize * 2];
-            // let color_hi_byte = self.mem.chram[tile_index * 16 + tile_y as usize * 2 + 1];
+            // TODO: Write the correct shade to the screen
 
-            // let color_lo_bit = color_lo_byte >> tile_x & 0x1;
-            // let color_hi_bit = color_hi_byte >> tile_x & 0x1;
+            // Move horizontally to the next pixel
+            current_tile_x += 1;
 
-            // let color_num = (color_hi_bit << 1) | color_lo_bit;
-
-            // // Map the color number to the shade to display on the screen
-            // let shade = self.bg_palette[color_num as usize];
+            // Move to the next tile if necessary
+            if current_tile_x == 8 {
+                current_tile_x = 0;
+                current_tile_index += 1;
+            }
         }
     }
 
-    /// Reads a byte of graphics memory.
+    /// Gets the shade for rendering a particular pixel of the screen.
+    pub fn shade(&self, tile_index: usize, x: u8, y: u8) -> &Shade {
+        // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
+        // pixel. The first byte contains the lower order bit of the color number, while the second
+        // byte contains the higher order bit.
+        let color_lo_byte = self.mem.chram[tile_index * 16 + y as usize * 2];
+        let color_hi_byte = self.mem.chram[tile_index * 16 + y as usize * 2 + 1];
+
+        // Get the color number using the low and high bytes from the Character RAM
+        let mut color_num = 0;
+        color_num.set_bit(0, color_lo_byte.has_bit_set(x));
+        color_num.set_bit(1, color_lo_byte.has_bit_set(x));
+
+        // Map the color number to the shade to display on the screen
+        &self.bg_palette[color_num as usize]
+    }
+
+    /// Finds the index of a tile in the Character RAM.
+    pub fn tile_index(&self, tile: u8) -> usize {
+        if self.signed_tile_mode {
+            ((tile as i8) as i16 + 256) as usize
+        } else {
+            tile as usize
+        }
+    }
+
     ///
     /// # Panics
     ///
@@ -368,15 +403,6 @@ impl fmt::Debug for Memory {
     }
 }
 
-/// Finds the index of a tile in the Character RAM.
-pub fn tile_index(tile: u8, signed_tile_mode: bool) -> usize {
-    if signed_tile_mode {
-        ((tile as i8) as i16 + 256) as usize
-    } else {
-        tile as usize
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::Ppu;
@@ -405,8 +431,9 @@ mod tests {
 
     #[test]
     fn tile_index_test() {
-        let mut j = -128;
+        let mut ppu = Ppu::new();
 
+        let mut j = -128;
         let mut i_u8;
         let mut j_u8;
 
@@ -415,8 +442,10 @@ mod tests {
             i_u8 = i as u8;
             j_u8 = j as u8;
 
-            assert_eq!(super::tile_index(i_u8, false), i_u8 as usize);
-            assert_eq!(super::tile_index(j_u8, true), i_u8 as usize + 128);
+            ppu.signed_tile_mode = false;
+            assert_eq!(ppu.tile_index(i_u8), i_u8 as usize);
+            ppu.signed_tile_mode = true;
+            assert_eq!(ppu.tile_index(j_u8), i_u8 as usize + 128);
 
             j += 1;
         }
