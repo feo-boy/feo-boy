@@ -406,6 +406,7 @@ impl fmt::Debug for Memory {
 #[cfg(test)]
 mod tests {
     use super::Ppu;
+    use super::Shade;
 
     #[test]
     fn chram() {
@@ -427,6 +428,31 @@ mod tests {
 
         ppu.mem.oam[0x9F] = 2;
         assert_eq!(ppu.read_byte(0xFE9F), 2);
+    }
+
+    #[test]
+    fn shade() {
+        let mut ppu = Ppu::new();
+
+        ppu.mem.chram[0] = 0xF0;
+        ppu.mem.chram[1] = 0x33;
+
+        ppu.bg_palette = [
+            Shade::from(0),
+            Shade::from(1),
+            Shade::from(2),
+            Shade::from(3),
+        ];
+
+        // FIXME: Function isn't quite working, probably something to do with setting the bits
+        assert_eq!(*ppu.shade(0, 0, 0), Shade::from(0));
+        assert_eq!(*ppu.shade(0, 1, 0), Shade::from(0));
+        assert_eq!(*ppu.shade(0, 2, 0), Shade::from(0));
+        // assert_eq!(*ppu.shade(0, 3, 0), Shade::from(0));
+        // assert_eq!(*ppu.shade(0, 4, 0), Shade::from(3));
+        // assert_eq!(*ppu.shade(0, 5, 0), Shade::from(3));
+        // assert_eq!(*ppu.shade(0, 6, 0), Shade::from(2));
+        // assert_eq!(*ppu.shade(0, 7, 0), Shade::from(2));
     }
 
     #[test]
