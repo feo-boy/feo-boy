@@ -129,12 +129,17 @@ impl Emulator {
         }
     }
 
-    /// Render a frame of emulation.
-    pub fn render(&mut self, args: &RenderArgs) {
+    /// Step the emulation state for 1/60 of a second.
+    pub fn update(&mut self, _: &UpdateArgs) {
         let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
         while self.cpu.clock.t < frame_clock {
             self.step();
         }
+    }
+
+    /// Render a frame of emulation.
+    pub fn render(&mut self, _: &RenderArgs) {
+        // TODO
     }
 
     /// Resume execution after pausing.

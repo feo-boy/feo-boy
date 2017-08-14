@@ -127,11 +127,15 @@ fn start_emulator(config: Config) -> Result<()> {
     emulator.reset();
 
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
-    window.set_ups(0);
+    window.set_ups(60);
 
-    while let Some(e) = window.next() {
-        if let Some(r) = e.render_args() {
-            emulator.render(&r);
+    while let Some(event) = window.next() {
+        if let Some(update_args) = event.update_args() {
+            emulator.update(&update_args);
+        }
+
+        if let Some(render_args) = event.render_args() {
+            emulator.render(&render_args);
         }
     }
 
