@@ -9,10 +9,7 @@ extern crate error_chain;
 extern crate piston_window;
 extern crate pretty_env_logger;
 
-use std::io::prelude::*;
-use std::io;
 use std::path::PathBuf;
-use std::process;
 
 use clap::{App, AppSettings, Arg};
 use piston_window::*;
@@ -25,88 +22,6 @@ struct Config {
     rom: PathBuf,
     bios: Option<PathBuf>,
     debug: bool,
-}
-
-fn parse_step(command: &str) -> Result<Option<i32>> {
-    let components = command.split(' ').collect::<Vec<_>>();
-
-    match components.len() {
-        1 => return Ok(None),
-        2 => (),
-        _ => bail!("`s` takes a single optional argument"),
-    }
-
-    let step = components[1].parse().chain_err(
-        || "could not parse step count",
-    )?;
-
-    Ok(Some(step))
-}
-
-fn parse_breakpoint(command: &str) -> Result<u16> {
-    let components = command.split(' ').collect::<Vec<_>>();
-
-    if components.len() != 2 {
-        bail!("`b` takes a single argument");
-    }
-
-    let breakpoint = &components[1];
-    if !breakpoint.starts_with("0x") {
-        bail!("breakpoint must start with '0x'");
-    }
-
-    let breakpoint = u16::from_str_radix(&breakpoint[2..], 16).chain_err(
-        || "could not parse hexadecimal number",
-    )?;
-    Ok(breakpoint)
-}
-
-fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
-    match &command[..1] {
-        "s" => {
-            let step = parse_step(command)?.unwrap_or_else(|| 1);
-
-            for _ in 0..step {
-                emulator.step();
-            }
-        }
-        "b" => {
-            let breakpoint = parse_breakpoint(command)?;
-            emulator.add_breakpoint(breakpoint);
-        }
-        "l" => {
-            let breakpoints = emulator.breakpoints();
-            if breakpoints.is_empty() {
-                println!("no breakpoints");
-            } else {
-                println!("breakpoints:");
-                for breakpoint in emulator.breakpoints() {
-                    println!("{:#06x}", breakpoint);
-                }
-            }
-        }
-        "r" => emulator.resume(),
-        "p" => {
-            let (address, instruction) = emulator.current_instruction();
-            println!("{:#06x}: {}", address, instruction);
-        }
-        "d" => println!("{}", emulator.bus.to_string()),
-        "c" => println!("{}", emulator.cpu.to_string()),
-        "q" => process::exit(0),
-        "?" => {
-            println!("s: step emulator");
-            println!("b: add breakpoint");
-            println!("l: list breakpoints");
-            println!("r: resume execution");
-            println!("p: print current instruction");
-            println!("d: dump memory");
-            println!("c: cpu state");
-            println!("q: quit");
-        }
-        _ => println!("unknown command"),
-    }
-
-    Ok(())
 }
 
 fn start_emulator(config: Config) -> Result<()> {
@@ -131,7 +46,7 @@ fn start_emulator(config: Config) -> Result<()> {
 
     while let Some(event) = window.next() {
         if let Some(update_args) = event.update_args() {
-            emulator.update(&update_args);
+            emulator.update(&update_args)?;
         }
 
         if let Some(render_args) = event.render_args() {

@@ -26,10 +26,12 @@ pub mod cpu;
 pub mod errors;
 pub mod graphics;
 pub mod memory;
+pub mod tui;
 
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io;
 use std::path::Path;
 
 use piston_window::*;
@@ -130,11 +132,24 @@ impl Emulator {
     }
 
     /// Step the emulation state for 1/60 of a second.
-    pub fn update(&mut self, _: &UpdateArgs) {
+    ///
+    /// If the debugger is enabled, debug commands will be read from stdin.
+    pub fn update(&mut self, _: &UpdateArgs) -> Result<()> {
         let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
         while self.cpu.clock.t < frame_clock {
-            self.step();
+            if self.is_paused() {
+                print!("feo debug [{}]: ", tui::COMMANDS);
+                io::stdout().flush()?;
+
+                let mut command = String::new();
+                io::stdin().read_line(&mut command)?;
+                tui::parse_command(self, &command)?;
+            } else {
+                self.step();
+            }
         }
+
+        Ok(())
     }
 
     /// Render a frame of emulation.
