@@ -189,6 +189,8 @@ impl Ppu {
 
     /// Performs one clock step of the PPU.
     pub fn step(&mut self, cycles: u32) {
+        // TODO: Set LCD status interrupt request here
+
         self.modeclock += cycles;
 
         match self.mode {

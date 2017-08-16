@@ -55,13 +55,47 @@ impl Clock {
     }
 }
 
-/// Whether various CPU interrupts are enabled.
+/// Contains whether an interrupt is enabled or requested.
+#[derive(Debug, Default)]
+pub struct InterruptState {
+    /// Whether the interrupt has been enabled via the Interrupt Enable I/O register (`0xFFFF`).
+    /// Note that this is independent of the Interrupt Master Enable (IME) flag.
+    pub enabled: bool,
+
+    /// Whether the interrupt has been requested by the program (by writing to the Interrupt Flag
+    /// I/O register `0xFF0F`) or triggered by a condition.
+    pub requested: bool,
+}
+
+/// CPU interrupt state.
 #[derive(Debug, Default)]
 pub struct Interrupts {
-    pub lcd_stat: bool,
-    pub timer: bool,
-    pub serial: bool,
-    pub joypad: bool,
+    /// Interrupt Master Enable (IME).
+    ///
+    /// This state overrides whether individual interrupts are enabled. When an interrupt is
+    /// triggered, it is set to `false`. A program may control this flag through the `EI`, `DI`,
+    /// and `RETI` instructions.
+    pub enabled: bool,
+
+    /// The V-blank interrupt occurs when the PPU has completed scanning the LCD lines, signalling
+    /// that video memory is no longer being read.
+    pub vblank: InterruptState,
+
+    /// The LCD Status interrupt may be triggered by a number of conditions. These conditions are
+    /// controlled by the LCD Status I/O register (`0xFF42`).
+    pub lcd_status: InterruptState,
+
+    /// The timer interrupt is triggered when the Timer Counter I/O register (`0xFF05`) overflows.
+    pub timer: InterruptState,
+
+    /// The serial interrupt is triggered when a data transfer has completed over the serial port.
+    pub serial: InterruptState,
+
+    /// The joypad interrupt is triggered when any button is pressed.
+    ///
+    /// On real hardware, this interrupt may activate multiple times per button press due to
+    /// fluctuating signal.
+    pub joypad: InterruptState,
 }
 
 /// The CPU.
@@ -73,8 +107,8 @@ pub struct Cpu {
     /// The clock corresponding to the last instruction cycle.
     pub clock: Clock,
 
-    /// True if interrupts are enabled.
-    interrupts: bool,
+    /// CPU interrupts.
+    pub interrupts: Interrupts,
 
     /// The state of execution.
     state: State,

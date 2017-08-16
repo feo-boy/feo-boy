@@ -482,7 +482,7 @@ impl super::Cpu {
             // 0xe3
 
             // DI
-            0xf3 => self.interrupts = false,
+            0xF3 => self.interrupts.enabled = false,
 
             // INC B
             0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
@@ -910,9 +910,9 @@ impl super::Cpu {
             }
 
             // RETI
-            0xd9 => {
+            0xD9 => {
                 self.ret(bus);
-                self.interrupts = true;
+                self.interrupts.enabled = true;
             }
 
             // JP (HL)
@@ -1068,7 +1068,7 @@ impl super::Cpu {
             // 0xeb
 
             // EI
-            0xfb => self.interrupts = true,
+            0xFB => self.interrupts.enabled = true,
 
             // INC C
             0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),

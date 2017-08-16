@@ -56,6 +56,21 @@ impl Bus {
         } = *self;
 
         match address {
+            // IF - Interrupt Flag
+            0xFF0F => {
+                let mut register = 0u8;
+
+                register.set_bit(0, interrupts.vblank.requested);
+                register.set_bit(1, interrupts.lcd_status.requested);
+                register.set_bit(2, interrupts.timer.requested);
+                register.set_bit(3, interrupts.serial.requested);
+                register.set_bit(4, interrupts.joypad.requested);
+
+                // The higher bits are unspecified.
+
+                register
+            }
+
             // STAT - LCDC Status
             0xFF41 => {
                 let mut register = 0u8;
@@ -92,13 +107,14 @@ impl Bus {
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
 
+            // IE - Interrupt Enable
             0xFFFF => {
                 let mut byte = 0x00;
-                byte.set_bit(0, ppu.interrupts.vblank);
-                byte.set_bit(1, interrupts.lcd_stat);
-                byte.set_bit(2, interrupts.timer);
-                byte.set_bit(3, interrupts.serial);
-                byte.set_bit(4, interrupts.joypad);
+                byte.set_bit(0, interrupts.vblank.enabled);
+                byte.set_bit(1, interrupts.lcd_status.enabled);
+                byte.set_bit(2, interrupts.timer.enabled);
+                byte.set_bit(3, interrupts.serial.enabled);
+                byte.set_bit(4, interrupts.joypad.enabled);
 
                 // Remaining bits are unspecified.
 
@@ -121,6 +137,15 @@ impl Bus {
         } = *self;
 
         match address {
+            // IF - Interrupt Flag
+            0xFF0F => {
+                interrupts.vblank.requested = byte.has_bit_set(0);
+                interrupts.lcd_status.requested = byte.has_bit_set(1);
+                interrupts.timer.requested = byte.has_bit_set(2);
+                interrupts.serial.requested = byte.has_bit_set(3);
+                interrupts.joypad.requested = byte.has_bit_set(4);
+            }
+
             // NR11 - Channel 1 Sound length/Wave pattern duty
             0xFF11 => {
                 warn!("attempted to modify sound channel 1 wave (unimplemented)");
@@ -201,12 +226,13 @@ impl Bus {
                 }
             }
 
+            // IE - Interrupt Enable
             0xFFFF => {
-                ppu.interrupts.vblank = byte.has_bit_set(0);
-                interrupts.lcd_stat = byte.has_bit_set(1);
-                interrupts.timer = byte.has_bit_set(2);
-                interrupts.serial = byte.has_bit_set(3);
-                interrupts.joypad = byte.has_bit_set(4);
+                interrupts.vblank.enabled = byte.has_bit_set(0);
+                interrupts.lcd_status.enabled = byte.has_bit_set(1);
+                interrupts.timer.enabled = byte.has_bit_set(2);
+                interrupts.serial.enabled = byte.has_bit_set(3);
+                interrupts.joypad.enabled = byte.has_bit_set(4);
             }
 
             _ => error!("write to unimplemented I/O register {:#02x}", address),
