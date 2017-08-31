@@ -324,7 +324,7 @@ impl Ppu {
         // Get the color number using the low and high bytes from the Character RAM
         let mut color_num = 0;
         color_num.set_bit(0, color_lo_byte.has_bit_set(x));
-        color_num.set_bit(1, color_lo_byte.has_bit_set(x));
+        color_num.set_bit(1, color_hi_byte.has_bit_set(x));
 
         // Map the color number to the shade to display on the screen
         &self.bg_palette[color_num as usize]
@@ -436,6 +436,7 @@ mod tests {
     fn shade() {
         let mut ppu = Ppu::new();
 
+        // Note that bytes are read backwards
         ppu.mem.chram[0] = 0xF0;
         ppu.mem.chram[1] = 0x33;
 
@@ -446,15 +447,16 @@ mod tests {
             Shade::from(3),
         ];
 
-        // FIXME: Function isn't quite working, probably something to do with setting the bits
-        assert_eq!(*ppu.shade(0, 0, 0), Shade::from(0));
-        assert_eq!(*ppu.shade(0, 1, 0), Shade::from(0));
+        assert_eq!(*ppu.shade(0, 0, 0), Shade::from(2));
+        assert_eq!(*ppu.shade(0, 1, 0), Shade::from(2));
         assert_eq!(*ppu.shade(0, 2, 0), Shade::from(0));
-        // assert_eq!(*ppu.shade(0, 3, 0), Shade::from(0));
-        // assert_eq!(*ppu.shade(0, 4, 0), Shade::from(3));
-        // assert_eq!(*ppu.shade(0, 5, 0), Shade::from(3));
-        // assert_eq!(*ppu.shade(0, 6, 0), Shade::from(2));
-        // assert_eq!(*ppu.shade(0, 7, 0), Shade::from(2));
+        assert_eq!(*ppu.shade(0, 3, 0), Shade::from(0));
+        assert_eq!(*ppu.shade(0, 4, 0), Shade::from(3));
+        assert_eq!(*ppu.shade(0, 5, 0), Shade::from(3));
+        assert_eq!(*ppu.shade(0, 6, 0), Shade::from(1));
+        assert_eq!(*ppu.shade(0, 7, 0), Shade::from(1));
+
+        // TODO: test indexing
     }
 
     #[test]
