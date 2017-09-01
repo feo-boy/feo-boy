@@ -6,12 +6,14 @@ extern crate clap;
 #[macro_use]
 extern crate error_chain;
 
+extern crate image;
 extern crate piston_window;
 extern crate pretty_env_logger;
 
 use std::path::PathBuf;
 
 use clap::{App, AppSettings, Arg};
+use image::RgbaImage;
 use piston_window::*;
 
 use feo_boy::Emulator;
@@ -44,13 +46,22 @@ fn start_emulator(config: Config) -> Result<()> {
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
     window.set_ups(60);
 
+    let mut buffer = RgbaImage::new(100, 100);
+    let mut texture = Texture::from_image(&mut window.factory, &buffer, &TextureSettings::new())
+        .unwrap();
+
     while let Some(event) = window.next() {
         if let Some(update_args) = event.update_args() {
             emulator.update(&update_args)?;
         }
 
-        if let Some(render_args) = event.render_args() {
-            emulator.render(&render_args);
+        if let Some(_) = event.render_args() {
+            emulator.render(&mut buffer);
+            texture.update(&mut window.encoder, &buffer).unwrap();
+
+            window.draw_2d(&event, |context, graphics| {
+                image(&texture, context.transform, graphics);
+            });
         }
     }
 

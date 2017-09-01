@@ -12,6 +12,7 @@ extern crate log;
 extern crate lazy_static;
 
 extern crate byteorder;
+extern crate image;
 extern crate itertools;
 extern crate piston_window;
 extern crate regex;
@@ -34,6 +35,7 @@ use std::io::prelude::*;
 use std::io;
 use std::path::Path;
 
+use image::{Rgba, RgbaImage};
 use piston_window::*;
 
 use bus::Bus;
@@ -153,7 +155,7 @@ impl Emulator {
     }
 
     /// Render a frame of emulation.
-    pub fn render(&mut self, _: &RenderArgs) {
+    pub fn render(&self, buffer: &mut RgbaImage) {
         // TODO
     }
 
