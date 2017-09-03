@@ -75,7 +75,7 @@ impl Memory {
 
     /// Return the second set of background map data from VRAM.
     fn bg2(&self) -> &[u8] {
-        &self.bg_map[0x9C00..0x9FFF]
+        &self.bg_map[0x400..0x7ff]
     }
 }
 
