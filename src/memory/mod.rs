@@ -261,7 +261,7 @@ impl Mmu {
             .enumerate()
             .flat_map(|(i, byte)| match i {
                 0x14E | 0x14F => None,
-                _ => Some(Wrapping(*byte as u16)),
+                _ => Some(Wrapping(u16::from(*byte))),
             })
             .sum();
         let global_checksum = BigEndian::read_u16(&rom[0x14E..0x150]);

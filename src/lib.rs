@@ -1,6 +1,7 @@
 //! A Game Boy emulator written in Rust.
 
 #![cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+#![cfg_attr(feature = "cargo-clippy", allow(unreadable_literal))]
 
 #[macro_use]
 extern crate bitflags;

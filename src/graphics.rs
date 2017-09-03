@@ -333,7 +333,7 @@ impl Ppu {
     /// Finds the index of a tile in the Character RAM.
     pub fn tile_index(&self, tile: u8) -> usize {
         if self.signed_tile_mode {
-            ((tile as i8) as i16 + 256) as usize
+            (i16::from(tile as i8) + 256) as usize
         } else {
             tile as usize
         }

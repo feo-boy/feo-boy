@@ -317,7 +317,7 @@ impl Registers {
         self.set_sp_r8_flags(rhs);
 
         let sp = self.sp as i16;
-        self.sp = (sp + rhs as i16) as u16;
+        self.sp = (sp + i16::from(rhs)) as u16;
     }
 
     /// Places the result of adding a signed byte to the stack pointer, SP, in the register pair
@@ -326,7 +326,7 @@ impl Registers {
         self.set_sp_r8_flags(rhs);
 
         let sp = self.sp as i16;
-        self.hl_mut().write((sp + rhs as i16) as u16);
+        self.hl_mut().write((sp + i16::from(rhs)) as u16);
     }
 
     /// Subtracts a byte from the accumulator and sets the flags appropriately.

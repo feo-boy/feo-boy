@@ -135,7 +135,7 @@ impl super::Cpu {
         let def = &INSTRUCTIONS[byte as usize];
 
         let operands = (0..def.num_operands)
-            .map(|i| bus.read_byte(self.reg.pc + 1 + i as u16))
+            .map(|i| bus.read_byte(self.reg.pc + 1 + u16::from(i)))
             .collect();
 
         Instruction {
@@ -160,7 +160,7 @@ impl super::Cpu {
             instruction.operands.len()
         );
 
-        let mut cycles = instruction.def.cycles as u32;
+        let mut cycles = u32::from(instruction.def.cycles);
 
         // Increment the program counter (PC) *before* executing the instruction.
         //
@@ -1386,7 +1386,7 @@ impl super::Cpu {
     /// Performs JR (relative jump) operation. Does not modify any flags.
     fn jr(&mut self, jump: i8) {
         let pc = self.reg.pc as i16;
-        self.reg.pc = (pc + jump as i16) as u16;
+        self.reg.pc = (pc + i16::from(jump)) as u16;
     }
 }
 
