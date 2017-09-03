@@ -339,6 +339,7 @@ impl Ppu {
         }
     }
 
+    /// Reads a byte of graphics memory.
     ///
     /// # Panics
     ///
