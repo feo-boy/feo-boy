@@ -31,6 +31,13 @@ struct InstructionDef {
     /// cycles. Four clock cycles is equivalent to a single machine cycle.
     pub cycles: u8,
 
+    /// The number of clock cycles it takes to execute this instruction if the instruction's
+    /// condition is true. Only conditional instructions will have this field set.
+    ///
+    /// For example, `RET Z` will only return if the zero flag is set. In that case, it will
+    /// execute in 20 cycles instead of 8.
+    pub condition_cycles: Option<u8>,
+
     /// The number of operands that this instruction uses.
     pub num_operands: u8,
 }
@@ -78,8 +85,22 @@ impl Display for Instruction {
 /// Macro to generate the definition of a single instruction.
 macro_rules! instruction {
     ( $byte:expr, $description:expr, $cycles:expr ) => {
+        instruction!(@inner $byte, $description, $cycles, None)
+    };
+
+    ( $byte:expr, $description:expr, $cycles:expr => $condition_cycles:expr ) => {
+        instruction!(@inner $byte, $description, $cycles, Some($condition_cycles))
+    };
+
+    ( @inner $byte:expr, $description:expr, $cycles:expr, $condition_cycles:expr ) => {
         {
             use $crate::cpu::instructions::DATA_RE;
+
+            let condition_cycles: Option<u8> = $condition_cycles;
+
+            if let Some(ref cycles) = condition_cycles {
+                assert!(*cycles > $cycles);
+            }
 
             let num_operands = DATA_RE.find($description).map(|mat| {
                 match mat.as_str() {
@@ -93,17 +114,20 @@ macro_rules! instruction {
                 byte: $byte,
                 description: $description,
                 cycles: $cycles,
+                condition_cycles: condition_cycles,
                 num_operands: num_operands,
             }
         }
-    }
+    };
 }
 
 /// Macro to quickly define all CPU instructions for the Game Boy Z80 processor.
 macro_rules! instructions {
-    ( $( $byte:expr, $description:expr, $cycles:expr ; )* ) => {
+    ( $( $byte:expr, $description:expr, $cycles:expr $( => $condition_cycles:tt )* ; )* ) => {
         {
-            let mut instructions = [ $( instruction!($byte, $description, $cycles) ),* ];
+            let mut instructions = [
+                $( instruction!($byte, $description, $cycles $( => $condition_cycles )*) ),*
+            ];
             instructions.sort_unstable_by_key(|instruction| instruction.byte);
             instructions
         }
@@ -143,7 +167,7 @@ impl super::Cpu {
             instruction.operands.len()
         );
 
-        let mut cycles = u32::from(instruction.def.cycles);
+        let mut condition_taken = false;
 
         // Increment the program counter (PC) *before* executing the instruction.
         //
@@ -163,7 +187,7 @@ impl super::Cpu {
             0x20 => {
                 if !self.reg.f.contains(ZERO) {
                     self.jr(instruction.operands[0] as i8);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -171,7 +195,7 @@ impl super::Cpu {
             0x30 => {
                 if !self.reg.f.contains(CARRY) {
                     self.jr(instruction.operands[0] as i8);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -215,7 +239,7 @@ impl super::Cpu {
             0xc0 => {
                 if !self.reg.f.contains(ZERO) {
                     self.ret(bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -223,7 +247,7 @@ impl super::Cpu {
             0xd0 => {
                 if !self.reg.f.contains(CARRY) {
                     self.ret(bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -381,7 +405,7 @@ impl super::Cpu {
             0xc2 => {
                 if !self.reg.f.contains(ZERO) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -389,7 +413,7 @@ impl super::Cpu {
             0xd2 => {
                 if !self.reg.f.contains(CARRY) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -524,7 +548,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -533,7 +557,7 @@ impl super::Cpu {
                 if !self.reg.f.contains(CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -756,7 +780,7 @@ impl super::Cpu {
             0x28 => {
                 if self.reg.f.contains(ZERO) {
                     self.jr(instruction.operands[0] as i8);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -764,7 +788,7 @@ impl super::Cpu {
             0x38 => {
                 if self.reg.f.contains(CARRY) {
                     self.jr(instruction.operands[0] as i8);
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -808,7 +832,7 @@ impl super::Cpu {
             0xc8 => {
                 if self.reg.f.contains(ZERO) {
                     self.ret(bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -816,7 +840,7 @@ impl super::Cpu {
             0xd8 => {
                 if self.reg.f.contains(CARRY) {
                     self.ret(bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -963,8 +987,7 @@ impl super::Cpu {
                 if self.reg.f.contains(ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
-
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -973,8 +996,7 @@ impl super::Cpu {
                 if self.reg.f.contains(CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
-
-                    cycles += 4;
+                    condition_taken = true;
                 }
             }
 
@@ -1106,7 +1128,7 @@ impl super::Cpu {
                 if self.reg.f.contains(ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -1115,7 +1137,7 @@ impl super::Cpu {
                 if self.reg.f.contains(CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
-                    cycles += 12;
+                    condition_taken = true;
                 }
             }
 
@@ -1317,6 +1339,11 @@ impl super::Cpu {
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
+        let cycles = match (condition_taken, instruction.def.condition_cycles) {
+            (true, Some(cycles)) => u32::from(cycles),
+            _ => u32::from(instruction.def.cycles),
+        };
+
         self.clock.t += cycles;
         self.clock.m += cycles / 4;
 
@@ -1383,8 +1410,8 @@ lazy_static! {
         // byte     description     cycles
         0x00,       "NOP",          4;
         0x10,       "STOP",         4;
-        0x20,       "JR NZ,r8",     8;
-        0x30,       "JR NC,r8",     8;
+        0x20,       "JR NZ,r8",     8 => 12;
+        0x30,       "JR NC,r8",     8 => 12;
         0x40,       "LD B,B",       4;
         0x50,       "LD D,B",       4;
         0x60,       "LD H,B",       4;
@@ -1393,8 +1420,8 @@ lazy_static! {
         0x90,       "SUB B",        4;
         0xa0,       "AND B",        4;
         0xb0,       "OR B",         4;
-        0xc0,       "RET NZ",       8;
-        0xd0,       "RET NC",       8;
+        0xc0,       "RET NZ",       8 => 20;
+        0xd0,       "RET NC",       8 => 20;
         0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
         0xf0,       "LDH A,(a8)",   12;     // AKA LD ($FF00+a8),A
         0x01,       "LD BC,d16",    12;
@@ -1425,8 +1452,8 @@ lazy_static! {
         0x92,       "SUB D",        4;
         0xa2,       "AND D",        4;
         0xb2,       "OR D",         4;
-        0xc2,       "JP NZ,a16",    12;
-        0xd2,       "JP NC,a16",    12;
+        0xc2,       "JP NZ,a16",    12 => 16;
+        0xd2,       "JP NC,a16",    12 => 16;
         0xe2,       "LD (C),A",     8;      // AKA LD ($FF00+C),A
         0xf2,       "LD A,(C)",     8;      // AKA LD A,($FF00+C)
         0x03,       "INC BC",       8;
@@ -1457,8 +1484,8 @@ lazy_static! {
         0x94,       "SUB H",        4;
         0xa4,       "AND H",        4;
         0xb4,       "OR H",         4;
-        0xc4,       "CALL NZ,a16",  12;
-        0xd4,       "CALL NC,a16",  12;
+        0xc4,       "CALL NZ,a16",  12 => 24;
+        0xd4,       "CALL NC,a16",  12 => 24;
         0xe4,       "UNUSED",       0;
         0xf4,       "UNUSED",       0;
         0x05,       "DEC B",        4;
@@ -1511,8 +1538,8 @@ lazy_static! {
         0xf7,       "RST 30H",      16;
         0x08,       "LD (a16),SP",  20;
         0x18,       "JR r8",        12;
-        0x28,       "JR Z,r8",      8;
-        0x38,       "JR C,r8",      8;
+        0x28,       "JR Z,r8",      8 => 12;
+        0x38,       "JR C,r8",      8 => 12;
         0x48,       "LD C,B",       4;
         0x58,       "LD E,B",       4;
         0x68,       "LD L,B",       4;
@@ -1521,8 +1548,8 @@ lazy_static! {
         0x98,       "SBC A,B",      4;
         0xa8,       "XOR B",        4;
         0xb8,       "CP B",         4;
-        0xc8,       "RET Z",        8;
-        0xd8,       "RET C",        8;
+        0xc8,       "RET Z",        8 => 20;
+        0xd8,       "RET C",        8 => 20;
         0xe8,       "ADD SP,r8",    16;
         0xf8,       "LD HL,SP+r8",  12;     // AKA LDHL SP,r8
         0x09,       "ADD HL,BC",    8;
@@ -1553,8 +1580,8 @@ lazy_static! {
         0x9a,       "SBC A,D",      4;
         0xaa,       "XOR D",        4;
         0xba,       "CP D",         4;
-        0xca,       "JP Z,a16",     12;
-        0xda,       "JP C,a16",     12;
+        0xca,       "JP Z,a16",     12 => 16;
+        0xda,       "JP C,a16",     12 => 16;
         0xea,       "LD (a16),A",   16;
         0xfa,       "LD A,(a16)",   16;
         0x0b,       "DEC BC",       8;
@@ -1585,8 +1612,8 @@ lazy_static! {
         0x9c,       "SBC A,H",      4;
         0xac,       "XOR H",        4;
         0xbc,       "CP H",         4;
-        0xcc,       "CALL Z,a16",   12;
-        0xdc,       "CALL C,a16",   12;
+        0xcc,       "CALL Z,a16",   12 => 24;
+        0xdc,       "CALL C,a16",   12 => 24;
         0xec,       "UNUSED",       0;
         0xfc,       "UNUSED",       0;
         0x0d,       "DEC C",        4;
@@ -1657,6 +1684,7 @@ mod tests {
             description: "NOP",
             num_operands: 0,
             cycles: 4,
+            condition_cycles: None,
         });
 
         let ld = instruction!(0x3e, "LD A,d8", 8);
@@ -1665,6 +1693,7 @@ mod tests {
             description: "LD A,d8",
             num_operands: 1,
             cycles: 8,
+            condition_cycles: None,
         });
 
         let jp = instruction!(0xc3, "JP a16", 16);
@@ -1673,6 +1702,16 @@ mod tests {
             description: "JP a16",
             num_operands: 2,
             cycles: 16,
+            condition_cycles: None,
+        });
+
+        let conditional_jp = instruction!(0xc8, "RET Z", 8 => 20);
+        assert_eq!(conditional_jp, InstructionDef {
+            byte: 0xc8,
+            description: "RET Z",
+            num_operands: 0,
+            cycles: 8,
+            condition_cycles: Some(20),
         });
     }
 
@@ -1745,6 +1784,7 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
+        assert_eq!(cpu.clock.t, 12);
 
         // Move backward 10
         let instruction = Instruction {
@@ -1753,6 +1793,17 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
+        assert_eq!(cpu.clock.t, 24);
+
+        // Do not jump
+        cpu.reg.f.insert(ZERO);
+        let instruction = Instruction {
+            def: &INSTRUCTIONS[0x20],
+            operands: SmallVec::from_slice(&[0x0a]),
+        };
+        cpu.execute(instruction, &mut bus);
+        assert_eq!(cpu.reg.pc, 6);
+        assert_eq!(cpu.clock.t, 32);
     }
 
     #[test]
