@@ -1,9 +1,7 @@
 //! CPU instruction definition.
 
 use std::fmt::{self, Display};
-use std::mem;
 use std::ops::{AddAssign, SubAssign};
-use std::ptr;
 
 use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
@@ -18,7 +16,7 @@ lazy_static! {
 }
 
 /// A definition of a single instruction.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct InstructionDef {
     /// The byte that identifies this instruction.
     pub byte: u8,
@@ -77,52 +75,37 @@ impl Display for Instruction {
     }
 }
 
+/// Macro to generate the definition of a single instruction.
+macro_rules! instruction {
+    ( $byte:expr, $description:expr, $cycles:expr ) => {
+        {
+            use $crate::cpu::instructions::DATA_RE;
+
+            let num_operands = DATA_RE.find($description).map(|mat| {
+                match mat.as_str() {
+                    "d8" | "a8" | "r8" => 1,
+                    "d16" | "a16" => 2,
+                    ty => unreachable!("unhandled data type: {}", ty),
+                }
+            }).unwrap_or_default();
+
+            InstructionDef {
+                byte: $byte,
+                description: $description,
+                cycles: $cycles,
+                num_operands: num_operands,
+            }
+        }
+    }
+}
+
 /// Macro to quickly define all CPU instructions for the Game Boy Z80 processor.
 macro_rules! instructions {
     ( $( $byte:expr, $description:expr, $cycles:expr ; )* ) => {
         {
-            let mut instruction_data = vec![None; 0x100];
-
-            $(
-                let num_operands = DATA_RE.find($description).map(|mat| {
-                    match mat.as_str() {
-                        "d8" | "a8" | "r8" => 1,
-                        "d16" | "a16" => 2,
-                        ty => unreachable!("unhandled data type: {}", ty),
-                    }
-                }).unwrap_or_default();
-
-                instruction_data[$byte] = Some(InstructionDef {
-                    byte: $byte,
-                    description: $description,
-                    cycles: $cycles,
-                    num_operands: num_operands,
-                });
-            )*
-
-            let instruction_data = instruction_data
-                .into_iter()
-                .enumerate()
-                .map(|(i, data)| {
-                    data.expect(&format!("missing data for instruction {:#04x}", i))
-                })
-                .collect::<Vec<_>>();
-
-            // We need to initialize a large array of a non-copy type here. Unfortunately, Default
-            // is only implemented for arrays of length up to 32.
-            //
-            // Just another use case that const generics would help with.
-            //
-            // This block is unsafe because if we got a panic while constructing this array, we
-            // would get undefined behavior while trying to run the destructor for the instructions
-            // array. However, this code cannot panic, so the abstraction is safe.
-            unsafe {
-                let mut instructions: [_; 0x100] = mem::uninitialized();
-                for (i, instruction) in instruction_data.into_iter().enumerate() {
-                    ptr::write(&mut instructions[i], instruction);
-                }
-                instructions
-            }
+            let mut instructions = [ $( instruction!($byte, $description, $cycles) ),* ];
+            instructions.sort_unstable_by_key(|instruction| instruction.byte);
+            instructions
         }
     }
 }
@@ -1664,7 +1647,34 @@ mod tests {
     use cpu::{Cpu, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
     use memory::Addressable;
 
-    use super::{INSTRUCTIONS, Instruction};
+    use super::{INSTRUCTIONS, Instruction, InstructionDef};
+
+    #[test]
+    fn instruction_macro() {
+        let nop = instruction!(0x00, "NOP", 4);
+        assert_eq!(nop, InstructionDef {
+            byte: 0x00,
+            description: "NOP",
+            num_operands: 0,
+            cycles: 4,
+        });
+
+        let ld = instruction!(0x3e, "LD A,d8", 8);
+        assert_eq!(ld, InstructionDef {
+            byte: 0x3e,
+            description: "LD A,d8",
+            num_operands: 1,
+            cycles: 8,
+        });
+
+        let jp = instruction!(0xc3, "JP a16", 16);
+        assert_eq!(jp, InstructionDef {
+            byte: 0xc3,
+            description: "JP a16",
+            num_operands: 2,
+            cycles: 16,
+        });
+    }
 
     #[test]
     fn instruction_display() {
