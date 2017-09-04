@@ -55,7 +55,7 @@ fn start_emulator(config: Config) -> Result<()> {
             emulator.update(&update_args)?;
         }
 
-        if let Some(_) = event.render_args() {
+        if event.render_args().is_some() {
             emulator.render(&mut buffer);
             texture.update(&mut window.encoder, &buffer).unwrap();
 
