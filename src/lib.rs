@@ -159,7 +159,11 @@ impl Emulator {
 
     /// Render a frame of emulation.
     pub fn render(&self, buffer: &mut RgbaImage) {
-        // TODO
+        for y in 0..SCREEN_DIMENSIONS.1 {
+            for x in 0..SCREEN_DIMENSIONS.0 {
+                buffer.put_pixel(x, y, self.bus.ppu.pixels.0[y as usize][x as usize].to_rgba());
+            }
+        }
     }
 
     /// Resume execution after pausing.

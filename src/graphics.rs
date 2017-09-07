@@ -2,17 +2,22 @@
 //!
 //! Contains an implementation of a PPU.
 
-use std::fmt;
+use std::fmt::{self, Debug, Formatter};
 
+use byteorder::{ByteOrder, LittleEndian};
 use image::Rgba;
 
 use bytes::ByteExt;
+use memory::Addressable;
 
 /// The width and height of the Game Boy screen.
 pub const SCREEN_DIMENSIONS: (u32, u32) = (160, 144);
+pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_HEIGHT: usize = 144;
+pub const SIGNED_TILE_DATA_START: u16 = 0x8800;
 
 /// The colors that can be displayed by the DMG.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Shade {
     White,
     LightGray,
@@ -26,7 +31,7 @@ pub enum Shade {
 
 impl Shade {
     /// Returns a pixel that represents the color of a `Shade`.
-    fn to_rgba(&self) -> Rgba<u8> {
+    pub fn to_rgba(&self) -> Rgba<u8> {
         use self::Shade::*;
 
         // This uses the GameBoy Pocket palette.
@@ -91,18 +96,6 @@ impl Default for Memory {
     }
 }
 
-impl Memory {
-    /// Return the first set of background map data from VRAM.
-    fn bg1(&self) -> &[u8] {
-        &self.bg_map[0..0x3FF]
-    }
-
-    /// Return the second set of background map data from VRAM.
-    fn bg2(&self) -> &[u8] {
-        &self.bg_map[0x400..0x7ff]
-    }
-}
-
 /// Groups information that determines if various interrupts are enabled.
 #[derive(Debug, Default)]
 pub struct Interrupts {
@@ -131,7 +124,7 @@ pub struct LcdControl {
     pub window_map_start: u16,
 
     /// The address of the start of the background and window tile data.
-    pub window_data_start: u16,
+    pub tile_data_start: u16,
 
     /// The address of the start of the background tile map.
     pub bg_map_start: u16,
@@ -145,6 +138,20 @@ pub struct LcdControl {
 pub struct Position {
     pub x: u8,
     pub y: u8,
+}
+
+pub struct ScreenBuffer(pub [[Shade; SCREEN_WIDTH]; SCREEN_HEIGHT]);
+
+impl Debug for ScreenBuffer {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("FrameBuffer").finish()
+    }
+}
+
+impl Default for ScreenBuffer {
+    fn default() -> ScreenBuffer {
+        ScreenBuffer([[Shade::default(); SCREEN_WIDTH]; SCREEN_HEIGHT])
+    }
 }
 
 /// The picture processing unit.
@@ -195,12 +202,8 @@ pub struct Ppu {
     /// Contains whether PPU-related interrupts are enabled or disabled.
     pub interrupts: Interrupts,
 
-    /// Indicates which background map is in use. If `false`, the first map is in use, and if
-    /// `true`, the second map is in use.
-    pub use_second_bg_map: bool,
-
-    /// Indicates whether we are using the signed or unsigned tile mode.
-    pub signed_tile_mode: bool,
+    /// The pixels to be rendered on the screen.
+    pub pixels: ScreenBuffer,
 }
 
 impl Ppu {
@@ -246,7 +249,6 @@ impl Ppu {
                     self.modeclock = 0;
                     self.line += 1;
 
-                    // FIXME: Should this be 143?
                     if self.line > 153 {
                         // Enter scanline mode
                         self.mode = 2;
@@ -289,86 +291,84 @@ impl Ppu {
     /// Renders the screen one line at a time. Move tile-by-tile through the line until it is
     /// complete.
     pub fn renderscan(&mut self) {
-        // Figure out which background map to use
-        let mut bg_map = if self.use_second_bg_map {
-            self.mem.bg2()
-        } else {
-            self.mem.bg1()
-        };
-
-        // Determine the index of the start of the tile line
-        let tile_line_index = (self.line + self.bg_scroll.y) / 8;
-        // Determine the index of the first tile within the line
-        let tile_line_offset = self.bg_scroll.x / 8;
-
-        // Finally, get the tile position value from the Background RAM
-        let tile = bg_map[(tile_line_index + tile_line_offset) as usize];
-
-        // Calculate the real index of the tile
-        let tile_index = self.tile_index(tile);
-
-        // Get position in tile
-        let tile_y = (self.line + self.bg_scroll.y) % 8;
-        let tile_x = self.bg_scroll.x % 8;
-
-        // Render the whole line
-        self.render_line(tile_index, tile_x, tile_y);
+        if self.control.background_enabled {
+            self.render_tiles();
+        }
     }
 
-    /// Renders the line starting from the given tile and (x,y) position in that tile.
-    pub fn render_line(&self, tile_index: usize, tile_x: u8, tile_y: u8) {
-        let mut current_tile_index = tile_index;
-        let mut current_tile_x = tile_x;
+    pub fn render_tiles(&mut self) {
+        const TILE_HEIGHT: u16 = 8;
+        const TILE_MAP_HEIGHT: u16 = 32;
+        const SIGNED_TILE_OFFSET: i16 = 128;
+        const TILE_DATA_ROW_SIZE: u16 = 16;
 
-        // Move across the full width of the screen
-        for i in 0..160 {
-            let shade = self.shade(current_tile_index, current_tile_x, tile_y);
+        // Calculate the absolute y-position of the pixel in the background map.
+        let y_position: u16 = (self.bg_scroll.y + self.line).into();
 
-            // TODO: Write the correct shade to the screen
+        // Find which row of the 32x32 tile map the tile is in.
+        let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
 
-            // Move horizontally to the next pixel
-            current_tile_x += 1;
+        // Draw the line.
+        for x in 0..160 {
+            let x_position = x + self.bg_scroll.x;
 
-            // Move to the next tile if necessary
-            if current_tile_x == 8 {
-                current_tile_x = 0;
-                current_tile_index += 1;
-            }
+            // Find x-position of the tile in the row of tiles.
+            let tile_offset = x_position / 8;
+
+            // Get the address of the tile in memory.
+            let tile_id_address = self.control.bg_map_start + &tile_row_offset.into() +
+                &tile_offset.into();
+
+            // Depending on which tile map we're using, the numbers can be signed or unsigned.
+            let tile_address = if self.control.tile_data_start == SIGNED_TILE_DATA_START {
+                let tile_id: i16 = (self.read_byte(tile_id_address) as i8).into();
+                self.control.tile_data_start +
+                    (tile_id + SIGNED_TILE_OFFSET) as u16 * TILE_DATA_ROW_SIZE
+            } else {
+                let tile_id: i16 = self.read_byte(tile_id_address).into();
+                self.control.tile_data_start + tile_id as u16 * TILE_DATA_ROW_SIZE
+            };
+
+            // Find the correct vertical position within the tile. Multiply by two because each
+            // row of the tile takes two bytes.
+            let tile_line = (y_position % TILE_HEIGHT) * 2;
+
+            let shade = self.shade(
+                self.read_word(tile_address + tile_line as u16),
+                x_position % 8,
+            );
+
+            self.pixels.0[self.line as usize][x as usize] = shade;
         }
     }
 
     /// Gets the shade for rendering a particular pixel of the screen.
-    pub fn shade(&self, tile_index: usize, x: u8, y: u8) -> &Shade {
+    pub fn shade(&self, tile_row: u16, tile_x: u8) -> Shade {
         // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
         // pixel. The first byte contains the lower order bit of the color number, while the second
         // byte contains the higher order bit.
-        let color_lo_byte = self.mem.chram[tile_index * 16 + y as usize * 2];
-        let color_hi_byte = self.mem.chram[tile_index * 16 + y as usize * 2 + 1];
+        let mut bytes = [0; 2];
+        LittleEndian::write_u16(&mut bytes, tile_row);
 
-        // Get the color number using the low and high bytes from the Character RAM
+        // Convert x-position into bit position (bit 7 is leftmost bit).
+        let color_bit = 7 - tile_x;
+
         let mut color_num = 0;
-        color_num.set_bit(0, color_lo_byte.has_bit_set(x));
-        color_num.set_bit(1, color_hi_byte.has_bit_set(x));
+        color_num.set_bit(0, bytes[0].has_bit_set(color_bit));
+        color_num.set_bit(1, bytes[1].has_bit_set(color_bit));
 
         // Map the color number to the shade to display on the screen
-        &self.bg_palette[color_num as usize]
+        self.bg_palette[color_num as usize]
     }
+}
 
-    /// Finds the index of a tile in the Character RAM.
-    pub fn tile_index(&self, tile: u8) -> usize {
-        if self.signed_tile_mode {
-            (i16::from(tile as i8) + 256) as usize
-        } else {
-            tile as usize
-        }
-    }
-
+impl Addressable for Ppu {
     /// Reads a byte of graphics memory.
     ///
     /// # Panics
     ///
     /// Panics if reading memory that is not managed by the PPU.
-    pub fn read_byte(&self, address: u16) -> u8 {
+    fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000...0x97FF => {
                 let index = address - 0x8000;
@@ -385,7 +385,7 @@ impl Ppu {
                 self.mem.oam[index as usize]
             }
 
-            _ => panic!("read out-of-range address in PPU"),
+            _ => panic!("read out-of-range address in PPU: {:#0x}", address),
         }
     }
 
@@ -394,7 +394,7 @@ impl Ppu {
     /// # Panics
     ///
     /// Panics if writing memory that is not managed by the PPU.
-    pub fn write_byte(&mut self, address: u16, byte: u8) {
+    fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000...0x97FF => {
                 let index = address - 0x8000;
@@ -432,6 +432,10 @@ impl fmt::Debug for Memory {
 
 #[cfg(test)]
 mod tests {
+    use byteorder::{ByteOrder, LittleEndian};
+
+    use memory::Addressable;
+
     use super::Ppu;
     use super::Shade;
 
@@ -461,48 +465,22 @@ mod tests {
     fn shade() {
         let mut ppu = Ppu::new();
 
-        // Note that bytes are read backwards
-        ppu.mem.chram[0] = 0xF0;
-        ppu.mem.chram[1] = 0x33;
+        let tile_row = LittleEndian::read_u16(&[0x4E, 0x8B]);
 
         ppu.bg_palette = [
-            Shade::from(0),
-            Shade::from(1),
-            Shade::from(2),
-            Shade::from(3),
+            Shade::White,
+            Shade::LightGray,
+            Shade::DarkGray,
+            Shade::Black,
         ];
 
-        assert_eq!(*ppu.shade(0, 0, 0), Shade::from(2));
-        assert_eq!(*ppu.shade(0, 1, 0), Shade::from(2));
-        assert_eq!(*ppu.shade(0, 2, 0), Shade::from(0));
-        assert_eq!(*ppu.shade(0, 3, 0), Shade::from(0));
-        assert_eq!(*ppu.shade(0, 4, 0), Shade::from(3));
-        assert_eq!(*ppu.shade(0, 5, 0), Shade::from(3));
-        assert_eq!(*ppu.shade(0, 6, 0), Shade::from(1));
-        assert_eq!(*ppu.shade(0, 7, 0), Shade::from(1));
-
-        // TODO: test indexing
-    }
-
-    #[test]
-    fn tile_index_test() {
-        let mut ppu = Ppu::new();
-
-        let mut j = -128;
-        let mut i_u8;
-        let mut j_u8;
-
-        for i in 0..256 {
-            // Annoying hack because rust doesn't support inclusive ranges yet
-            i_u8 = i as u8;
-            j_u8 = j as u8;
-
-            ppu.signed_tile_mode = false;
-            assert_eq!(ppu.tile_index(i_u8), i_u8 as usize);
-            ppu.signed_tile_mode = true;
-            assert_eq!(ppu.tile_index(j_u8), i_u8 as usize + 128);
-
-            j += 1;
-        }
+        assert_eq!(ppu.shade(tile_row, 0), Shade::DarkGray);
+        assert_eq!(ppu.shade(tile_row, 1), Shade::LightGray);
+        assert_eq!(ppu.shade(tile_row, 2), Shade::White);
+        assert_eq!(ppu.shade(tile_row, 3), Shade::White);
+        assert_eq!(ppu.shade(tile_row, 4), Shade::Black);
+        assert_eq!(ppu.shade(tile_row, 5), Shade::LightGray);
+        assert_eq!(ppu.shade(tile_row, 6), Shade::Black);
+        assert_eq!(ppu.shade(tile_row, 7), Shade::DarkGray);
     }
 }

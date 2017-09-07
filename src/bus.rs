@@ -182,7 +182,7 @@ impl Bus {
                 control.display_enabled = byte.has_bit_set(7);
                 control.window_map_start = if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
                 control.window_enabled = byte.has_bit_set(5);
-                control.window_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
+                control.tile_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
                 control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
                 control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
                 control.sprites_enabled = byte.has_bit_set(1);
@@ -205,7 +205,7 @@ impl Bus {
 
             // BGP - BG Palette Data
             0xFF47 => {
-                let mut palette = &mut ppu.bg_palette;
+                let palette = &mut ppu.bg_palette;
 
                 for i in 0..4 {
                     let shade = (byte >> (i * 2)) & 0x3;
