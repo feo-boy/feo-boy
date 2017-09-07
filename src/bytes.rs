@@ -1,6 +1,6 @@
 //! Additional functionality for working with bytes.
 
-/// Extension trait for bit manipulation.
+/// Extension trait providing additional methods for `u8`.
 pub trait ByteExt {
     /// Returns whether the byte has its nth bit set.
     fn has_bit_set(&self, n: u8) -> bool;
@@ -31,9 +31,28 @@ impl ByteExt for u8 {
     }
 }
 
+/// Extension trait providing additional methods for `u16`.
+pub trait WordExt {
+    /// Returns the low byte (bits 0-7) of the word.
+    fn lo(&self) -> u8;
+
+    /// Returns the high byte (bits 8-15) of the word.
+    fn hi(&self) -> u8;
+}
+
+impl WordExt for u16 {
+    fn lo(&self) -> u8 {
+        *self as u8
+    }
+
+    fn hi(&self) -> u8 {
+        ((self >> 8) & 0xff_u16) as u8
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ByteExt;
+    use super::{ByteExt, WordExt};
 
     #[test]
     fn has_bit_set() {
@@ -65,5 +84,13 @@ mod tests {
     fn set_bit_out_of_range() {
         let mut byte = 0xFF;
         byte.set_bit(8, true);
+    }
+
+    #[test]
+    fn high_and_low() {
+        assert_eq!(0xabcd.lo(), 0xcd);
+        assert_eq!(0xabcd.hi(), 0xab);
+        assert_eq!(0xff00.lo(), 0x00);
+        assert_eq!(0xff00.hi(), 0xff);
     }
 }
