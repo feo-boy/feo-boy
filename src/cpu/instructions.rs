@@ -1062,11 +1062,8 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
-                error!(
-                    "unimplemented prefix instruction {:#0x} at {:#0x}",
-                    bus.read_byte(self.reg.pc + 1),
-                    self.reg.pc + 1
-                );
+                let instr = bus.read_byte(self.reg.pc + 1);
+                self.execute_prefix(instr, bus);
                 self.reg.pc += 1;
             }
 
@@ -1352,6 +1349,44 @@ impl super::Cpu {
         self.clock.m += cycles / 4;
 
         cycles
+    }
+
+    pub fn execute_prefix<B: Addressable>(&mut self, instruction: u8, bus: &mut B) -> u32 {
+        match instruction {
+            0x00 => (),
+
+            0x17 => {
+                self.reg.f.set(ZERO, self.reg.a == 0);
+                self.reg.a = self.reg.a.rotate_left(1);
+            }
+
+            // SET x,B
+            0xe0 => self.reg.b = self.reg.b | (1 << 4),
+
+            // BIT b,r
+            0x47 => {
+                self.reg.f.set(ZERO, self.reg.a & (1 << 0) == 0);
+                self.reg.f.set(SUBTRACT, false);
+                self.reg.f.set(HALF_CARRY, true);
+            }
+
+            // SLA
+            0x20 => {
+                self.reg.f.set(CARRY, self.reg.b >> 7 & 1 != 0);
+                self.reg.b = self.reg.b << 1;
+                self.reg.f.set(ZERO, self.reg.b == 0);
+            }
+
+            // error
+            catch => {
+                error!(
+                    "unimplemented prefix instruction {:#0x} at {:#0x}",
+                    catch,
+                    self.reg.pc + 1
+                )
+            }
+        }
+        8
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
