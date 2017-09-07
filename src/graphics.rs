@@ -8,6 +8,9 @@ use image::Rgba;
 
 use bytes::ByteExt;
 
+/// The width and height of the Game Boy screen.
+pub const SCREEN_DIMENSIONS: (u32, u32) = (160, 144);
+
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Shade {

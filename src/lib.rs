@@ -45,6 +45,8 @@ use errors::*;
 use graphics::Ppu;
 use memory::Mmu;
 
+pub use graphics::SCREEN_DIMENSIONS;
+
 const CYCLES_PER_FRAME: u32 = 70224;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.

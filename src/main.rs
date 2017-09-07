@@ -16,7 +16,7 @@ use clap::{App, AppSettings, Arg};
 use image::RgbaImage;
 use piston_window::*;
 
-use feo_boy::Emulator;
+use feo_boy::{Emulator, SCREEN_DIMENSIONS};
 use feo_boy::errors::*;
 
 #[derive(Debug, Clone)]
@@ -46,7 +46,8 @@ fn start_emulator(config: Config) -> Result<()> {
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
     window.set_ups(60);
 
-    let mut buffer = RgbaImage::new(100, 100);
+    let (width, height) = SCREEN_DIMENSIONS;
+    let mut buffer = RgbaImage::new(width, height);
     let mut texture = Texture::from_image(&mut window.factory, &buffer, &TextureSettings::new())
         .unwrap();
 
