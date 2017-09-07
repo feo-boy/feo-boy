@@ -4,6 +4,8 @@
 
 use std::fmt;
 
+use image::Rgba;
+
 use bytes::ByteExt;
 
 /// The colors that can be displayed by the DMG.
@@ -15,7 +17,26 @@ pub enum Shade {
     Black,
 
     /// A shade that is only used by sprites.
+    // FIXME: Should this be represented by `None`?
     Transparent,
+}
+
+impl Shade {
+    /// Returns a pixel that represents the color of a `Shade`.
+    fn to_rgba(&self) -> Rgba<u8> {
+        use self::Shade::*;
+
+        // This uses the GameBoy Pocket palette.
+        // TODO: Support more palettes.
+        match *self {
+            White => Rgba([0xFF, 0xFF, 0xFF, 0xFF]),
+            LightGray => Rgba([0xA9, 0xA9, 0xA9, 0xFF]),
+            DarkGray => Rgba([0x54, 0x54, 0x54, 0xFF]),
+            Black => Rgba([0x00, 0x00, 0x00, 0xFF]),
+
+            Transparent => panic!("transparent pixels cannot be displayed"),
+        }
+    }
 }
 
 impl Default for Shade {

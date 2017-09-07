@@ -36,7 +36,7 @@ use std::io::prelude::*;
 use std::io;
 use std::path::Path;
 
-use image::{Rgba, RgbaImage};
+use image::RgbaImage;
 use piston_window::*;
 
 use bus::Bus;
