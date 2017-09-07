@@ -1062,7 +1062,11 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
-                error!("unimplemented prefix instruction");
+                error!(
+                    "unimplemented prefix instruction {:#0x} at {:#0x}",
+                    bus.read_byte(self.reg.pc + 1),
+                    self.reg.pc + 1
+                );
                 self.reg.pc += 1;
             }
 
@@ -1679,40 +1683,52 @@ mod tests {
     #[test]
     fn instruction_macro() {
         let nop = instruction!(0x00, "NOP", 4);
-        assert_eq!(nop, InstructionDef {
-            byte: 0x00,
-            description: "NOP",
-            num_operands: 0,
-            cycles: 4,
-            condition_cycles: None,
-        });
+        assert_eq!(
+            nop,
+            InstructionDef {
+                byte: 0x00,
+                description: "NOP",
+                num_operands: 0,
+                cycles: 4,
+                condition_cycles: None,
+            }
+        );
 
         let ld = instruction!(0x3e, "LD A,d8", 8);
-        assert_eq!(ld, InstructionDef {
-            byte: 0x3e,
-            description: "LD A,d8",
-            num_operands: 1,
-            cycles: 8,
-            condition_cycles: None,
-        });
+        assert_eq!(
+            ld,
+            InstructionDef {
+                byte: 0x3e,
+                description: "LD A,d8",
+                num_operands: 1,
+                cycles: 8,
+                condition_cycles: None,
+            }
+        );
 
         let jp = instruction!(0xc3, "JP a16", 16);
-        assert_eq!(jp, InstructionDef {
-            byte: 0xc3,
-            description: "JP a16",
-            num_operands: 2,
-            cycles: 16,
-            condition_cycles: None,
-        });
+        assert_eq!(
+            jp,
+            InstructionDef {
+                byte: 0xc3,
+                description: "JP a16",
+                num_operands: 2,
+                cycles: 16,
+                condition_cycles: None,
+            }
+        );
 
         let conditional_jp = instruction!(0xc8, "RET Z", 8 => 20);
-        assert_eq!(conditional_jp, InstructionDef {
-            byte: 0xc8,
-            description: "RET Z",
-            num_operands: 0,
-            cycles: 8,
-            condition_cycles: Some(20),
-        });
+        assert_eq!(
+            conditional_jp,
+            InstructionDef {
+                byte: 0xc8,
+                description: "RET Z",
+                num_operands: 0,
+                cycles: 8,
+                condition_cycles: Some(20),
+            }
+        );
     }
 
     #[test]
