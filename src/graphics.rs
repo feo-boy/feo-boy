@@ -299,8 +299,6 @@ impl Ppu {
     pub fn render_tiles(&mut self) {
         const TILE_HEIGHT: u16 = 8;
         const TILE_MAP_HEIGHT: u16 = 32;
-        const SIGNED_TILE_OFFSET: i16 = 128;
-        const TILE_DATA_ROW_SIZE: u16 = 16;
 
         // Calculate the absolute y-position of the pixel in the background map.
         let y_position: u16 = (self.bg_scroll.y + self.line).into();
@@ -319,15 +317,8 @@ impl Ppu {
             let tile_id_address = self.control.bg_map_start + &tile_row_offset.into() +
                 &tile_offset.into();
 
-            // Depending on which tile map we're using, the numbers can be signed or unsigned.
-            let tile_address = if self.control.tile_data_start == SIGNED_TILE_DATA_START {
-                let tile_id: i16 = (self.read_byte(tile_id_address) as i8).into();
-                self.control.tile_data_start +
-                    (tile_id + SIGNED_TILE_OFFSET) as u16 * TILE_DATA_ROW_SIZE
-            } else {
-                let tile_id: i16 = self.read_byte(tile_id_address).into();
-                self.control.tile_data_start + tile_id as u16 * TILE_DATA_ROW_SIZE
-            };
+            let tile_id = self.read_byte(tile_id_address);
+            let tile_address = self.tile_data_address(tile_id);
 
             // Find the correct vertical position within the tile. Multiply by two because each
             // row of the tile takes two bytes.
@@ -342,8 +333,25 @@ impl Ppu {
         }
     }
 
+    /// Given a tile identifier, returns the starting address of the tile.
+    ///
+    /// The tile identifier may be interpreted as signed or unsigned depending on the tile map
+    /// being used.
+    fn tile_data_address(&self, tile_id: u8) -> u16 {
+        const SIGNED_TILE_OFFSET: i16 = 128;
+        const TILE_DATA_ROW_SIZE: u16 = 16;
+
+        // Depending on which tile map we're using, the numbers can be signed or unsigned.
+        if self.control.tile_data_start == SIGNED_TILE_DATA_START {
+            self.control.tile_data_start +
+                (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16 * TILE_DATA_ROW_SIZE
+        } else {
+            self.control.tile_data_start + &tile_id.into() * TILE_DATA_ROW_SIZE
+        }
+    }
+
     /// Gets the shade for rendering a particular pixel of the screen.
-    pub fn shade(&self, tile_row: u16, tile_x: u8) -> Shade {
+    fn shade(&self, tile_row: u16, tile_x: u8) -> Shade {
         // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
         // pixel. The first byte contains the lower order bit of the color number, while the second
         // byte contains the higher order bit.
@@ -432,11 +440,14 @@ impl fmt::Debug for Memory {
 
 #[cfg(test)]
 mod tests {
+    use std::u8;
+
     use byteorder::{ByteOrder, LittleEndian};
 
     use memory::Addressable;
 
     use super::Ppu;
+    use super::SIGNED_TILE_DATA_START;
     use super::Shade;
 
     #[test]
@@ -482,5 +493,20 @@ mod tests {
         assert_eq!(ppu.shade(tile_row, 5), Shade::LightGray);
         assert_eq!(ppu.shade(tile_row, 6), Shade::Black);
         assert_eq!(ppu.shade(tile_row, 7), Shade::DarkGray);
+    }
+
+    #[test]
+    fn tile_data_address() {
+        let mut ppu = Ppu::new();
+        ppu.control.tile_data_start = 0x8000;
+        assert_eq!(ppu.tile_data_address(0), 0x8000);
+        assert_eq!(ppu.tile_data_address(37), 0x8250);
+        assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
+
+        let mut ppu = Ppu::new();
+        ppu.control.tile_data_start = SIGNED_TILE_DATA_START;
+        assert_eq!(ppu.tile_data_address(0), 0x9000);
+        assert_eq!(ppu.tile_data_address(37), 0x9250);
+        assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
     }
 }
