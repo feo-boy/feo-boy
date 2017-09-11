@@ -12,7 +12,7 @@ use memory::Addressable;
 
 lazy_static! {
     /// Matches instruction descriptions that take operands.
-    static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8").unwrap();
+    static ref DATA_RE: Regex = Regex::new("d8|d16|a8|a16|r8|PREFIX CB").unwrap();
 }
 
 /// A definition of a single instruction.
@@ -68,6 +68,10 @@ impl Display for Instruction {
             let replacement = match mat.as_str() {
                 "d8" | "a8" | "r8" => format!("${:#04x}", &self.operands[0]),
                 "d16" | "a16" => format!("${:#06x}", LittleEndian::read_u16(&self.operands)),
+                "PREFIX CB" => {
+                    // TODO: Display the actual prefix instruction
+                    format!("PREFIX CB: {:#04x}", &self.operands[0])
+                },
                 ty => unreachable!("unhandled data type: {}", ty),
             };
 
@@ -104,7 +108,7 @@ macro_rules! instruction {
 
             let num_operands = DATA_RE.find($description).map(|mat| {
                 match mat.as_str() {
-                    "d8" | "a8" | "r8" => 1,
+                    "d8" | "a8" | "r8" | "PREFIX CB" => 1,
                     "d16" | "a16" => 2,
                     ty => unreachable!("unhandled data type: {}", ty),
                 }
@@ -1062,9 +1066,7 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
-                let instr = bus.read_byte(self.reg.pc + 1);
-                self.execute_prefix(instr, bus);
-                self.reg.pc += 1;
+                self.execute_prefix(instruction.operands[0], bus);
             }
 
             // UNUSED
@@ -1762,6 +1764,18 @@ mod tests {
                 num_operands: 0,
                 cycles: 8,
                 condition_cycles: Some(20),
+            }
+        );
+
+        let prefix_instruction = instruction!(0xcb, "PREFIX CB", 0);
+        assert_eq!(
+            prefix_instruction,
+            InstructionDef {
+                byte: 0xcb,
+                description: "PREFIX CB",
+                num_operands: 1,
+                cycles: 0,
+                condition_cycles: None,
             }
         );
     }
