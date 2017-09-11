@@ -7,6 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
+use bytes::ByteExt;
 use cpu::{self, State, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
 use memory::Addressable;
 
@@ -1066,7 +1067,7 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
-                self.execute_prefix(instruction.operands[0], bus);
+                self.execute_prefix(instruction.operands[0]);
             }
 
             // UNUSED
@@ -1353,9 +1354,21 @@ impl super::Cpu {
         cycles
     }
 
-    pub fn execute_prefix<B: Addressable>(&mut self, instruction: u8, bus: &mut B) -> u32 {
+    pub fn execute_prefix(&mut self, instruction: u8) -> u32 {
         match instruction {
             0x00 => (),
+
+            // RL C
+            0x11 => {
+                // FIXME: Share code with cpu::Registers
+                let old_carry = self.reg.f.contains(CARRY);
+                let new_carry = self.reg.c.has_bit_set(7);
+
+                self.reg.f = Flags::empty();
+                self.reg.c <<= 1;
+                self.reg.c.set_bit(0, old_carry);
+                self.reg.f.set(CARRY, new_carry);
+            }
 
             0x17 => {
                 self.reg.f.set(ZERO, self.reg.a == 0);
@@ -1377,6 +1390,13 @@ impl super::Cpu {
                 self.reg.f.set(CARRY, self.reg.b >> 7 & 1 != 0);
                 self.reg.b = self.reg.b << 1;
                 self.reg.f.set(ZERO, self.reg.b == 0);
+            }
+
+            // BIT 7,H
+            0x7c => {
+                self.reg.f.set(ZERO, !self.reg.h.has_bit_set(7));
+                self.reg.f.remove(SUBTRACT);
+                self.reg.f.insert(HALF_CARRY);
             }
 
             // error
