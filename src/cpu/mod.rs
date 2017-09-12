@@ -11,7 +11,7 @@ use std::fmt;
 use memory::{Addressable, Mmu};
 
 pub use self::instructions::Instruction;
-pub use self::registers::{Registers, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+pub use self::registers::{Registers, Flags};
 
 /// Current state of the CPU.
 #[derive(Debug)]

@@ -8,7 +8,7 @@ use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
 use bytes::ByteExt;
-use cpu::{self, State, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+use cpu::{self, State, Flags};
 use memory::Addressable;
 
 lazy_static! {
@@ -190,7 +190,7 @@ impl super::Cpu {
 
             // JR NZ,r8
             0x20 => {
-                if !self.reg.f.contains(ZERO) {
+                if !self.reg.f.contains(Flags::ZERO) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
                 }
@@ -198,7 +198,7 @@ impl super::Cpu {
 
             // JR NC,r8
             0x30 => {
-                if !self.reg.f.contains(CARRY) {
+                if !self.reg.f.contains(Flags::CARRY) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
                 }
@@ -242,7 +242,7 @@ impl super::Cpu {
 
             // RET NZ
             0xc0 => {
-                if !self.reg.f.contains(ZERO) {
+                if !self.reg.f.contains(Flags::ZERO) {
                     self.ret(bus);
                     condition_taken = true;
                 }
@@ -250,7 +250,7 @@ impl super::Cpu {
 
             // RET NC
             0xd0 => {
-                if !self.reg.f.contains(CARRY) {
+                if !self.reg.f.contains(Flags::CARRY) {
                     self.ret(bus);
                     condition_taken = true;
                 }
@@ -408,7 +408,7 @@ impl super::Cpu {
 
             // JP NZ,a16
             0xc2 => {
-                if !self.reg.f.contains(ZERO) {
+                if !self.reg.f.contains(Flags::ZERO) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
                     condition_taken = true;
                 }
@@ -416,7 +416,7 @@ impl super::Cpu {
 
             // JP NC,a16
             0xd2 => {
-                if !self.reg.f.contains(CARRY) {
+                if !self.reg.f.contains(Flags::CARRY) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
                     condition_taken = true;
                 }
@@ -550,7 +550,7 @@ impl super::Cpu {
 
             // CALL NZ,a16
             0xc4 => {
-                if !self.reg.f.contains(ZERO) {
+                if !self.reg.f.contains(Flags::ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
                     condition_taken = true;
@@ -559,7 +559,7 @@ impl super::Cpu {
 
             // CALL NC,a16
             0xd4 => {
-                if !self.reg.f.contains(CARRY) {
+                if !self.reg.f.contains(Flags::CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
                     condition_taken = true;
@@ -719,9 +719,8 @@ impl super::Cpu {
 
             // SCF
             0x37 => {
-                self.reg.f.remove(SUBTRACT);
-                self.reg.f.remove(HALF_CARRY);
-                self.reg.f.insert(CARRY);
+                self.reg.f.remove(Flags::SUBTRACT | Flags::HALF_CARRY);
+                self.reg.f.insert(Flags::CARRY);
             }
 
             // LD B,A
@@ -783,7 +782,7 @@ impl super::Cpu {
 
             // JR Z,r8
             0x28 => {
-                if self.reg.f.contains(ZERO) {
+                if self.reg.f.contains(Flags::ZERO) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
                 }
@@ -791,7 +790,7 @@ impl super::Cpu {
 
             // JR C,r8
             0x38 => {
-                if self.reg.f.contains(CARRY) {
+                if self.reg.f.contains(Flags::CARRY) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
                 }
@@ -835,7 +834,7 @@ impl super::Cpu {
 
             // RET Z
             0xc8 => {
-                if self.reg.f.contains(ZERO) {
+                if self.reg.f.contains(Flags::ZERO) {
                     self.ret(bus);
                     condition_taken = true;
                 }
@@ -843,7 +842,7 @@ impl super::Cpu {
 
             // RET C
             0xd8 => {
-                if self.reg.f.contains(CARRY) {
+                if self.reg.f.contains(Flags::CARRY) {
                     self.ret(bus);
                     condition_taken = true;
                 }
@@ -989,7 +988,7 @@ impl super::Cpu {
 
             // JP Z,a16
             0xca => {
-                if self.reg.f.contains(ZERO) {
+                if self.reg.f.contains(Flags::ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
                     condition_taken = true;
@@ -998,7 +997,7 @@ impl super::Cpu {
 
             // JP C,a16
             0xda => {
-                if self.reg.f.contains(CARRY) {
+                if self.reg.f.contains(Flags::CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
                     condition_taken = true;
@@ -1129,7 +1128,7 @@ impl super::Cpu {
 
             // CALL Z,a16
             0xcc => {
-                if self.reg.f.contains(ZERO) {
+                if self.reg.f.contains(Flags::ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
                     condition_taken = true;
@@ -1138,7 +1137,7 @@ impl super::Cpu {
 
             // CALL C,a16
             0xdc => {
-                if self.reg.f.contains(CARRY) {
+                if self.reg.f.contains(Flags::CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.call(address, bus);
                     condition_taken = true;
@@ -1361,17 +1360,17 @@ impl super::Cpu {
             // RL C
             0x11 => {
                 // FIXME: Share code with cpu::Registers
-                let old_carry = self.reg.f.contains(CARRY);
+                let old_carry = self.reg.f.contains(Flags::CARRY);
                 let new_carry = self.reg.c.has_bit_set(7);
 
                 self.reg.f = Flags::empty();
                 self.reg.c <<= 1;
                 self.reg.c.set_bit(0, old_carry);
-                self.reg.f.set(CARRY, new_carry);
+                self.reg.f.set(Flags::CARRY, new_carry);
             }
 
             0x17 => {
-                self.reg.f.set(ZERO, self.reg.a == 0);
+                self.reg.f.set(Flags::ZERO, self.reg.a == 0);
                 self.reg.a = self.reg.a.rotate_left(1);
             }
 
@@ -1380,23 +1379,23 @@ impl super::Cpu {
 
             // BIT b,r
             0x47 => {
-                self.reg.f.set(ZERO, self.reg.a & (1 << 0) == 0);
-                self.reg.f.set(SUBTRACT, false);
-                self.reg.f.set(HALF_CARRY, true);
+                self.reg.f.set(Flags::ZERO, self.reg.a & (1 << 0) == 0);
+                self.reg.f.set(Flags::SUBTRACT, false);
+                self.reg.f.set(Flags::HALF_CARRY, true);
             }
 
             // SLA
             0x20 => {
-                self.reg.f.set(CARRY, self.reg.b >> 7 & 1 != 0);
+                self.reg.f.set(Flags::CARRY, self.reg.b >> 7 & 1 != 0);
                 self.reg.b = self.reg.b << 1;
-                self.reg.f.set(ZERO, self.reg.b == 0);
+                self.reg.f.set(Flags::ZERO, self.reg.b == 0);
             }
 
             // BIT 7,H
             0x7c => {
-                self.reg.f.set(ZERO, !self.reg.h.has_bit_set(7));
-                self.reg.f.remove(SUBTRACT);
-                self.reg.f.insert(HALF_CARRY);
+                self.reg.f.set(Flags::ZERO, !self.reg.h.has_bit_set(7));
+                self.reg.f.remove(Flags::SUBTRACT);
+                self.reg.f.insert(Flags::HALF_CARRY);
             }
 
             // error
@@ -1424,22 +1423,22 @@ impl super::Cpu {
 
     /// Increments a byte by 1 and sets the flags appropriately.
     fn inc(byte: &mut u8, flags: &mut Flags) {
-        flags.set(HALF_CARRY, cpu::is_half_carry_add(*byte, 1));
+        flags.set(Flags::HALF_CARRY, cpu::is_half_carry_add(*byte, 1));
 
         *byte = byte.wrapping_add(1);
 
-        flags.set(ZERO, *byte == 0);
-        flags.remove(SUBTRACT);
+        flags.set(Flags::ZERO, *byte == 0);
+        flags.remove(Flags::SUBTRACT);
     }
 
     /// Decrements a byte by 1 and sets the flags appropriately.
     fn dec(byte: &mut u8, flags: &mut Flags) {
-        flags.set(HALF_CARRY, cpu::is_half_carry_sub(*byte, 1));
+        flags.set(Flags::HALF_CARRY, cpu::is_half_carry_sub(*byte, 1));
 
         *byte = byte.wrapping_sub(1);
 
-        flags.set(ZERO, *byte == 0);
-        flags.insert(SUBTRACT);
+        flags.set(Flags::ZERO, *byte == 0);
+        flags.insert(Flags::SUBTRACT);
     }
 
     /// Performs a CALL operation. Does not modify any flags.
@@ -1732,7 +1731,7 @@ lazy_static! {
 mod tests {
     use smallvec::SmallVec;
 
-    use cpu::{Cpu, Flags, ZERO, SUBTRACT, HALF_CARRY, CARRY};
+    use cpu::{Cpu, Flags};
     use memory::Addressable;
 
     use super::{INSTRUCTIONS, Instruction, InstructionDef};
@@ -1889,7 +1888,7 @@ mod tests {
         assert_eq!(cpu.clock.t, 24);
 
         // Do not jump
-        cpu.reg.f.insert(ZERO);
+        cpu.reg.f.insert(Flags::ZERO);
         let instruction = Instruction {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
@@ -2034,12 +2033,11 @@ mod tests {
         };
         cpu.execute(instruction_1, &mut bus);
 
-        assert_eq!(cpu.reg.f, CARRY);
+        assert_eq!(cpu.reg.f, Flags::CARRY);
 
-        cpu.reg.f.insert(ZERO);
-        cpu.reg.f.insert(SUBTRACT);
-        cpu.reg.f.insert(HALF_CARRY);
-        cpu.reg.f.insert(CARRY);
+        cpu.reg.f.insert(
+            Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY,
+        );
 
         let instruction_2 = Instruction {
             def: &INSTRUCTIONS[0x37],
@@ -2047,7 +2045,7 @@ mod tests {
         };
         cpu.execute(instruction_2, &mut bus);
 
-        assert_eq!(cpu.reg.f, ZERO | CARRY);
+        assert_eq!(cpu.reg.f, Flags::ZERO | Flags::CARRY);
     }
 
     #[test]

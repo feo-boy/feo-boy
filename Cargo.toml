@@ -13,7 +13,7 @@ doc = false
 path = "src/main.rs"
 
 [dependencies]
-bitflags = "0.9"
+bitflags = "1"
 byteorder = "1"
 clap = "2"
 error-chain = "0.11"
