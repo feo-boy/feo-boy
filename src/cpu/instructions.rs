@@ -72,7 +72,7 @@ impl Display for Instruction {
                 "PREFIX CB" => {
                     // TODO: Display the actual prefix instruction
                     format!("PREFIX CB: {:#04x}", &self.operands[0])
-                },
+                }
                 ty => unreachable!("unhandled data type: {}", ty),
             };
 
@@ -1401,7 +1401,7 @@ impl super::Cpu {
 
             // error
             catch => {
-                error!(
+                panic!(
                     "unimplemented prefix instruction {:#0x} at {:#0x}",
                     catch,
                     self.reg.pc + 1
