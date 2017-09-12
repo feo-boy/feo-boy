@@ -37,7 +37,6 @@ use std::io;
 use std::path::Path;
 
 use image::RgbaImage;
-use piston_window::*;
 
 use bus::Bus;
 use cpu::{Cpu, Instruction};
@@ -50,13 +49,16 @@ pub use graphics::SCREEN_DIMENSIONS;
 const CYCLES_PER_FRAME: u32 = 70224;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Emulator {
     /// The CPU.
     pub cpu: Cpu,
 
     /// Other components of the emulator.
     pub bus: Bus,
+
+    /// An image buffer to be drawn to the screen.
+    pub screen_buffer: RgbaImage,
 
     debug: Option<Debugger>,
 }
@@ -71,9 +73,12 @@ impl Emulator {
             ..Default::default()
         };
 
+        let (width, height) = SCREEN_DIMENSIONS;
+
         Emulator {
             cpu,
             bus,
+            screen_buffer: RgbaImage::new(width, height),
             debug: None,
         }
     }
@@ -126,7 +131,7 @@ impl Emulator {
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
         let cycles = self.cpu.step(&mut self.bus);
-        self.bus.ppu.step(cycles);
+        self.bus.ppu.step(cycles, &mut self.screen_buffer);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;
@@ -139,7 +144,7 @@ impl Emulator {
     /// Step the emulation state for 1/60 of a second.
     ///
     /// If the debugger is enabled, debug commands will be read from stdin.
-    pub fn update(&mut self, _: &UpdateArgs) -> Result<()> {
+    pub fn update(&mut self) -> Result<()> {
         let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
         while self.cpu.clock.t < frame_clock {
             if self.is_paused() {
@@ -155,15 +160,6 @@ impl Emulator {
         }
 
         Ok(())
-    }
-
-    /// Render a frame of emulation.
-    pub fn render(&self, buffer: &mut RgbaImage) {
-        for y in 0..SCREEN_DIMENSIONS.1 {
-            for x in 0..SCREEN_DIMENSIONS.0 {
-                buffer.put_pixel(x, y, self.bus.ppu.pixels.0[y as usize][x as usize].to_rgba());
-            }
-        }
     }
 
     /// Resume execution after pausing.
@@ -196,6 +192,12 @@ impl Emulator {
     /// address.
     pub fn current_instruction(&self) -> (u16, Instruction) {
         (self.cpu.reg.pc, self.cpu.fetch(&self.bus))
+    }
+}
+
+impl Default for Emulator {
+    fn default() -> Self {
+        Emulator::new()
     }
 }
 

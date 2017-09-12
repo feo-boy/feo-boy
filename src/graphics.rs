@@ -5,7 +5,7 @@
 use std::fmt::{self, Debug, Formatter};
 
 use byteorder::{ByteOrder, LittleEndian};
-use image::Rgba;
+use image::{Rgba, RgbaImage};
 
 use bytes::ByteExt;
 use memory::Addressable;
@@ -215,7 +215,7 @@ impl Ppu {
     }
 
     /// Performs one clock step of the PPU.
-    pub fn step(&mut self, cycles: u32) {
+    pub fn step(&mut self, cycles: u32, buffer: &mut RgbaImage) {
         // TODO: Set LCD status interrupt request here
 
         self.modeclock += cycles;
@@ -228,7 +228,9 @@ impl Ppu {
                     self.line += 1;
 
                     if self.line == 143 {
-                        // FIXME: show the image data on the screen here
+                        for (x, y, pixel) in buffer.enumerate_pixels_mut() {
+                            *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
+                        }
 
                         // Enter vertical blank mode
                         self.mode = 1;

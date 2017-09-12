@@ -13,10 +13,9 @@ extern crate pretty_env_logger;
 use std::path::PathBuf;
 
 use clap::{App, AppSettings, Arg};
-use image::RgbaImage;
 use piston_window::*;
 
-use feo_boy::{Emulator, SCREEN_DIMENSIONS};
+use feo_boy::Emulator;
 use feo_boy::errors::*;
 
 #[derive(Debug, Clone)]
@@ -46,20 +45,21 @@ fn start_emulator(config: Config) -> Result<()> {
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
     window.set_ups(60);
 
-    let (width, height) = SCREEN_DIMENSIONS;
-    let mut buffer = RgbaImage::new(width, height);
-    let mut texture = Texture::from_image(&mut window.factory, &buffer, &TextureSettings::new())
-        .unwrap();
+    let mut texture = Texture::from_image(
+        &mut window.factory,
+        &emulator.screen_buffer,
+        &TextureSettings::new(),
+    ).unwrap();
 
     while let Some(event) = window.next() {
-        if let Some(update_args) = event.update_args() {
-            emulator.update(&update_args)?;
+        if event.update_args().is_some() {
+            emulator.update()?;
         }
 
         if event.render_args().is_some() {
-            emulator.render(&mut buffer);
-            texture.update(&mut window.encoder, &buffer).unwrap();
-
+            texture
+                .update(&mut window.encoder, &mut emulator.screen_buffer)
+                .unwrap();
             window.draw_2d(&event, |context, graphics| {
                 image(&texture, context.transform, graphics);
             });
