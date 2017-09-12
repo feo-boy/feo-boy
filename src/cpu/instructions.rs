@@ -1825,16 +1825,24 @@ mod tests {
     }
 
     #[test]
-    fn fetch_nop() {
+    fn fetch() {
         let mut bus = [0u8; 0x10000];
         let cpu = Cpu::new();
 
         bus.write_byte(0x00, 0x00);
         let nop = cpu.fetch(&bus);
-
         assert_eq!(nop.def.byte, 0x00);
         assert_eq!(nop.def.num_operands, 0);
         assert_eq!(nop.operands.len(), 0);
+
+        let mut bus = [0u8; 0x10000];
+        let cpu = Cpu::new();
+        bus.write_byte(0x0000, 0xcb);
+        bus.write_byte(0x0001, 0x7c);
+        let prefix_instruction = cpu.fetch(&bus);
+        assert_eq!(prefix_instruction.def.byte, 0xcb);
+        assert_eq!(prefix_instruction.def.num_operands, 1);
+        assert_eq!(prefix_instruction.operands.into_vec().as_slice(), &[0x7c]);
     }
 
     #[test]
