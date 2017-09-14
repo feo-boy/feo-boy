@@ -136,36 +136,31 @@ impl Cpu {
             return;
         }
 
-        if bus.interrupts.vblank.enabled && bus.interrupts.vblank.requested {
-            bus.interrupts.enabled = false;
-            bus.interrupts.vblank.requested = false;
-            self.rst(0x0040, bus);
-            self.clock.m += 3;
-            self.clock.t += 12;
-        } else if bus.interrupts.lcd_status.enabled && bus.interrupts.lcd_status.requested {
-            bus.interrupts.enabled = false;
-            bus.interrupts.lcd_status.requested = false;
-            self.rst(0x0048, bus);
-            self.clock.m += 3;
-            self.clock.t += 12;
-        } else if bus.interrupts.timer.enabled && bus.interrupts.timer.requested {
-            bus.interrupts.enabled = false;
-            bus.interrupts.timer.requested = false;
-            self.rst(0x0050, bus);
-            self.clock.m += 3;
-            self.clock.t += 12;
-        } else if bus.interrupts.serial.enabled && bus.interrupts.serial.requested {
-            bus.interrupts.enabled = false;
-            bus.interrupts.serial.requested = false;
-            self.rst(0x0058, bus);
-            self.clock.m += 3;
-            self.clock.t += 12;
-        } else if bus.interrupts.joypad.enabled && bus.interrupts.joypad.requested {
-            bus.interrupts.enabled = false;
-            bus.interrupts.joypad.requested = false;
-            self.rst(0x0060, bus);
-            self.clock.m += 3;
-            self.clock.t += 12;
+        macro_rules! handle_interrupts {
+            ( $bus:expr; $( $interrupt:ident, $vector:expr ; )* ) => {
+                $(
+                    if $bus.interrupts.$interrupt.enabled && $bus.interrupts.$interrupt.requested {
+                        $bus.interrupts.enabled = false;
+                        $bus.interrupts.$interrupt.requested = false;
+                        self.rst($vector, $bus);
+
+                        // FIXME: The timing for interrupts might be more subtle than this.
+                        self.clock.m += 3;
+                        self.clock.t += 12;
+
+                        return;
+                    }
+                )*
+            }
+        }
+
+        handle_interrupts! {
+            bus;
+            vblank, 0x0040;
+            lcd_status, 0x0048;
+            timer, 0x0050;
+            serial, 0x0058;
+            joypad, 0x0060;
         }
     }
 
