@@ -71,6 +71,22 @@ impl Bus {
                 register
             }
 
+            // LCDC - LCD Control
+            0xFF40 => {
+                let control = &ppu.control;
+
+                let mut register = 0u8;
+                register.set_bit(7, control.display_enabled);
+                register.set_bit(6, control.window_map_start == 0x9C00);
+                register.set_bit(5, control.window_enabled);
+                register.set_bit(4, control.tile_data_start == 0x8000);
+                register.set_bit(3, control.bg_map_start == 0x9C00);
+                register.set_bit(2, control.sprite_size == (8, 16));
+                register.set_bit(1, control.sprites_enabled);
+                register.set_bit(0, control.background_enabled);
+                register
+            }
+
             // STAT - LCDC Status
             0xFF41 => {
                 let mut register = 0u8;
@@ -184,7 +200,7 @@ impl Bus {
                 control.window_enabled = byte.has_bit_set(5);
                 control.tile_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
                 control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
-                control.sprite_size = if byte.has_bit_set(2) { (8, 8) } else { (8, 16) };
+                control.sprite_size = if byte.has_bit_set(2) { (8, 16) } else { (8, 8) };
                 control.sprites_enabled = byte.has_bit_set(1);
                 control.background_enabled = byte.has_bit_set(0);
             }
