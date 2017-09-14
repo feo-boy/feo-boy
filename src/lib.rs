@@ -157,7 +157,7 @@ impl Emulator {
 
                 let mut command = String::new();
                 io::stdin().read_line(&mut command)?;
-                tui::parse_command(self, &command)?;
+                tui::parse_command(self, &command.trim())?;
             } else {
                 self.step();
             }

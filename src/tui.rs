@@ -90,3 +90,11 @@ fn parse_breakpoint(command: &str) -> Result<u16> {
     )?;
     Ok(breakpoint)
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_breakpoint() {
+        assert_eq!(super::parse_breakpoint("b 0x174").unwrap(), 0x174);
+    }
+}
