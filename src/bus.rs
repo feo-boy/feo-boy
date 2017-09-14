@@ -322,10 +322,10 @@ mod tests {
     #[test]
     fn read_write() {
         fn prop(address: u16, value: u8) -> TestResult {
-            // Make sure the address is writable. Also, ignore I/O registers for now since they
+            // Make sure the address is writable. Also, ignore certain registers for now since they
             // aren't implemented fully.
             match address {
-                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFF7F | 0xFFFF => {
+                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFF39 | 0xFF41...0xFF7F => {
                     return TestResult::discard();
                 }
                 _ => (),
