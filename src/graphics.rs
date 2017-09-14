@@ -202,6 +202,11 @@ pub struct Ppu {
     /// left.
     pub bg_scroll: Position,
 
+    /// The upper/left position of the window area. The window area is an alternate background
+    /// area which can be displayed above the normal background. Sprites may be displayed above
+    /// or behind the window.
+    pub window: Position,
+
     /// A value that is compared against the current line.
     ///
     /// Used by the LCDC status and LYC I/O registers.
@@ -313,22 +318,36 @@ impl Ppu {
         const TILE_HEIGHT: u16 = 8;
         const TILE_MAP_HEIGHT: u16 = 32;
 
+        // Check if the window is enabled.
+        let using_window = self.control.window_enabled && self.window.y <= self.line;
+
         // Calculate the absolute y-position of the pixel in the background map.
-        let y_position: u16 = (self.bg_scroll.y + self.line).into();
+        let y_position: u16 = if using_window {
+            (self.window.y + self.line).into()
+        } else {
+            (self.bg_scroll.y + self.line).into()
+        };
 
         // Find which row of the 32x32 tile map the tile is in.
         let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
 
         // Draw the line.
         for x in 0..160 {
-            let x_position = x + self.bg_scroll.x;
+            let x_position = if using_window && x >= self.window.x {
+                x - self.window.x
+            } else {
+                x + self.bg_scroll.x
+            };
 
             // Find x-position of the tile in the row of tiles.
             let tile_offset = x_position / 8;
 
             // Get the address of the tile in memory.
-            let tile_id_address = self.control.bg_map_start + &tile_row_offset.into() +
-                &tile_offset.into();
+            let tile_id_address = if using_window {
+                self.control.window_map_start + &tile_row_offset.into() + &tile_offset.into()
+            } else {
+                self.control.bg_map_start + &tile_row_offset.into() + &tile_offset.into()
+            };
 
             let tile_id = self.read_byte(tile_id_address);
             let tile_address = self.tile_data_address(tile_id);
