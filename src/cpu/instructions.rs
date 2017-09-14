@@ -7,6 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
+use bus::Bus;
 use bytes::ByteExt;
 use cpu::{self, State, Flags};
 use memory::Addressable;
@@ -162,7 +163,7 @@ impl super::Cpu {
     /// registers, and CPU clock.
     ///
     /// Returns the number of clock cycles the instruction takes.
-    pub fn execute<B: Addressable>(&mut self, instruction: Instruction, bus: &mut B) -> u32 {
+    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) -> u32 {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -494,7 +495,7 @@ impl super::Cpu {
             // 0xe3
 
             // DI
-            0xF3 => self.interrupts.enabled = false,
+            0xF3 => bus.interrupts.enabled = false,
 
             // INC B
             0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
@@ -923,7 +924,7 @@ impl super::Cpu {
             // RETI
             0xD9 => {
                 self.ret(bus);
-                self.interrupts.enabled = true;
+                bus.interrupts.enabled = true;
             }
 
             // JP (HL)
@@ -1076,7 +1077,7 @@ impl super::Cpu {
             // 0xeb
 
             // EI
-            0xFB => self.interrupts.enabled = true,
+            0xFB => bus.interrupts.enabled = true,
 
             // INC C
             0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
@@ -1415,7 +1416,7 @@ impl super::Cpu {
     ///
     /// The current value of the program counter is assumed to be the address of the next
     /// instruction.
-    fn rst<B: Addressable>(&mut self, addr: u16, bus: &mut B) {
+    pub fn rst<B: Addressable>(&mut self, addr: u16, bus: &mut B) {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = addr;
@@ -1731,6 +1732,7 @@ lazy_static! {
 mod tests {
     use smallvec::SmallVec;
 
+    use bus::Bus;
     use cpu::{Cpu, Flags};
     use memory::Addressable;
 
@@ -1825,19 +1827,19 @@ mod tests {
 
     #[test]
     fn fetch() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = [0; 0x10000];
         let cpu = Cpu::new();
 
-        bus.write_byte(0x00, 0x00);
+        bus[0x00] = 0x00;
         let nop = cpu.fetch(&bus);
         assert_eq!(nop.def.byte, 0x00);
         assert_eq!(nop.def.num_operands, 0);
         assert_eq!(nop.operands.len(), 0);
 
-        let mut bus = [0u8; 0x10000];
+        let mut bus = [0; 0x10000];
         let cpu = Cpu::new();
-        bus.write_byte(0x0000, 0xcb);
-        bus.write_byte(0x0001, 0x7c);
+        bus[0x0000] = 0xcb;
+        bus[0x0001] = 0x7c;
         let prefix_instruction = cpu.fetch(&bus);
         assert_eq!(prefix_instruction.def.byte, 0xcb);
         assert_eq!(prefix_instruction.def.num_operands, 1);
@@ -1846,7 +1848,7 @@ mod tests {
 
     #[test]
     fn rst() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF0;
@@ -1864,7 +1866,7 @@ mod tests {
 
     #[test]
     fn jr_nz() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.pc = 0;
@@ -1915,39 +1917,41 @@ mod tests {
 
     #[test]
     fn ld_addr_c_a() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
-        cpu.reg.c = 0x11;
+        // Write to the SCY (Scroll Y) register.
+        cpu.reg.c = 0x42;
         cpu.reg.a = 0xab;
-
         let instruction = Instruction {
             def: &INSTRUCTIONS[0xe2],
             operands: Default::default(),
         };
         cpu.execute(instruction, &mut bus);
-        assert_eq!(bus.read_byte(0xFF11), 0xab);
+
+        assert_eq!(bus.read_byte(0xFF42), 0xab);
     }
 
     #[test]
-    fn ldh() {
-        let mut bus = [0u8; 0x10000];
+    fn ldh_c() {
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
-        cpu.reg.c = 0x23;
-        bus[0xFF23] = 0xBE;
-
+        // Write to SCX (Scroll X) register.
+        bus.write_byte(0xFF42, 0xBE);
+        cpu.reg.c = 0x42;
         let instruction = Instruction {
             def: &INSTRUCTIONS[0xf2],
             ..Default::default()
         };
         cpu.execute(instruction, &mut bus);
+
         assert_eq!(cpu.reg.a, 0xBE);
     }
 
     #[test]
     fn ld_addr_a16_a() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.a = 0x11;
@@ -1963,7 +1967,7 @@ mod tests {
 
     #[test]
     fn ld_a_addr_a16() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         bus.write_byte(0xc000, 0xaa);
@@ -1979,7 +1983,7 @@ mod tests {
 
     #[test]
     fn load_16() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xFFF8;
@@ -1990,13 +1994,13 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
 
-        assert_eq!(bus[0xC100], 0xF8);
-        assert_eq!(bus[0xC101], 0xFF);
+        assert_eq!(bus.read_byte(0xC100), 0xF8);
+        assert_eq!(bus.read_byte(0xC101), 0xFF);
     }
 
     #[test]
     fn call() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
@@ -2009,7 +2013,7 @@ mod tests {
 
     #[test]
     fn ret() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0xffff;
@@ -2022,7 +2026,7 @@ mod tests {
 
     #[test]
     fn scf() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.f = Flags::empty();
@@ -2050,7 +2054,7 @@ mod tests {
 
     #[test]
     fn jp_hl() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.pc = 0;
@@ -2067,7 +2071,7 @@ mod tests {
 
     #[test]
     fn ld_sp_hl() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
         cpu.reg.sp = 0;

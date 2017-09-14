@@ -133,9 +133,10 @@ impl Emulator {
         let cycles = self.cpu.step(&mut self.bus);
         self.bus.ppu.step(
             cycles,
-            &mut self.cpu.interrupts,
+            &mut self.bus.interrupts,
             &mut self.screen_buffer,
         );
+        self.cpu.handle_interrupts(&mut self.bus);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;

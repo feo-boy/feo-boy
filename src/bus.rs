@@ -6,7 +6,7 @@ use std::ops::Range;
 use itertools::Itertools;
 
 use bytes::ByteExt;
-use cpu;
+use cpu::Interrupts;
 use graphics::{Ppu, Shade};
 use memory::{Addressable, Mmu};
 
@@ -18,7 +18,7 @@ use memory::{Addressable, Mmu};
 pub struct Bus {
     pub ppu: Ppu,
     pub mmu: Mmu,
-    pub interrupts: cpu::Interrupts,
+    pub interrupts: Interrupts,
 }
 
 impl Addressable for Bus {

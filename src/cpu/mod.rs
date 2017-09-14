@@ -8,6 +8,7 @@ mod registers;
 use std::default::Default;
 use std::fmt;
 
+use bus::Bus;
 use memory::{Addressable, Mmu};
 
 pub use self::instructions::Instruction;
@@ -107,9 +108,6 @@ pub struct Cpu {
     /// The clock corresponding to the last instruction cycle.
     pub clock: Clock,
 
-    /// CPU interrupts.
-    pub interrupts: Interrupts,
-
     /// The state of execution.
     state: State,
 }
@@ -122,7 +120,7 @@ impl Cpu {
     /// Fetch and execute a single instruction.
     ///
     /// Returns the number of cycles the instruction takes.
-    pub fn step<B: Addressable>(&mut self, bus: &mut B) -> u32 {
+    pub fn step(&mut self, bus: &mut Bus) -> u32 {
         match self.state {
             State::Running => (),
             _ => return 0,
@@ -130,6 +128,19 @@ impl Cpu {
 
         let instruction = self.fetch(bus);
         self.execute(instruction, bus)
+    }
+
+    /// Execute any enabled interrupt requests.
+    pub fn handle_interrupts(&mut self, bus: &mut Bus) {
+        if !bus.interrupts.enabled {
+            return;
+        }
+
+        if bus.interrupts.vblank.enabled && bus.interrupts.vblank.requested {
+            bus.interrupts.enabled = false;
+            bus.interrupts.vblank.requested = false;
+            self.rst(0x0040, bus);
+        }
     }
 
     /// Push a value onto the stack.

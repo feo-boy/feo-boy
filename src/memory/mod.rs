@@ -37,6 +37,7 @@ pub trait Addressable {
     }
 }
 
+#[cfg(test)]
 impl Addressable for [u8; 0x10000] {
     fn read_byte(&self, address: u16) -> u8 {
         self[address as usize]
