@@ -140,6 +140,32 @@ impl Cpu {
             bus.interrupts.enabled = false;
             bus.interrupts.vblank.requested = false;
             self.rst(0x0040, bus);
+            self.clock.m += 3;
+            self.clock.t += 12;
+        } else if bus.interrupts.lcd_status.enabled && bus.interrupts.lcd_status.requested {
+            bus.interrupts.enabled = false;
+            bus.interrupts.lcd_status.requested = false;
+            self.rst(0x0048, bus);
+            self.clock.m += 3;
+            self.clock.t += 12;
+        } else if bus.interrupts.timer.enabled && bus.interrupts.timer.requested {
+            bus.interrupts.enabled = false;
+            bus.interrupts.timer.requested = false;
+            self.rst(0x0050, bus);
+            self.clock.m += 3;
+            self.clock.t += 12;
+        } else if bus.interrupts.serial.enabled && bus.interrupts.serial.requested {
+            bus.interrupts.enabled = false;
+            bus.interrupts.serial.requested = false;
+            self.rst(0x0058, bus);
+            self.clock.m += 3;
+            self.clock.t += 12;
+        } else if bus.interrupts.joypad.enabled && bus.interrupts.joypad.requested {
+            bus.interrupts.enabled = false;
+            bus.interrupts.joypad.requested = false;
+            self.rst(0x0060, bus);
+            self.clock.m += 3;
+            self.clock.t += 12;
         }
     }
 
