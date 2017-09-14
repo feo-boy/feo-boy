@@ -1408,8 +1408,25 @@ impl super::Cpu {
                 self.reg.f.insert(Flags::HALF_CARRY);
             }
 
-            // RES 0,A
-            0x87 => self.reg.a = self.reg.a & !(1 << 0),
+            // RES b,A
+            0x87 => self.reg.a = self.reg.a & !(1 << 0), // 0,A
+            0x97 => self.reg.a = self.reg.a & !(1 << 2), // 2,A
+            0xA7 => self.reg.a = self.reg.a & !(1 << 4), // 4,A
+            0xB7 => self.reg.a = self.reg.a & !(1 << 6), // 6,A
+            0x8F => self.reg.a = self.reg.a & !(1 << 1), // 1,A
+            0x9F => self.reg.a = self.reg.a & !(1 << 3), // 3,A
+            0xAF => self.reg.a = self.reg.a & !(1 << 5), // 5,A
+            0xBF => self.reg.a = self.reg.a & !(1 << 7), // 7,A
+
+            // RES b,B
+            0x80 => self.reg.b = self.reg.b & !(1 << 0), // 0,B
+            0x90 => self.reg.b = self.reg.b & !(1 << 2), // 2,B
+            0xA0 => self.reg.b = self.reg.b & !(1 << 4), // 4,B
+            0xB0 => self.reg.b = self.reg.b & !(1 << 6), // 6,B
+            0x88 => self.reg.b = self.reg.b & !(1 << 1), // 1,B
+            0x98 => self.reg.b = self.reg.b & !(1 << 3), // 3,B
+            0xA8 => self.reg.b = self.reg.b & !(1 << 5), // 5,B
+            0xB8 => self.reg.b = self.reg.b & !(1 << 7), // 7,B
 
             // error
             catch => {
