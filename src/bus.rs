@@ -259,6 +259,12 @@ impl Bus {
             // OBP1 - Object Palette 1 Data
             0xFF49 => Self::set_sprite_palette(&mut ppu.sprite_palette[1], byte),
 
+            // WY - Window Y position
+            0xFF4A => ppu.window.y = byte,
+
+            // WB - Window X position minus 7
+            0xFF4B => ppu.window.x = byte,
+
             // Unmap BIOS
             0xFF50 => {
                 if mmu.bios_mapped {
