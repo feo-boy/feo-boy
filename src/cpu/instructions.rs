@@ -1067,7 +1067,7 @@ impl super::Cpu {
 
             // PREFIX CB
             0xcb => {
-                self.execute_prefix(instruction.operands[0]);
+                self.execute_prefix(instruction.operands[0], bus);
             }
 
             // UNUSED
@@ -1354,7 +1354,7 @@ impl super::Cpu {
         cycles
     }
 
-    pub fn execute_prefix(&mut self, instruction: u8) -> u32 {
+    pub fn execute_prefix(&mut self, instruction: u8, bus: &mut Bus) -> u32 {
         match instruction {
             0x00 => (),
 
@@ -1427,6 +1427,90 @@ impl super::Cpu {
             0x98 => self.reg.b = self.reg.b & !(1 << 3), // 3,B
             0xA8 => self.reg.b = self.reg.b & !(1 << 5), // 5,B
             0xB8 => self.reg.b = self.reg.b & !(1 << 7), // 7,B
+
+            // RES b,C
+            0x81 => self.reg.c = self.reg.c & !(1 << 0), // 0,C
+            0x91 => self.reg.c = self.reg.c & !(1 << 2), // 2,C
+            0xA1 => self.reg.c = self.reg.c & !(1 << 4), // 4,C
+            0xB1 => self.reg.c = self.reg.c & !(1 << 6), // 6,C
+            0x89 => self.reg.c = self.reg.c & !(1 << 1), // 1,C
+            0x99 => self.reg.c = self.reg.c & !(1 << 3), // 3,C
+            0xA9 => self.reg.c = self.reg.c & !(1 << 5), // 5,C
+            0xB9 => self.reg.c = self.reg.c & !(1 << 7), // 7,C
+
+            // RES b,D
+            0x82 => self.reg.d = self.reg.d & !(1 << 0), // 0,D
+            0x92 => self.reg.d = self.reg.d & !(1 << 2), // 2,D
+            0xA2 => self.reg.d = self.reg.d & !(1 << 4), // 4,D
+            0xB2 => self.reg.d = self.reg.d & !(1 << 6), // 6,D
+            0x8A => self.reg.d = self.reg.d & !(1 << 1), // 1,D
+            0x9A => self.reg.d = self.reg.d & !(1 << 3), // 3,D
+            0xAA => self.reg.d = self.reg.d & !(1 << 5), // 5,D
+            0xBA => self.reg.d = self.reg.d & !(1 << 7), // 7,D
+
+            // RES b,E
+            0x83 => self.reg.e = self.reg.e & !(1 << 0), // 0,E
+            0x93 => self.reg.e = self.reg.e & !(1 << 2), // 2,E
+            0xA3 => self.reg.e = self.reg.e & !(1 << 4), // 4,E
+            0xB3 => self.reg.e = self.reg.e & !(1 << 6), // 6,E
+            0x8B => self.reg.e = self.reg.e & !(1 << 1), // 1,E
+            0x9B => self.reg.e = self.reg.e & !(1 << 3), // 3,E
+            0xAB => self.reg.e = self.reg.e & !(1 << 5), // 5,E
+            0xBB => self.reg.e = self.reg.e & !(1 << 7), // 7,E
+
+            // RES b,H
+            0x84 => self.reg.h = self.reg.h & !(1 << 0), // 0,H
+            0x94 => self.reg.h = self.reg.h & !(1 << 2), // 2,H
+            0xA4 => self.reg.h = self.reg.h & !(1 << 4), // 4,H
+            0xB4 => self.reg.h = self.reg.h & !(1 << 6), // 6,H
+            0x8C => self.reg.h = self.reg.h & !(1 << 1), // 1,H
+            0x9C => self.reg.h = self.reg.h & !(1 << 3), // 3,H
+            0xAC => self.reg.h = self.reg.h & !(1 << 5), // 5,H
+            0xBC => self.reg.h = self.reg.h & !(1 << 7), // 7,H
+
+            // RES b,L
+            0x85 => self.reg.l = self.reg.l & !(1 << 0), // 0,L
+            0x95 => self.reg.l = self.reg.l & !(1 << 2), // 2,L
+            0xA5 => self.reg.l = self.reg.l & !(1 << 4), // 4,L
+            0xB5 => self.reg.l = self.reg.l & !(1 << 6), // 6,L
+            0x8D => self.reg.l = self.reg.l & !(1 << 1), // 1,L
+            0x9D => self.reg.l = self.reg.l & !(1 << 3), // 3,L
+            0xAD => self.reg.l = self.reg.l & !(1 << 5), // 5,L
+            0xBD => self.reg.l = self.reg.l & !(1 << 7), // 7,L
+
+            // RES b,(HL)
+            0x86 => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 0);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 0,(HL)
+            0x96 => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 2);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 2,(HL)
+            0xA6 => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 4);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 4,(HL)
+            0xB6 => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 6);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 6,(HL)
+            0x8E => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 1);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 1,(HL)
+            0x9E => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 3);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 3,(HL)
+            0xAE => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 5);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 5,(HL)
+            0xBE => {
+                let byte = bus.read_byte(self.reg.hl()) & !(1 << 7);
+                bus.write_byte(self.reg.hl(), byte);
+            } // 7,(HL)
 
             // error
             catch => {
