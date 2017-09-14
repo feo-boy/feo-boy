@@ -1378,6 +1378,15 @@ impl super::Cpu {
             // SET x,B
             0xe0 => self.reg.b = self.reg.b | (1 << 4),
 
+            // SWAP A
+            0x37 => {
+                self.reg.a = self.reg.a.rotate_left(4);
+                self.reg.f.remove(
+                    Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY,
+                );
+                self.reg.f.set(Flags::ZERO, self.reg.a == 0);
+            }
+
             // BIT b,r
             0x47 => {
                 self.reg.f.set(Flags::ZERO, self.reg.a & (1 << 0) == 0);
@@ -1398,6 +1407,9 @@ impl super::Cpu {
                 self.reg.f.remove(Flags::SUBTRACT);
                 self.reg.f.insert(Flags::HALF_CARRY);
             }
+
+            // RES 0,A
+            0x87 => self.reg.a = self.reg.a & !(1 << 0),
 
             // error
             catch => {
