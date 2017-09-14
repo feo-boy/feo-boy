@@ -309,6 +309,10 @@ impl Ppu {
     /// Renders the screen one line at a time. Move tile-by-tile through the line until it is
     /// complete.
     pub fn renderscan(&mut self) {
+        if !self.control.display_enabled {
+            return;
+        }
+
         if self.control.background_enabled {
             self.render_tiles();
         }
