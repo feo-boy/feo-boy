@@ -8,6 +8,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use image::{Rgba, RgbaImage};
 
 use bytes::ByteExt;
+use cpu::Interrupts;
 use memory::Addressable;
 
 /// The width and height of the Game Boy screen.
@@ -96,13 +97,20 @@ impl Default for Memory {
     }
 }
 
-/// Groups information that determines if various interrupts are enabled.
+/// Determines under which conditions the LCDC Status register (0xFF41) will fire.
 #[derive(Debug, Default)]
-pub struct Interrupts {
+pub struct LcdcStatusInterrupts {
+    /// Fires during H-Blank.
     pub hblank: bool,
+
+    /// Fires during V-Blank.
     pub vblank: bool,
+
+    /// Fires when OAM is being transferred.
     pub oam: bool,
-    pub ly_lyc: bool,
+
+    /// Fires when LYC = LY (i.e., 0xFF45 = 0xFF44).
+    pub ly_lyc_coincidence: bool,
 }
 
 /// Core LCD settings.
@@ -199,8 +207,8 @@ pub struct Ppu {
     /// Used by the LCDC status and LYC I/O registers.
     pub line_compare: u8,
 
-    /// Contains whether PPU-related interrupts are enabled or disabled.
-    pub interrupts: Interrupts,
+    /// Contains conditions under which the LCDC Status register will fire.
+    pub lcd_status_interrupts: LcdcStatusInterrupts,
 
     /// The pixels to be rendered on the screen.
     pub pixels: ScreenBuffer,
@@ -215,7 +223,7 @@ impl Ppu {
     }
 
     /// Performs one clock step of the PPU.
-    pub fn step(&mut self, cycles: u32, buffer: &mut RgbaImage) {
+    pub fn step(&mut self, cycles: u32, interrupts: &mut Interrupts, buffer: &mut RgbaImage) {
         // TODO: Set LCD status interrupt request here
 
         self.modeclock += cycles;
@@ -228,14 +236,17 @@ impl Ppu {
                     self.line += 1;
 
                     if self.line == 143 {
-                        for (x, y, pixel) in buffer.enumerate_pixels_mut() {
-                            *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
-                        }
-
                         // Enter vertical blank mode
                         self.mode = 1;
 
                         debug!("set graphics mode to {}", self.mode);
+
+                        // Draw the pixels to the screen.
+                        for (x, y, pixel) in buffer.enumerate_pixels_mut() {
+                            *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
+                        }
+
+                        interrupts.vblank.requested = true;
                     } else {
                         // Enter scanline mode
                         self.mode = 2;

@@ -85,10 +85,10 @@ impl Bus {
                 );
 
                 // Other bits are set if the various interrupts are enabled.
-                register.set_bit(3, ppu.interrupts.hblank);
-                register.set_bit(4, ppu.interrupts.vblank);
-                register.set_bit(5, ppu.interrupts.oam);
-                register.set_bit(6, ppu.interrupts.ly_lyc);
+                register.set_bit(3, ppu.lcd_status_interrupts.hblank);
+                register.set_bit(4, ppu.lcd_status_interrupts.vblank);
+                register.set_bit(5, ppu.lcd_status_interrupts.oam);
+                register.set_bit(6, ppu.lcd_status_interrupts.ly_lyc_coincidence);
 
                 // The highest bit is unspecified.
 
@@ -191,10 +191,10 @@ impl Bus {
 
             // STAT - LCDC Status
             0xFF41 => {
-                ppu.interrupts.hblank = byte.has_bit_set(3);
-                ppu.interrupts.vblank = byte.has_bit_set(4);
-                ppu.interrupts.oam = byte.has_bit_set(5);
-                ppu.interrupts.ly_lyc = byte.has_bit_set(6);
+                ppu.lcd_status_interrupts.hblank = byte.has_bit_set(3);
+                ppu.lcd_status_interrupts.vblank = byte.has_bit_set(4);
+                ppu.lcd_status_interrupts.oam = byte.has_bit_set(5);
+                ppu.lcd_status_interrupts.ly_lyc_coincidence = byte.has_bit_set(6);
             }
 
             // SCY - Scroll Y
@@ -361,7 +361,7 @@ mod tests {
         let mut bus = Bus::default();
         bus.ppu.line = 40;
         bus.ppu.line_compare = 40;
-        bus.ppu.interrupts.vblank = true;
+        bus.ppu.lcd_status_interrupts.vblank = true;
 
         assert_eq!(bus.read_byte(0xFF41), 0b00010100);
     }

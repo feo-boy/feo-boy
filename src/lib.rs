@@ -131,7 +131,11 @@ impl Emulator {
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
         let cycles = self.cpu.step(&mut self.bus);
-        self.bus.ppu.step(cycles, &mut self.screen_buffer);
+        self.bus.ppu.step(
+            cycles,
+            &mut self.cpu.interrupts,
+            &mut self.screen_buffer,
+        );
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;
