@@ -56,6 +56,14 @@ impl Bus {
         } = *self;
 
         match address {
+            // P1/JOYP - Joypad
+            0xFF00 => {
+                warn!("input is not implemented");
+
+                // Indicates that no buttons are pressed.
+                0x0F
+            }
+
             // IF - Interrupt Flag
             0xFF0F => {
                 let mut register = 0u8;
