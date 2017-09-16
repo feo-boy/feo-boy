@@ -12,10 +12,9 @@ use cpu::Interrupts;
 use memory::Addressable;
 
 /// The width and height of the Game Boy screen.
-pub const SCREEN_DIMENSIONS: (u32, u32) = (160, 144);
+pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
-pub const SIGNED_TILE_DATA_START: u16 = 0x8800;
 
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -113,6 +112,72 @@ pub struct LcdcStatusInterrupts {
     pub ly_lyc_coincidence: bool,
 }
 
+/// The location of the window or background tile map.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TileMapStart {
+    /// The low tile map (0x9800).
+    Low,
+
+    /// The high tile map (0x9C00).
+    High,
+}
+
+impl TileMapStart {
+    fn address(&self) -> u16 {
+        match *self {
+            TileMapStart::Low => 0x9800,
+            TileMapStart::High => 0x9C00,
+        }
+    }
+}
+
+impl Default for TileMapStart {
+    fn default() -> Self {
+        TileMapStart::Low
+    }
+}
+
+/// The location of the window or background tile data.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TileDataStart {
+    /// The low address (0x8000). Offsets are unsigned.
+    Low,
+
+    /// The high address (0x8800). Offsets are signed.
+    High,
+}
+
+impl TileDataStart {
+    fn address(&self) -> u16 {
+        match *self {
+            TileDataStart::Low => 0x8000,
+            TileDataStart::High => 0x8800,
+        }
+    }
+}
+
+impl Default for TileDataStart {
+    fn default() -> Self {
+        TileDataStart::High
+    }
+}
+
+/// The available sizes of sprites.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SpriteSize {
+    /// 8x8
+    Small,
+
+    /// 8x16
+    Large,
+}
+
+impl Default for SpriteSize {
+    fn default() -> Self {
+        SpriteSize::Small
+    }
+}
+
 /// Core LCD settings.
 #[derive(Debug, Default)]
 pub struct LcdControl {
@@ -129,16 +194,16 @@ pub struct LcdControl {
     pub background_enabled: bool,
 
     /// The address of the start of the window tile map.
-    pub window_map_start: u16,
+    pub window_map_start: TileMapStart,
 
     /// The address of the start of the background and window tile data.
-    pub tile_data_start: u16,
+    pub tile_data_start: TileDataStart,
 
     /// The address of the start of the background tile map.
-    pub bg_map_start: u16,
+    pub bg_map_start: TileMapStart,
 
-    /// The size of the sprites being used. Valid values are 8x8 and 8x16.
-    pub sprite_size: (u8, u8),
+    /// The size of the sprites being used.
+    pub sprite_size: SpriteSize,
 }
 
 /// An X/Y coordinate pair.
@@ -331,7 +396,7 @@ impl Ppu {
             let tile_offset = x_position / 8;
 
             // Get the address of the tile in memory.
-            let tile_id_address = self.control.bg_map_start + &tile_row_offset.into() +
+            let tile_id_address = self.control.bg_map_start.address() + &tile_row_offset.into() +
                 &tile_offset.into();
 
             let tile_id = self.read_byte(tile_id_address);
@@ -358,13 +423,15 @@ impl Ppu {
         const SIGNED_TILE_OFFSET: i16 = 128;
         const TILE_DATA_ROW_SIZE: u16 = 16;
 
-        // Depending on which tile map we're using, the numbers can be signed or unsigned.
-        if self.control.tile_data_start == SIGNED_TILE_DATA_START {
-            self.control.tile_data_start +
-                (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16 * TILE_DATA_ROW_SIZE
-        } else {
-            self.control.tile_data_start + &tile_id.into() * TILE_DATA_ROW_SIZE
-        }
+        let start = &self.control.tile_data_start;
+
+        // Depending on which tile map we're using, the offset can be signed or unsigned.
+        let offset = match *start {
+            TileDataStart::Low => tile_id.into(),
+            TileDataStart::High => (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16,
+        };
+
+        start.address() + offset * TILE_DATA_ROW_SIZE
     }
 
     /// Gets the shade for rendering a particular pixel of the screen.
@@ -463,9 +530,7 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::Ppu;
-    use super::SIGNED_TILE_DATA_START;
-    use super::Shade;
+    use super::{Ppu, Shade, TileDataStart};
 
     #[test]
     fn chram() {
@@ -515,13 +580,13 @@ mod tests {
     #[test]
     fn tile_data_address() {
         let mut ppu = Ppu::new();
-        ppu.control.tile_data_start = 0x8000;
+        ppu.control.tile_data_start = TileDataStart::Low;
         assert_eq!(ppu.tile_data_address(0), 0x8000);
         assert_eq!(ppu.tile_data_address(37), 0x8250);
         assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
 
         let mut ppu = Ppu::new();
-        ppu.control.tile_data_start = SIGNED_TILE_DATA_START;
+        ppu.control.tile_data_start = TileDataStart::High;
         assert_eq!(ppu.tile_data_address(0), 0x9000);
         assert_eq!(ppu.tile_data_address(37), 0x9250);
         assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);

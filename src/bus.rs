@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use bytes::ByteExt;
 use cpu::Interrupts;
-use graphics::{Ppu, Shade};
+use graphics::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
 use memory::{Addressable, Mmu};
 
 /// The "wires" of the emulator.
@@ -85,11 +85,11 @@ impl Bus {
 
                 let mut register = 0u8;
                 register.set_bit(7, control.display_enabled);
-                register.set_bit(6, control.window_map_start == 0x9C00);
+                register.set_bit(6, control.window_map_start != TileMapStart::default());
                 register.set_bit(5, control.window_enabled);
-                register.set_bit(4, control.tile_data_start == 0x8000);
-                register.set_bit(3, control.bg_map_start == 0x9C00);
-                register.set_bit(2, control.sprite_size == (8, 16));
+                register.set_bit(4, control.tile_data_start != TileDataStart::default());
+                register.set_bit(3, control.bg_map_start != TileMapStart::default());
+                register.set_bit(2, control.sprite_size != SpriteSize::default());
                 register.set_bit(1, control.sprites_enabled);
                 register.set_bit(0, control.background_enabled);
                 register
@@ -204,11 +204,27 @@ impl Bus {
                 let control = &mut ppu.control;
 
                 control.display_enabled = byte.has_bit_set(7);
-                control.window_map_start = if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 };
+                control.window_map_start = if byte.has_bit_set(6) {
+                    TileMapStart::Low
+                } else {
+                    TileMapStart::High
+                };
                 control.window_enabled = byte.has_bit_set(5);
-                control.tile_data_start = if byte.has_bit_set(4) { 0x8000 } else { 0x8800 };
-                control.bg_map_start = if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 };
-                control.sprite_size = if byte.has_bit_set(2) { (8, 16) } else { (8, 8) };
+                control.tile_data_start = if byte.has_bit_set(4) {
+                    TileDataStart::Low
+                } else {
+                    TileDataStart::High
+                };
+                control.bg_map_start = if byte.has_bit_set(3) {
+                    TileMapStart::High
+                } else {
+                    TileMapStart::Low
+                };
+                control.sprite_size = if byte.has_bit_set(2) {
+                    SpriteSize::Large
+                } else {
+                    SpriteSize::Small
+                };
                 control.sprites_enabled = byte.has_bit_set(1);
                 control.background_enabled = byte.has_bit_set(0);
             }
