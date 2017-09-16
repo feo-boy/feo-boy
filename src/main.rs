@@ -6,7 +6,6 @@ extern crate clap;
 #[macro_use]
 extern crate error_chain;
 
-extern crate image;
 extern crate piston_window;
 extern crate pretty_env_logger;
 
