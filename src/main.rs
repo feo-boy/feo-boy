@@ -61,6 +61,7 @@ fn start_emulator(config: Config) -> Result<()> {
                 .update(&mut window.encoder, &mut emulator.screen_buffer)
                 .unwrap();
             window.draw_2d(&event, |context, graphics| {
+                clear([1.0; 4], graphics);
                 image(&texture, context.transform, graphics);
             });
         }
