@@ -15,7 +15,6 @@ extern crate lazy_static;
 extern crate byteorder;
 extern crate image;
 extern crate itertools;
-extern crate piston_window;
 extern crate regex;
 extern crate smallvec;
 
