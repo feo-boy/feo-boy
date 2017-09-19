@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use bus::Bus;
 use bytes::ByteExt;
-use cpu::{self, State, Flags};
+use cpu::{self, arithmetic, State, Flags};
 use memory::Addressable;
 
 lazy_static! {
@@ -713,7 +713,7 @@ impl super::Cpu {
             0x07 => self.reg.rlc(),
 
             // RLA
-            0x17 => self.reg.rl(),
+            0x17 => arithmetic::rl(&mut self.reg.a, &mut self.reg.f),
 
             // DAA
             0x27 => self.reg.daa(),
@@ -1359,16 +1359,7 @@ impl super::Cpu {
             0x00 => (),
 
             // RL C
-            0x11 => {
-                // FIXME: Share code with cpu::Registers
-                let old_carry = self.reg.f.contains(Flags::CARRY);
-                let new_carry = self.reg.c.has_bit_set(7);
-
-                self.reg.f = Flags::empty();
-                self.reg.c <<= 1;
-                self.reg.c.set_bit(0, old_carry);
-                self.reg.f.set(Flags::CARRY, new_carry);
-            }
+            0x11 => arithmetic::rl(&mut self.reg.c, &mut self.reg.f),
 
             0x17 => {
                 self.reg.f.set(Flags::ZERO, self.reg.a == 0);

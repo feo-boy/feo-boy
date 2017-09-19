@@ -2,6 +2,7 @@
 //!
 //! Contains an implementation of the registers and instruction set.
 
+pub mod arithmetic;
 mod instructions;
 mod registers;
 

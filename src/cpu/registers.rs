@@ -404,20 +404,6 @@ impl Registers {
         self.f.set(Flags::ZERO, self.a == 0);
     }
 
-    /// Rotates register A left one bit, through the carry bit.
-    ///
-    /// The carry bit is set to the leaving bit on the left, and bit 0 is set to the old value of
-    /// the carry bit.
-    pub fn rl(&mut self) {
-        let old_carry = self.f.contains(Flags::CARRY);
-        let new_carry = self.a.has_bit_set(7);
-
-        self.f = Flags::empty();
-        self.a <<= 1;
-        self.a.set_bit(0, old_carry);
-        self.f.set(Flags::CARRY, new_carry);
-    }
-
     /// Rotates register A left one bit and sets the flags appropriately.
     ///
     /// The leaving bit on the left is copied into the carry bit.
@@ -754,16 +740,6 @@ mod tests {
         // This is a different value than the GameBoy programming manual, which specifies `0x0A` as
         // the correct result.
         assert_eq!(reg.a, 0x0B);
-        assert_eq!(reg.f, Flags::CARRY);
-    }
-
-    #[test]
-    fn rl() {
-        let mut reg = Registers::default();
-        reg.a = 0x95;
-        reg.f.insert(Flags::CARRY);
-        reg.rl();
-        assert_eq!(reg.a, 0x2B);
         assert_eq!(reg.f, Flags::CARRY);
     }
 
