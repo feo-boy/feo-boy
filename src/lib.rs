@@ -19,6 +19,7 @@ extern crate regex;
 extern crate smallvec;
 
 #[cfg(test)]
+#[macro_use]
 extern crate quickcheck;
 
 pub mod bus;

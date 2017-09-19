@@ -785,73 +785,20 @@ mod tests {
         assert_eq!(reg.f, Flags::SUBTRACT | Flags::HALF_CARRY);
     }
 
-    #[test]
-    fn ccf() {
-        let mut reg = Registers::default();
+    quickcheck! {
+        fn ccf(flags: u8) -> bool {
+            let mut reg = Registers::default();
+            reg.f = Flags::from_bits_truncate(flags);
 
-        reg.f = Flags::empty();
-        reg.ccf();
-        assert_eq!(reg.f, Flags::CARRY);
+            let carry_set = reg.f.contains(Flags::CARRY);
+            let zero_set = reg.f.contains(Flags::ZERO);
 
-        reg.f = Flags::ZERO;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO | Flags::CARRY);
+            reg.ccf();
 
-        reg.f = Flags::SUBTRACT;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::CARRY);
-
-        reg.f = Flags::HALF_CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::CARRY);
-
-        reg.f = Flags::ZERO | Flags::SUBTRACT;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO | Flags::CARRY);
-
-        reg.f = Flags::ZERO | Flags::HALF_CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO | Flags::CARRY);
-
-        reg.f = Flags::SUBTRACT | Flags::HALF_CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::CARRY);
-
-        reg.f = Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO | Flags::CARRY);
-
-        reg.f = Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::empty());
-
-        reg.f = Flags::ZERO | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO);
-
-        reg.f = Flags::SUBTRACT | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::empty());
-
-        reg.f = Flags::HALF_CARRY | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::empty());
-
-        reg.f = Flags::ZERO | Flags::SUBTRACT | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO);
-
-        reg.f = Flags::ZERO | Flags::HALF_CARRY | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO);
-
-        reg.f = Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::empty());
-
-        reg.f = Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY;
-        reg.ccf();
-        assert_eq!(reg.f, Flags::ZERO);
+            !reg.f.intersects(Flags::SUBTRACT | Flags::HALF_CARRY)
+                && carry_set != reg.f.contains(Flags::CARRY)
+                && zero_set == reg.f.contains(Flags::ZERO)
+        }
     }
 
     #[test]
