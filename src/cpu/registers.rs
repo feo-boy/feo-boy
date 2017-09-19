@@ -7,8 +7,7 @@ use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, BigEndian};
 
-use bytes::ByteExt;
-use cpu;
+use bytes::{ByteExt, WordExt};
 
 bitflags! {
     /// CPU status flags.
@@ -280,39 +279,36 @@ impl Registers {
 
     /// Adds a byte and the value of the carry to the accumulator and sets the flags appropriately.
     pub fn adc(&mut self, rhs: u8) {
-        self.f.remove(Flags::SUBTRACT);
+        let carry_bit = self.f.contains(Flags::CARRY) as u8;
 
-        let carry_bit = if self.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let (sum, is_half_carry_rhs) = self.a.half_carry_add(rhs);
+        let (_, is_half_carry_bit) = sum.half_carry_add(carry_bit);
 
-        let is_half_carry = cpu::is_half_carry_add(self.a, rhs) ||
-            cpu::is_half_carry_add(self.a.wrapping_add(rhs), carry_bit);
-        self.f.set(Flags::HALF_CARRY, is_half_carry);
+        let (sum, is_carry_rhs) = self.a.overflowing_add(rhs);
+        let (sum, is_carry_bit) = sum.overflowing_add(carry_bit);
 
-        let (a, carry) = {
-            let (a, rhs_carry) = self.a.overflowing_add(rhs);
-            let (a, bit_carry) = a.overflowing_add(carry_bit);
-
-            (a, rhs_carry || bit_carry)
-        };
-        self.a = a;
-        self.f.set(Flags::CARRY, carry);
+        self.a = sum;
 
         self.f.set(Flags::ZERO, self.a == 0);
+        self.f.remove(Flags::SUBTRACT);
+        self.f.set(
+            Flags::HALF_CARRY,
+            is_half_carry_rhs || is_half_carry_bit,
+        );
+        self.f.set(Flags::CARRY, is_carry_rhs || is_carry_bit);
     }
 
     /// Adds a 16-bit number to the HL register pair and sets the flags appropriately.
     pub fn add_hl(&mut self, rhs: u16) {
         let hl = self.hl();
 
-        self.f.remove(Flags::SUBTRACT);
-        self.f.set(
-            Flags::HALF_CARRY,
-            cpu::is_half_carry_add_16(hl, rhs),
-        );
+        let (sum, is_carry) = hl.overflowing_add(rhs);
+        let (_, is_half_carry) = hl.half_carry_add(rhs);
+        self.hl_mut().write(sum);
 
-        let (a, carry) = hl.overflowing_add(rhs);
-        self.f.set(Flags::CARRY, carry);
-        self.hl_mut().write(a);
+        self.f.remove(Flags::SUBTRACT);
+        self.f.set(Flags::HALF_CARRY, is_half_carry);
+        self.f.set(Flags::CARRY, is_carry);
     }
 
     /// Adds a signed byte to the stack pointer, SP, and sets the flags appropriately.
@@ -340,23 +336,23 @@ impl Registers {
 
     /// Subtracts a byte and the carry flag from the accumulator and sets the flags appropriately.
     pub fn sbc(&mut self, rhs: u8) {
-        self.f.insert(Flags::SUBTRACT);
+        let carry_bit = self.f.contains(Flags::CARRY) as u8;
 
-        let carry_bit = if self.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let (difference, is_half_carry_rhs) = self.a.half_carry_sub(rhs);
+        let (_, is_half_carry_bit) = difference.half_carry_sub(carry_bit);
 
-        let is_half_carry = cpu::is_half_carry_sub(self.a, rhs) ||
-            cpu::is_half_carry_sub(self.a.wrapping_sub(rhs), carry_bit);
-        self.f.set(Flags::HALF_CARRY, is_half_carry);
+        let (difference, is_carry_rhs) = self.a.overflowing_sub(rhs);
+        let (difference, is_carry_bit) = difference.overflowing_sub(carry_bit);
 
-        let (a, carry) = {
-            let (a, rhs_carry) = self.a.overflowing_sub(rhs);
-            let (a, bit_carry) = a.overflowing_sub(carry_bit);
-            (a, rhs_carry || bit_carry)
-        };
-        self.a = a;
-        self.f.set(Flags::CARRY, carry);
+        self.a = difference;
 
         self.f.set(Flags::ZERO, self.a == 0);
+        self.f.insert(Flags::SUBTRACT);
+        self.f.set(
+            Flags::HALF_CARRY,
+            is_half_carry_rhs || is_half_carry_bit,
+        );
+        self.f.set(Flags::CARRY, is_carry_rhs || is_carry_bit);
     }
 
     /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately. Unsets
@@ -458,7 +454,7 @@ impl Registers {
         self.f = Flags::empty();
         self.f.set(
             Flags::HALF_CARRY,
-            cpu::is_half_carry_add(low_byte, rhs as u8),
+            low_byte.half_carry_add(rhs as u8).1,
         );
         self.f.set(
             Flags::CARRY,

@@ -1,12 +1,28 @@
 //! Additional functionality for working with bytes.
 
 /// Extension trait providing additional methods for `u8`.
-pub trait ByteExt {
+pub trait ByteExt
+where
+    Self: Sized,
+{
     /// Returns whether the byte has its nth bit set.
     fn has_bit_set(&self, n: u8) -> bool;
 
     /// If `set` is true, flips bit `n` on, and vice-versa.
     fn set_bit(&mut self, n: u8, set: bool);
+
+    /// Returns a tuple containing the result of adding `other` to `self`, and a boolean indicating
+    /// whether there was a half carry.
+    ///
+    /// A half carry is a carry from the low nibble to the high nibble (from bit 3 to bit 4).
+    fn half_carry_add(&self, other: Self) -> (Self, bool);
+
+    /// Returns a tuple containing the result of adding `other` to `self`, and a boolean indicating
+    /// whether there was a half carry.
+    ///
+    /// A half carry occurs if the subtraction requires a borrow from the high nibble to the low
+    /// nibble (from bit 4 to bit 3).
+    fn half_carry_sub(&self, other: Self) -> (Self, bool);
 }
 
 impl ByteExt for u8 {
@@ -29,6 +45,16 @@ impl ByteExt for u8 {
             *self &= !(1 << n);
         }
     }
+
+    fn half_carry_add(&self, other: u8) -> (u8, bool) {
+        let is_half_carry = (((self & 0xf).wrapping_add(other & 0xf)) & 0x10) == 0x10;
+        (self.wrapping_add(other), is_half_carry)
+    }
+
+    fn half_carry_sub(&self, other: u8) -> (u8, bool) {
+        let is_half_carry = (self & 0xf) < (other & 0xf);
+        (self.wrapping_sub(other), is_half_carry)
+    }
 }
 
 /// Extension trait providing additional methods for `u16`.
@@ -38,6 +64,12 @@ pub trait WordExt {
 
     /// Returns the high byte (bits 8-15) of the word.
     fn hi(&self) -> u8;
+
+    /// Returns a tuple containing the result of adding `other` to `self`, and a boolean indicating
+    /// whether there was a half carry.
+    ///
+    /// A half carry is a carry from bit 11 to 12.
+    fn half_carry_add(&self, other: u16) -> (u16, bool);
 }
 
 impl WordExt for u16 {
@@ -47,6 +79,13 @@ impl WordExt for u16 {
 
     fn hi(&self) -> u8 {
         ((self >> 8) & 0xff_u16) as u8
+    }
+
+    /// Returns `true` if the addition of two 16-bit numbers would require a half carry (a carry from
+    /// bit 11 to 12, zero-indexed).
+    fn half_carry_add(&self, other: u16) -> (u16, bool) {
+        let is_half_carry = (((self & 0xfff).wrapping_add(other & 0xfff)) & 0x1000) == 0x1000;
+        (self.wrapping_add(other), is_half_carry)
     }
 }
 
@@ -92,5 +131,19 @@ mod tests {
         assert_eq!(0xabcd.hi(), 0xab);
         assert_eq!(0xff00.lo(), 0x00);
         assert_eq!(0xff00.hi(), 0xff);
+    }
+
+    #[test]
+    fn half_carry() {
+        assert_eq!(0x0Fu8.half_carry_add(0x01), (0x10, true));
+        assert_eq!(0x37u8.half_carry_add(0x44), (0x7B, false));
+
+        assert_eq!(0x0FFFu16.half_carry_add(0x0FFF), (0x1FFE, true));
+        assert_eq!(0x0FFFu16.half_carry_add(0x0001), (0x1000, true));
+        assert_eq!(0x0000u16.half_carry_add(0x0001), (0x0001, false));
+
+        assert_eq!(0xF0u8.half_carry_sub(0x01), (0xEF, true));
+        assert_eq!(0xFFu8.half_carry_sub(0xF0), (0x0F, false));
+        assert_eq!(0x3Eu8.half_carry_sub(0x0F), (0x2F, true));
     }
 }

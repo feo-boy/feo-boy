@@ -3,7 +3,7 @@
 //! This module should contain free functions that operate on bytes and flags.
 
 use bytes::ByteExt;
-use cpu::{self, Flags};
+use cpu::Flags;
 
 /// Increments by 1 (with overflow).
 ///
@@ -16,12 +16,12 @@ use cpu::{self, Flags};
 /// | Half-carry | Set if there is a carry from bit 3.
 /// | Carry      | Not affected.
 pub fn inc(byte: &mut u8, flags: &mut Flags) {
-    flags.set(Flags::HALF_CARRY, cpu::is_half_carry_add(*byte, 1));
-
-    *byte = byte.wrapping_add(1);
+    let (sum, is_half_carry) = byte.half_carry_add(1);
+    *byte = sum;
 
     flags.set(Flags::ZERO, *byte == 0);
     flags.remove(Flags::SUBTRACT);
+    flags.set(Flags::HALF_CARRY, is_half_carry);
 }
 
 /// Decrements a byte by 1 (with underflow).
@@ -35,12 +35,12 @@ pub fn inc(byte: &mut u8, flags: &mut Flags) {
 /// | Half-carry | Set if there is a borrow from bit 4.
 /// | Carry      | Not affected.
 pub fn dec(byte: &mut u8, flags: &mut Flags) {
-    flags.set(Flags::HALF_CARRY, cpu::is_half_carry_sub(*byte, 1));
-
-    *byte = byte.wrapping_sub(1);
+    let (difference, is_half_carry) = byte.half_carry_sub(1);
+    *byte = difference;
 
     flags.set(Flags::ZERO, *byte == 0);
     flags.insert(Flags::SUBTRACT);
+    flags.set(Flags::HALF_CARRY, is_half_carry);
 }
 
 /// Rotate left through the carry flag.

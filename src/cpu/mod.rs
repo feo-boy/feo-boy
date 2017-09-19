@@ -202,43 +202,11 @@ impl fmt::Display for Cpu {
     }
 }
 
-/// Returns `true` if the addition of two bytes would require a half carry (a carry from the low
-/// nibble to the high nibble).
-pub fn is_half_carry_add(a: u8, b: u8) -> bool {
-    (((a & 0xf).wrapping_add(b & 0xf)) & 0x10) == 0x10
-}
-
-/// Returns `true` if the addition of two 16-bit numbers would require a half carry (a carry from
-/// bit 11 to 12, zero-indexed).
-pub fn is_half_carry_add_16(a: u16, b: u16) -> bool {
-    (((a & 0xfff).wrapping_add(b & 0xfff)) & 0x1000) == 0x1000
-}
-
-/// Returns `true` if the subtraction of `b` from `a` requires a borrow from the high nibble to the
-/// low nibble.
-pub fn is_half_carry_sub(a: u8, b: u8) -> bool {
-    (a & 0xf) < (b & 0xf)
-}
-
 #[cfg(test)]
 mod tests {
     use bus::Bus;
 
     use super::Cpu;
-
-    #[test]
-    fn half_carry() {
-        assert!(super::is_half_carry_add(0x0f, 0x01));
-        assert!(!super::is_half_carry_add(0x37, 0x44));
-
-        assert!(super::is_half_carry_add_16(0x0fff, 0x0fff));
-        assert!(super::is_half_carry_add_16(0x0fff, 0x0001));
-        assert!(!super::is_half_carry_add_16(0x0000, 0x0001));
-
-        assert!(super::is_half_carry_sub(0xf0, 0x01));
-        assert!(!super::is_half_carry_sub(0xff, 0xf0));
-        assert!(super::is_half_carry_sub(0x3e, 0x0f));
-    }
 
     #[test]
     fn skip_bios() {
