@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use bus::Bus;
 use bytes::ByteExt;
-use cpu::{self, arithmetic, State, Flags};
+use cpu::{arithmetic, State, Flags};
 use memory::Addressable;
 
 lazy_static! {
@@ -498,18 +498,18 @@ impl super::Cpu {
             0xF3 => bus.interrupts.enabled = false,
 
             // INC B
-            0x04 => Self::inc(&mut self.reg.b, &mut self.reg.f),
+            0x04 => arithmetic::inc(&mut self.reg.b, &mut self.reg.f),
 
             // INC D
-            0x14 => Self::inc(&mut self.reg.d, &mut self.reg.f),
+            0x14 => arithmetic::inc(&mut self.reg.d, &mut self.reg.f),
 
             // INC H
-            0x24 => Self::inc(&mut self.reg.h, &mut self.reg.f),
+            0x24 => arithmetic::inc(&mut self.reg.h, &mut self.reg.f),
 
             // INC (HL)
             0x34 => {
                 let mut byte = bus.read_byte(self.reg.hl());
-                Self::inc(&mut byte, &mut self.reg.f);
+                arithmetic::inc(&mut byte, &mut self.reg.f);
                 bus.write_byte(self.reg.hl(), byte);
             }
 
@@ -574,18 +574,18 @@ impl super::Cpu {
             // 0xf4
 
             // DEC B
-            0x05 => Self::dec(&mut self.reg.b, &mut self.reg.f),
+            0x05 => arithmetic::dec(&mut self.reg.b, &mut self.reg.f),
 
             // DEC D
-            0x15 => Self::dec(&mut self.reg.d, &mut self.reg.f),
+            0x15 => arithmetic::dec(&mut self.reg.d, &mut self.reg.f),
 
             // DEC H
-            0x25 => Self::dec(&mut self.reg.h, &mut self.reg.f),
+            0x25 => arithmetic::dec(&mut self.reg.h, &mut self.reg.f),
 
             // DEC (HL)
             0x35 => {
                 let mut byte = bus.read_byte(self.reg.hl());
-                Self::dec(&mut byte, &mut self.reg.f);
+                arithmetic::dec(&mut byte, &mut self.reg.f);
                 bus.write_byte(self.reg.hl(), byte);
             }
 
@@ -1080,16 +1080,16 @@ impl super::Cpu {
             0xFB => bus.interrupts.enabled = true,
 
             // INC C
-            0x0c => Self::inc(&mut self.reg.c, &mut self.reg.f),
+            0x0c => arithmetic::inc(&mut self.reg.c, &mut self.reg.f),
 
             // INC E
-            0x1c => Self::inc(&mut self.reg.e, &mut self.reg.f),
+            0x1c => arithmetic::inc(&mut self.reg.e, &mut self.reg.f),
 
             // INC L
-            0x2c => Self::inc(&mut self.reg.l, &mut self.reg.f),
+            0x2c => arithmetic::inc(&mut self.reg.l, &mut self.reg.f),
 
             // INC A
-            0x3c => Self::inc(&mut self.reg.a, &mut self.reg.f),
+            0x3c => arithmetic::inc(&mut self.reg.a, &mut self.reg.f),
 
             // LD C,H
             0x4c => self.reg.c = self.reg.h,
@@ -1152,16 +1152,16 @@ impl super::Cpu {
             // 0xfc
 
             // DEC C
-            0x0d => Self::dec(&mut self.reg.c, &mut self.reg.f),
+            0x0d => arithmetic::dec(&mut self.reg.c, &mut self.reg.f),
 
             // DEC E
-            0x1d => Self::dec(&mut self.reg.e, &mut self.reg.f),
+            0x1d => arithmetic::dec(&mut self.reg.e, &mut self.reg.f),
 
             // DEC L
-            0x2d => Self::dec(&mut self.reg.l, &mut self.reg.f),
+            0x2d => arithmetic::dec(&mut self.reg.l, &mut self.reg.f),
 
             // DEC A
-            0x3d => Self::dec(&mut self.reg.a, &mut self.reg.f),
+            0x3d => arithmetic::dec(&mut self.reg.a, &mut self.reg.f),
 
             // LD C,L
             0x4d => self.reg.c = self.reg.l,
@@ -1524,26 +1524,6 @@ impl super::Cpu {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = addr;
-    }
-
-    /// Increments a byte by 1 and sets the flags appropriately.
-    fn inc(byte: &mut u8, flags: &mut Flags) {
-        flags.set(Flags::HALF_CARRY, cpu::is_half_carry_add(*byte, 1));
-
-        *byte = byte.wrapping_add(1);
-
-        flags.set(Flags::ZERO, *byte == 0);
-        flags.remove(Flags::SUBTRACT);
-    }
-
-    /// Decrements a byte by 1 and sets the flags appropriately.
-    fn dec(byte: &mut u8, flags: &mut Flags) {
-        flags.set(Flags::HALF_CARRY, cpu::is_half_carry_sub(*byte, 1));
-
-        *byte = byte.wrapping_sub(1);
-
-        flags.set(Flags::ZERO, *byte == 0);
-        flags.insert(Flags::SUBTRACT);
     }
 
     /// Performs a CALL operation. Does not modify any flags.
