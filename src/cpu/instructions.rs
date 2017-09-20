@@ -713,7 +713,7 @@ impl super::Cpu {
             0x07 => self.reg.rlca(),
 
             // RLA
-            0x17 => arithmetic::rl(&mut self.reg.a, &mut self.reg.f),
+            0x17 => self.reg.rla(),
 
             // DAA
             0x27 => self.reg.daa(),

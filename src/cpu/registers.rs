@@ -410,6 +410,14 @@ impl Registers {
         self.f.remove(Flags::ZERO);
     }
 
+    /// Rotates register A left through the carry flag.
+    ///
+    /// Unlike `RL`, the zero flag is unconditionally reset.
+    pub fn rla(&mut self) {
+        arithmetic::rl(&mut self.a, &mut self.f);
+        self.f.remove(Flags::ZERO);
+    }
+
     /// Rotates register A right one bit, through the carry bit.
     ///
     /// The carry bit is set to the leaving bit on the right, and bit 7 is set to the old value of
@@ -743,6 +751,18 @@ mod tests {
         reg.rlca();
         assert_eq!(reg.a, 0x00);
         assert_eq!(reg.f, Flags::empty());
+    }
+
+    #[test]
+    fn rla() {
+        let mut reg = Registers::default();
+        reg.a = 0x95;
+        reg.f = Flags::CARRY;
+
+        reg.rla();
+
+        assert_eq!(reg.a, 0x2B);
+        assert_eq!(reg.f, Flags::CARRY);
     }
 
     #[test]
