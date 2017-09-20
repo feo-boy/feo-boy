@@ -434,11 +434,11 @@ impl Registers {
 
     /// Rotates register A right one bit and sets the flags appropriately.
     ///
-    /// The leaving bit on the right is copied into the carry bit. Other flags are reset.
-    pub fn rrc(&mut self) {
-        self.f = Flags::empty();
-        self.f.set(Flags::CARRY, self.a.has_bit_set(0));
-        self.a = self.a.rotate_right(1);
+    /// The leaving bit on the right is copied into the carry bit. Unlike `RRC`, the zero flag is
+    /// unconditionally reset.
+    pub fn rrca(&mut self) {
+        arithmetic::rrc(&mut self.a, &mut self.f);
+        self.f.remove(Flags::ZERO);
     }
 
     /// Inverts all bits in `A` and sets the flags appropriately.
@@ -766,19 +766,13 @@ mod tests {
     }
 
     #[test]
-    fn rrc() {
+    fn rrca() {
         let mut reg = Registers::default();
-        reg.a = 0x11;
-        reg.rrc();
+        reg.a = 0x3B;
+        reg.rrca();
 
-        assert_eq!(reg.a, 0x88);
+        assert_eq!(reg.a, 0x9D);
         assert_eq!(reg.f, Flags::CARRY);
-
-        reg.a = 0x10;
-        reg.rrc();
-
-        assert_eq!(reg.a, 0x08);
-        assert_eq!(reg.f, Flags::empty());
     }
 
     #[test]

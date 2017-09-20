@@ -61,6 +61,24 @@ pub fn rlc(byte: &mut u8, flags: &mut Flags) {
     flags.set(Flags::CARRY, byte.has_bit_set(0));
 }
 
+/// Rotate right, copying into the carry.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------  | ---
+/// | Zero       | Set if the result is 0.
+/// | Subtract   | Reset.
+/// | Half-carry | Reset.
+/// | Carry      | Set to the old value of bit 0.
+pub fn rrc(byte: &mut u8, flags: &mut Flags) {
+    *byte = byte.rotate_right(1);
+
+    flags.set(Flags::ZERO, *byte == 0);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY);
+    flags.set(Flags::CARRY, byte.has_bit_set(7));
+}
+
 /// Rotate left through the carry flag.
 ///
 /// # Flags
@@ -131,6 +149,33 @@ mod tests {
         super::rlc(&mut byte, &mut flags);
         assert_eq!(byte, 0x00);
         assert_eq!(flags, Flags::ZERO);
+    }
+
+    #[test]
+    fn rrc() {
+        let mut byte = 0x01;
+        let mut flags = Flags::empty();
+        super::rrc(&mut byte, &mut flags);
+        assert_eq!(byte, 0x80);
+        assert_eq!(flags, Flags::CARRY);
+
+        let mut byte = 0x00;
+        let mut flags = Flags::empty();
+        super::rrc(&mut byte, &mut flags);
+        assert_eq!(byte, 0x00);
+        assert_eq!(flags, Flags::ZERO);
+
+        let mut byte = 0x11;
+        let mut flags = Flags::empty();
+        super::rrc(&mut byte, &mut flags);
+        assert_eq!(byte, 0x88);
+        assert_eq!(flags, Flags::CARRY);
+
+        let mut byte = 0x10;
+        let mut flags = Flags::empty();
+        super::rrc(&mut byte, &mut flags);
+        assert_eq!(byte, 0x08);
+        assert_eq!(flags, Flags::empty());
     }
 
     #[test]
