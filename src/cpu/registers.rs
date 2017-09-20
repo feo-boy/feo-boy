@@ -421,15 +421,10 @@ impl Registers {
     /// Rotates register A right one bit, through the carry bit.
     ///
     /// The carry bit is set to the leaving bit on the right, and bit 7 is set to the old value of
-    /// the carry bit.
-    pub fn rr(&mut self) {
-        let old_carry = self.f.contains(Flags::CARRY);
-        let new_carry = self.a.has_bit_set(0);
-
-        self.f = Flags::empty();
-        self.a >>= 1;
-        self.a.set_bit(7, old_carry);
-        self.f.set(Flags::CARRY, new_carry);
+    /// the carry bit. Unlike `RR`, the zero flag is unconditionally reset.
+    pub fn rra(&mut self) {
+        arithmetic::rr(&mut self.a, &mut self.f);
+        self.f.remove(Flags::ZERO);
     }
 
     /// Rotates register A right one bit and sets the flags appropriately.
@@ -776,20 +771,12 @@ mod tests {
     }
 
     #[test]
-    fn rr() {
+    fn rra() {
         let mut reg = Registers::default();
-        reg.a = 0x11;
-        reg.rr();
-
-        assert_eq!(reg.a, 0x08);
+        reg.a = 0x81;
+        reg.rra();
+        assert_eq!(reg.a, 0x40);
         assert_eq!(reg.f, Flags::CARRY);
-
-        reg.a = 0x10;
-        reg.f = Flags::CARRY;
-        reg.rr();
-
-        assert_eq!(reg.a, 0x88);
-        assert_eq!(reg.f, Flags::empty());
     }
 
     #[test]

@@ -1278,7 +1278,7 @@ impl super::Cpu {
             0x0f => self.reg.rrca(),
 
             // RRA
-            0x1f => self.reg.rr(),
+            0x1f => self.reg.rra(),
 
             // CPL
             0x2f => self.reg.cpl(),
