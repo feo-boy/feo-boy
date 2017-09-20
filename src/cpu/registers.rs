@@ -8,6 +8,7 @@ use std::ops::{AddAssign, SubAssign};
 use byteorder::{ByteOrder, BigEndian};
 
 use bytes::{ByteExt, WordExt};
+use cpu::arithmetic;
 
 bitflags! {
     /// CPU status flags.
@@ -402,11 +403,11 @@ impl Registers {
 
     /// Rotates register A left one bit and sets the flags appropriately.
     ///
-    /// The leaving bit on the left is copied into the carry bit.
-    pub fn rlc(&mut self) {
-        self.f = Flags::empty();
-        self.a = self.a.rotate_left(1);
-        self.f.set(Flags::CARRY, self.a.has_bit_set(0));
+    /// The leaving bit on the left is copied into the carry bit. Unlike `RLC`, the zero flag is
+    /// unconditionally reset.
+    pub fn rlca(&mut self) {
+        arithmetic::rlc(&mut self.a, &mut self.f);
+        self.f.remove(Flags::ZERO);
     }
 
     /// Rotates register A right one bit, through the carry bit.
@@ -728,15 +729,20 @@ mod tests {
     }
 
     #[test]
-    fn rlc() {
+    fn rlca() {
         let mut reg = Registers::default();
         reg.a = 0x85;
-        reg.rlc();
+        reg.rlca();
 
         // This is a different value than the GameBoy programming manual, which specifies `0x0A` as
         // the correct result.
         assert_eq!(reg.a, 0x0B);
         assert_eq!(reg.f, Flags::CARRY);
+
+        let mut reg = Registers::default();
+        reg.rlca();
+        assert_eq!(reg.a, 0x00);
+        assert_eq!(reg.f, Flags::empty());
     }
 
     #[test]

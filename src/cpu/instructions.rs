@@ -710,7 +710,7 @@ impl super::Cpu {
             0xf6 => self.reg.or(instruction.operands[0]),
 
             // RLCA
-            0x07 => self.reg.rlc(),
+            0x07 => self.reg.rlca(),
 
             // RLA
             0x17 => arithmetic::rl(&mut self.reg.a, &mut self.reg.f),
