@@ -28,10 +28,13 @@ struct InstructionDef {
 
     /// The number of clock cycles it takes to execute this instruction.
     ///
+    /// Prefix instructions have a cycle count of 0 in this representation. Use the `cycles()`
+    /// method of `Instruction` to get the correct cycle count.
+    ///
     /// Note that this is measured in clock cycles, not machine cycles. While Nintendo's official
     /// documentation records the timings in machine cycles, most online documentation uses clock
     /// cycles. Four clock cycles is equivalent to a single machine cycle.
-    pub cycles: u8,
+    cycles: u8,
 
     /// The number of clock cycles it takes to execute this instruction if the instruction's
     /// condition is true. Only conditional instructions will have this field set.
@@ -44,6 +47,35 @@ struct InstructionDef {
     pub num_operands: u8,
 }
 
+/// A definition of a prefix (`0xCB`) instruction.
+///
+/// These instructions are notably simpler than more general instructions, as they are always 8 or
+/// 16 cycles each and do not have operands.
+#[derive(Debug, Clone)]
+struct PrefixInstructionDef {
+    /// The byte that identifies this prefix instruction.
+    pub byte: u8,
+
+    /// A short, human readable representation of the prefix instruction in Z80 assembly syntax.
+    pub description: &'static str,
+
+    /// The number of clock cycles it takes to execute this instruction.
+    ///
+    /// See the note on `InstructionDef::cycles` for how this field differs from machine cycles.
+    cycles: u8,
+}
+
+// FIXME: Remove this impl once all prefix instructions are implemented.
+impl Default for PrefixInstructionDef {
+    fn default() -> PrefixInstructionDef {
+        PrefixInstructionDef {
+            byte: 0,
+            description: "UNDEFINED PREFIX INSTRUCTION",
+            cycles: 8,
+        }
+    }
+}
+
 /// A single instruction to be executed by the CPU.
 #[derive(Debug, Clone)]
 pub struct Instruction {
@@ -51,6 +83,17 @@ pub struct Instruction {
 
     /// Vector containing the operands of the instruction. May be empty.
     operands: SmallVec<[u8; 2]>,
+}
+
+impl Instruction {
+    /// The number of clock cycles it takes to execute this instruction.
+    pub fn cycles(&self) -> u8 {
+        if self.def.byte == 0xCB {
+            PREFIX_INSTRUCTIONS[self.operands[0] as usize].cycles
+        } else {
+            self.def.cycles
+        }
+    }
 }
 
 impl Default for Instruction {
@@ -71,8 +114,9 @@ impl Display for Instruction {
                 "d8" | "a8" | "r8" => format!("${:#04x}", &self.operands[0]),
                 "d16" | "a16" => format!("${:#06x}", LittleEndian::read_u16(&self.operands)),
                 "PREFIX CB" => {
-                    // TODO: Display the actual prefix instruction
-                    format!("PREFIX CB: {:#04x}", &self.operands[0])
+                    PREFIX_INSTRUCTIONS[self.operands[0] as usize]
+                        .description
+                        .to_string()
                 }
                 ty => unreachable!("unhandled data type: {}", ty),
             };
@@ -136,6 +180,38 @@ macro_rules! instructions {
             ];
             instructions.sort_unstable_by_key(|instruction| instruction.byte);
             instructions
+        }
+    }
+}
+
+/// Macro to quickly define all prefix instructions.
+macro_rules! prefix_instructions {
+    ( $( $byte:expr, $description:expr ; )* ) => {
+        {
+            use $crate::regex::Regex;
+
+            let memory_access_re = Regex::new(r"\(HL\)").unwrap();
+
+            // FIXME: This should be an array once all instructions are defined.
+            let mut prefix_instructions = vec![PrefixInstructionDef::default(); 0x100];
+
+            $(
+                // If the instruction accesses memory (through HL), the instruction will take 16
+                // cycles. Otherwise, it will take 8.
+                let cycles = if memory_access_re.is_match($description) {
+                    16
+                } else {
+                    8
+                };
+
+                prefix_instructions[$byte] = PrefixInstructionDef {
+                    byte: $byte,
+                    description: $description,
+                    cycles,
+                };
+            )*
+
+            prefix_instructions
         }
     }
 }
@@ -1345,7 +1421,7 @@ impl super::Cpu {
 
         let cycles = match (condition_taken, instruction.def.condition_cycles) {
             (true, Some(cycles)) => u32::from(cycles),
-            _ => u32::from(instruction.def.cycles),
+            _ => u32::from(instruction.cycles()),
         };
 
         self.clock.t += cycles;
@@ -1354,7 +1430,7 @@ impl super::Cpu {
         cycles
     }
 
-    pub fn execute_prefix(&mut self, instruction: u8, bus: &mut Bus) -> u32 {
+    pub fn execute_prefix(&mut self, instruction: u8, bus: &mut Bus) {
         match instruction {
             0x00 => (),
 
@@ -1512,7 +1588,6 @@ impl super::Cpu {
                 )
             }
         }
-        8
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
@@ -1810,6 +1885,17 @@ lazy_static! {
         0xef,       "RST 28H",      16;
         0xff,       "RST 38H",      16;
     };
+
+    /// Prefix instruction definitions.
+    ///
+    /// Descriptions taken from [here].
+    ///
+    /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+    static ref PREFIX_INSTRUCTIONS: Vec<PrefixInstructionDef> = prefix_instructions! {
+        // byte     description
+        0x11,       "RL C";
+        0x86,       "RES 0,(HL)";
+    };
 }
 
 #[cfg(test)]
@@ -1886,6 +1972,23 @@ mod tests {
     }
 
     #[test]
+    fn cycles() {
+        let rl_c = Instruction {
+            def: &INSTRUCTIONS[0xCB],
+            operands: SmallVec::from_slice(&[0x11]),
+        };
+
+        assert_eq!(rl_c.cycles(), 8);
+
+        let res_0_hl = Instruction {
+            def: &INSTRUCTIONS[0xCB],
+            operands: SmallVec::from_slice(&[0x86]),
+        };
+
+        assert_eq!(res_0_hl.cycles(), 16);
+    }
+
+    #[test]
     fn instruction_display() {
         let nop = Instruction {
             def: &INSTRUCTIONS[0x00],
@@ -1907,6 +2010,13 @@ mod tests {
         };
 
         assert_eq!(&ld_hl_d16.to_string(), "LD HL,$0xbeef");
+
+        let rl_c = Instruction {
+            def: &INSTRUCTIONS[0xCB],
+            operands: SmallVec::from_slice(&[0x11]),
+        };
+
+        assert_eq!(&rl_c.to_string(), "RL C");
     }
 
     #[test]
