@@ -27,6 +27,7 @@ pub mod bytes;
 pub mod cpu;
 pub mod errors;
 pub mod graphics;
+pub mod input;
 pub mod memory;
 pub mod tui;
 
@@ -45,6 +46,7 @@ use graphics::Ppu;
 use memory::Mmu;
 
 pub use graphics::SCREEN_DIMENSIONS;
+pub use input::Button;
 
 const CYCLES_PER_FRAME: u32 = 70224;
 
@@ -144,6 +146,14 @@ impl Emulator {
                 debugger.paused = true;
             }
         }
+    }
+
+    pub fn press(&mut self, button: &Button) {
+        self.bus.button_state.press(button);
+    }
+
+    pub fn release(&mut self, button: &Button) {
+        self.bus.button_state.release(button);
     }
 
     /// Step the emulation state for 1/60 of a second.

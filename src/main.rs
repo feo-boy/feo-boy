@@ -51,6 +51,28 @@ fn start_emulator(config: Config) -> Result<()> {
     ).unwrap();
 
     while let Some(event) = window.next() {
+        if let Some(args) = event.button_args() {
+            // TODO: Make this configurable
+            let button = match args.button {
+                Button::Keyboard(Key::Up) => Some(feo_boy::Button::Up),
+                Button::Keyboard(Key::Down) => Some(feo_boy::Button::Down),
+                Button::Keyboard(Key::Left) => Some(feo_boy::Button::Left),
+                Button::Keyboard(Key::Right) => Some(feo_boy::Button::Right),
+                Button::Keyboard(Key::X) => Some(feo_boy::Button::B),
+                Button::Keyboard(Key::Z) => Some(feo_boy::Button::A),
+                Button::Keyboard(Key::Return) => Some(feo_boy::Button::Start),
+                Button::Keyboard(Key::Backspace) => Some(feo_boy::Button::Select),
+                _ => None,
+            };
+
+            if let Some(ref button) = button {
+                match args.state {
+                    ButtonState::Press => emulator.press(button),
+                    ButtonState::Release => emulator.release(button),
+                }
+            }
+        }
+
         if event.update_args().is_some() {
             emulator.update()?;
         }

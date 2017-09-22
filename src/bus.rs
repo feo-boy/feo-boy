@@ -8,6 +8,7 @@ use itertools::Itertools;
 use bytes::ByteExt;
 use cpu::Interrupts;
 use graphics::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
+use input::{Button, ButtonState, SelectFlags};
 use memory::{Addressable, Mmu};
 
 /// The "wires" of the emulator.
@@ -19,6 +20,7 @@ pub struct Bus {
     pub ppu: Ppu,
     pub mmu: Mmu,
     pub interrupts: Interrupts,
+    pub button_state: ButtonState,
 }
 
 impl Addressable for Bus {
@@ -52,16 +54,43 @@ impl Bus {
         let Bus {
             ref ppu,
             ref interrupts,
+            ref button_state,
             ..
         } = *self;
 
         match address {
             // P1/JOYP - Joypad
             0xFF00 => {
-                warn!("input is not implemented");
+                let mut register = 0u8;
 
-                // Indicates that no buttons are pressed.
-                0x0F
+                register.set_bit(
+                    0,
+                    !(button_state.is_pressed(&Button::Right) ||
+                          button_state.is_pressed(&Button::A)),
+                );
+
+                register.set_bit(
+                    1,
+                    !(button_state.is_pressed(&Button::Left) ||
+                          button_state.is_pressed(&Button::B)),
+                );
+
+                register.set_bit(
+                    2,
+                    !(button_state.is_pressed(&Button::Up) ||
+                          button_state.is_pressed(&Button::Select)),
+                );
+
+                register.set_bit(
+                    3,
+                    !(button_state.is_pressed(&Button::Down) ||
+                          button_state.is_pressed(&Button::Start)),
+                );
+
+                // Sets bits 4 and 5.
+                register |= button_state.select.bits();
+
+                register
             }
 
             // IF - Interrupt Flag
@@ -157,10 +186,15 @@ impl Bus {
             ref mut ppu,
             ref mut mmu,
             ref mut interrupts,
+            ref mut button_state,
             ..
         } = *self;
 
         match address {
+            0xFF00 => {
+                button_state.select = SelectFlags::from_bits_truncate(byte);
+            }
+
             // IF - Interrupt Flag
             0xFF0F => {
                 interrupts.vblank.requested = byte.has_bit_set(0);
