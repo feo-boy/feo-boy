@@ -15,6 +15,7 @@ use memory::Addressable;
 pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
+pub const SPRITE_START: u16 = 0xFE00;
 
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -413,7 +414,8 @@ impl Ppu {
 
             // Get the address of the tile in memory.
             let tile_id_address = if using_window {
-                self.control.window_map_start.address() + &tile_row_offset.into() + &tile_offset.into()
+                self.control.window_map_start.address() + &tile_row_offset.into() +
+                    &tile_offset.into()
             } else {
                 self.control.bg_map_start.address() + &tile_row_offset.into() + &tile_offset.into()
             };
@@ -470,6 +472,57 @@ impl Ppu {
 
         // Map the color number to the shade to display on the screen
         self.bg_palette[color_num as usize]
+    }
+
+    /// Render the sprites on the screen.
+    pub fn render_sprite(&mut self) {
+        for sprite in 0..40 {
+            // The sprite occupies 4 bytes in the table
+            let index = (sprite as u8) * 4;
+            // Get the index of the sprite
+            let absolute_index = SPRITE_START + index.into();
+            let y_position = self.read_byte(absolute_index - 16) - 16;
+            let x_position = self.read_byte(absolute_index - 8) - 8;
+            let tile_location = self.read_byte(absolute_index + 2);
+            let attributes = self.read_byte(absolute_index + 3);
+
+            let y_flip = attributes.has_bit_set(6);
+            let x_flip = attributes.has_bit_set(5);
+
+            let y_size = match self.control.sprite_size {
+                SpriteSize::Small => 8,
+                SpriteSize::Large => 16,
+            };
+
+            if (self.line >= y_position) && (self.line < (y_position + y_size)) {
+                let current_line = if y_flip {
+                    (y_position as i16 + y_size as i16 - self.line as i16) * 2
+                } else {
+                    (self.line as i16 - y_position as i16) * 2
+                };
+
+                let data_address = (0x8000 + (tile_location.into() * 16)) + current_line as u16;
+                let data_1 = self.read_byte(data_address);
+                let data_2 = self.read_byte(data_address + 1);
+
+                for tile_pixel in 0..8.rev() {
+                    let colorbit = if x_flip {
+                        (7 - tile_pixel as i8) as u8
+                    } else {
+                        tile_pixel as u8
+                    };
+
+                    let color_bit_value = data_2.has_bit_set(colorbit) as u8;
+                    let color_num = (color_bit_value << 1) | data_1.has_bit_set(colorbit) as u8;
+
+                    let color_address = if attributes.has_bit_set(4) {
+                        0xFF49
+                    } else {
+                        0xFF48
+                    };
+                }
+            }
+        }
     }
 }
 
