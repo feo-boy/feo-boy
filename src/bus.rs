@@ -160,6 +160,162 @@ impl Bus {
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
 
+            // Undocumented
+            0xFF4C => 0xFF,
+
+            // KEY1 - Prepare Speed Switch - (CGB Only)
+            0xFF4D => 0xFF,
+
+            // Undocumented
+            0xFF4E => 0xFF,
+
+            // VBK - VRAM Bank (CGB Only)
+            0xFF4F => 0xFF,
+
+            // Unmap BIOS Register
+            0xFF50 => 0xFF,
+
+            // HDMA1 - New DMA Source, High (CGB Only)
+            0xFF51 => 0xFF,
+
+            // HDMA2 - New DMA Source, Low (CGB Only)
+            0xFF52 => 0xFF,
+
+            // HDMA3 - New DMA Destination, High (CGB Only)
+            0xFF53 => 0xFF,
+
+            // HDMA4 - New DMA Destination, Low (CGB Only)
+            0xFF54 => 0xFF,
+
+            // HDMA5 - New DMA Length/Mode/Start (CGB Only)
+            0xFF55 => 0xFF,
+
+            // RP - Infrared Communications Port (CGB Only)
+            0xFF56 => 0xFF,
+
+            // Undocumented
+            0xFF57 => 0xFF,
+
+            // Undocumented
+            0xFF58 => 0xFF,
+
+            // Undocumented
+            0xFF59 => 0xFF,
+
+            // Undocumented
+            0xFF5A => 0xFF,
+
+            // Undocumented
+            0xFF5B => 0xFF,
+
+            // Undocumented
+            0xFF5C => 0xFF,
+
+            // Undocumented
+            0xFF5D => 0xFF,
+
+            // Undocumented
+            0xFF5E => 0xFF,
+
+            // Undocumented
+            0xFF5F => 0xFF,
+
+            // Undocumented
+            0xFF60 => 0xFF,
+
+            // Undocumented
+            0xFF61 => 0xFF,
+
+            // Undocumented
+            0xFF62 => 0xFF,
+
+            // Undocumented
+            0xFF63 => 0xFF,
+
+            // Undocumented
+            0xFF64 => 0xFF,
+
+            // Undocumented
+            0xFF65 => 0xFF,
+
+            // Undocumented
+            0xFF66 => 0xFF,
+
+            // Undocumented
+            0xFF67 => 0xFF,
+
+            // BCPS/BGPI - Background Palette Index (CGB Only)
+            0xFF68 => 0xFF,
+
+            // BCPD/BGPD - Background Palette Data (CGB Only)
+            0xFF69 => 0xFF,
+
+            // OCPS/OBPI - Sprite Palette Index (CGB Only)
+            0xFF6A => 0xFF,
+
+            // OCPD/OBPD - Sprite Palette Data (CGB Only)
+            0xFF6B => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF6C => 0xFF,
+
+            // Undocumented
+            0xFF6D => 0xFF,
+
+            // Undocumented
+            0xFF6E => 0xFF,
+
+            // Undocumented
+            0xFF6F => 0xFF,
+
+            // SVBK - WRAM Bank (CGB Only)
+            0xFF70 => 0xFF,
+
+            // Undocumented
+            0xFF71 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF72 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF73 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF74 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF75 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF76 => 0xFF,
+
+            // Undocumented (CGB)
+            0xFF77 => 0xFF,
+
+            // Undocumented
+            0xFF78 => 0xFF,
+
+            // Undocumented
+            0xFF79 => 0xFF,
+
+            // Undocumented
+            0xFF7A => 0xFF,
+
+            // Undocumented
+            0xFF7B => 0xFF,
+
+            // Undocumented
+            0xFF7C => 0xFF,
+
+            // Undocumented
+            0xFF7D => 0xFF,
+
+            // Undocumented
+            0xFF7E => 0xFF,
+
+            // Undocumented
+            0xFF7F => 0xFF,
+
             // IE - Interrupt Enable
             0xFFFF => {
                 let mut byte = 0x00;
