@@ -16,6 +16,7 @@ pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 pub const SPRITE_START: u16 = 0xFE00;
+pub const SPRITE_TILE_DATA_START: u16 = 0x8000;
 
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -506,25 +507,32 @@ impl Ppu {
                     (i16::from(self.line) - i16::from(y_position)) * 2
                 };
 
-                let data_address: u16 = (0x8000 + (u16::from(tile_location) * 16)) +
+                // Get the address of the color information within the sprite tile data. The color
+                // is stored as two bytes corresponding to an 8-pixel line, as with background
+                // tiles.
+                let data_address: u16 = (SPRITE_TILE_DATA_START + (u16::from(tile_location) * 16)) +
                     current_line as u16;
                 let color_row = self.read_word(data_address);
 
+                // Find the shade for each pixel in the line
                 for tile_pixel in (0..8).rev() {
-                    let colorbit = if x_flip {
+                    // Get the bit that corresponds to the pixel within the line
+                    let color_bit = if x_flip {
                         (7 - tile_pixel as i8) as u8
                     } else {
                         tile_pixel as u8
                     };
 
+                    // Determine which sprite palette to use
                     let sprite_palette = if attributes.has_bit_set(4) {
                         &self.sprite_palette[1]
                     } else {
                         &self.sprite_palette[0]
                     };
 
-                    let shade = *Self::shade(color_row, colorbit, sprite_palette);
+                    let shade = *Self::shade(color_row, color_bit, sprite_palette);
 
+                    // Find the horizontal position of the pixel on the screen
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
                     let pixel = x_position + x_pixel;
 
