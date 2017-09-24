@@ -427,9 +427,10 @@ impl Ppu {
             // row of the tile takes two bytes.
             let tile_line = (y_position % TILE_HEIGHT) * 2;
 
-            let shade = self.shade(
+            let shade = Self::shade(
                 self.read_word(tile_address + tile_line as u16),
                 x_position % 8,
+                self.bg_palette,
             );
 
             self.pixels.0[self.line as usize][x as usize] = shade;
@@ -456,7 +457,7 @@ impl Ppu {
     }
 
     /// Gets the shade for rendering a particular pixel of the screen.
-    fn shade(&self, tile_row: u16, tile_x: u8) -> Shade {
+    fn shade(tile_row: u16, tile_x: u8, palette: &[Shade]) -> &Shade {
         // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
         // pixel. The first byte contains the lower order bit of the color number, while the second
         // byte contains the higher order bit.
@@ -471,7 +472,7 @@ impl Ppu {
         color_num.set_bit(1, bytes[1].has_bit_set(color_bit));
 
         // Map the color number to the shade to display on the screen
-        self.bg_palette[color_num as usize]
+        &palette[color_num as usize]
     }
 
     /// Render the sprites on the screen.
@@ -502,8 +503,10 @@ impl Ppu {
                 };
 
                 let data_address = (0x8000 + (tile_location.into() * 16)) + current_line as u16;
-                let data_1 = self.read_byte(data_address);
-                let data_2 = self.read_byte(data_address + 1);
+                let color_row = self.read_word(data_address);
+
+                // let data_1 = self.read_byte(data_address);
+                // let data_2 = self.read_byte(data_address + 1);
 
                 for tile_pixel in 0..8.rev() {
                     let colorbit = if x_flip {
@@ -512,14 +515,15 @@ impl Ppu {
                         tile_pixel as u8
                     };
 
-                    let color_bit_value = data_2.has_bit_set(colorbit) as u8;
-                    let color_num = (color_bit_value << 1) | data_1.has_bit_set(colorbit) as u8;
+                    // let color_bit_value = data_2.has_bit_set(colorbit) as u8;
+                    // let color_num = (color_bit_value << 1) | data_1.has_bit_set(colorbit) as u8;
 
-                    let color_address = if attributes.has_bit_set(4) {
-                        0xFF49
-                    } else {
-                        0xFF48
-                    };
+                    // let color_address = if attributes.has_bit_set(4) {
+                    //     0xFF49
+                    // } else {
+                    //     0xFF48
+                    // };
+                    let shade = self.shade(color_row, colorbit, self.sprite_palette);
                 }
             }
         }
