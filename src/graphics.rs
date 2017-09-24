@@ -427,10 +427,10 @@ impl Ppu {
             // row of the tile takes two bytes.
             let tile_line = (y_position % TILE_HEIGHT) * 2;
 
-            let shade = Self::shade(
+            let shade = *Self::shade(
                 self.read_word(tile_address + tile_line as u16),
                 x_position % 8,
-                self.bg_palette,
+                &self.bg_palette,
             );
 
             self.pixels.0[self.line as usize][x as usize] = shade;
@@ -456,7 +456,7 @@ impl Ppu {
         start.address() + offset * TILE_DATA_ROW_SIZE
     }
 
-    /// Gets the shade for rendering a particular pixel of the screen.
+    /// Gets the shade for rendering a particular pixel of the screen, using the given palette.
     fn shade(tile_row: u16, tile_x: u8, palette: &[Shade]) -> &Shade {
         // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
         // pixel. The first byte contains the lower order bit of the color number, while the second
@@ -481,49 +481,54 @@ impl Ppu {
             // The sprite occupies 4 bytes in the table
             let index = (sprite as u8) * 4;
             // Get the index of the sprite
-            let absolute_index = SPRITE_START + index.into();
+            let absolute_index: u16 = SPRITE_START + u16::from(index);
             let y_position = self.read_byte(absolute_index - 16) - 16;
             let x_position = self.read_byte(absolute_index - 8) - 8;
             let tile_location = self.read_byte(absolute_index + 2);
             let attributes = self.read_byte(absolute_index + 3);
 
+            // Determine whether the sprite is flipped horizontally or vertically
             let y_flip = attributes.has_bit_set(6);
             let x_flip = attributes.has_bit_set(5);
 
+            // Determine whether this is an 8x8 or 8x16 sprite
             let y_size = match self.control.sprite_size {
                 SpriteSize::Small => 8,
                 SpriteSize::Large => 16,
             };
 
+            // Continue if the sprite is on the current line
             if (self.line >= y_position) && (self.line < (y_position + y_size)) {
+                // Get the line of the sprite to be displayed
                 let current_line = if y_flip {
-                    (y_position as i16 + y_size as i16 - self.line as i16) * 2
+                    (i16::from(y_position) + i16::from(y_size) - i16::from(self.line)) * 2
                 } else {
-                    (self.line as i16 - y_position as i16) * 2
+                    (i16::from(self.line) - i16::from(y_position)) * 2
                 };
 
-                let data_address = (0x8000 + (tile_location.into() * 16)) + current_line as u16;
+                let data_address: u16 = (0x8000 + (u16::from(tile_location) * 16)) +
+                    current_line as u16;
                 let color_row = self.read_word(data_address);
 
-                // let data_1 = self.read_byte(data_address);
-                // let data_2 = self.read_byte(data_address + 1);
-
-                for tile_pixel in 0..8.rev() {
+                for tile_pixel in (0..8).rev() {
                     let colorbit = if x_flip {
                         (7 - tile_pixel as i8) as u8
                     } else {
                         tile_pixel as u8
                     };
 
-                    // let color_bit_value = data_2.has_bit_set(colorbit) as u8;
-                    // let color_num = (color_bit_value << 1) | data_1.has_bit_set(colorbit) as u8;
+                    let sprite_palette = if attributes.has_bit_set(4) {
+                        &self.sprite_palette[1]
+                    } else {
+                        &self.sprite_palette[0]
+                    };
 
-                    // let color_address = if attributes.has_bit_set(4) {
-                    //     0xFF49
-                    // } else {
-                    //     0xFF48
-                    // };
-                    let shade = self.shade(color_row, colorbit, self.sprite_palette);
+                    let shade = *Self::shade(color_row, colorbit, sprite_palette);
+
+                    let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
+                    let pixel = x_position + x_pixel;
+
+                    self.pixels.0[self.line as usize][pixel as usize] = shade;
                 }
             }
         }
@@ -643,14 +648,14 @@ mod tests {
             Shade::Black,
         ];
 
-        assert_eq!(ppu.shade(tile_row, 0), Shade::DarkGray);
-        assert_eq!(ppu.shade(tile_row, 1), Shade::LightGray);
-        assert_eq!(ppu.shade(tile_row, 2), Shade::White);
-        assert_eq!(ppu.shade(tile_row, 3), Shade::White);
-        assert_eq!(ppu.shade(tile_row, 4), Shade::Black);
-        assert_eq!(ppu.shade(tile_row, 5), Shade::LightGray);
-        assert_eq!(ppu.shade(tile_row, 6), Shade::Black);
-        assert_eq!(ppu.shade(tile_row, 7), Shade::DarkGray);
+        assert_eq!(*Ppu::shade(tile_row, 0, &ppu.bg_palette), Shade::DarkGray);
+        assert_eq!(*Ppu::shade(tile_row, 1, &ppu.bg_palette), Shade::LightGray);
+        assert_eq!(*Ppu::shade(tile_row, 2, &ppu.bg_palette), Shade::White);
+        assert_eq!(*Ppu::shade(tile_row, 3, &ppu.bg_palette), Shade::White);
+        assert_eq!(*Ppu::shade(tile_row, 4, &ppu.bg_palette), Shade::Black);
+        assert_eq!(*Ppu::shade(tile_row, 5, &ppu.bg_palette), Shade::LightGray);
+        assert_eq!(*Ppu::shade(tile_row, 6, &ppu.bg_palette), Shade::Black);
+        assert_eq!(*Ppu::shade(tile_row, 7, &ppu.bg_palette), Shade::DarkGray);
     }
 
     #[test]
