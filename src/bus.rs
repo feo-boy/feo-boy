@@ -160,6 +160,9 @@ impl Bus {
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
 
+            // WX - Window X Position minus 7
+            0xFF4B => ppu.window.x.wrapping_add(7),
+
             // Undocumented
             0xFF4C => 0xFF,
 
@@ -453,7 +456,7 @@ impl Bus {
             0xFF4A => ppu.window.y = byte,
 
             // WB - Window X position minus 7
-            0xFF4B => ppu.window.x = byte,
+            0xFF4B => ppu.window.x = byte.wrapping_sub(7),
 
             // Unmap BIOS
             0xFF50 => {
@@ -528,18 +531,46 @@ impl Display for Bus {
 mod tests {
     use super::Bus;
 
-    use quickcheck::{TestResult, quickcheck};
+    use quickcheck::{TestResult, Arbitrary, Gen, quickcheck};
 
     use graphics::Shade;
     use memory::{Addressable, BIOS_SIZE};
 
     #[test]
     fn read_write() {
-        fn prop(address: u16, value: u8) -> TestResult {
+        use std::{u16, u8};
+
+        // By default, quickcheck only checks numbers from 0 to 100.
+
+        #[derive(Debug, Clone)]
+        struct Address(u16);
+
+        #[derive(Debug, Clone)]
+        struct Byte(u8);
+
+        impl Arbitrary for Address {
+            fn arbitrary<G: Gen>(gen: &mut G) -> Address {
+                let rand: u32 = gen.gen_range(0, u32::from(u16::MAX) + 1);
+                Address(rand as u16)
+            }
+        }
+
+        impl Arbitrary for Byte {
+            fn arbitrary<G: Gen>(gen: &mut G) -> Byte {
+                let rand: u16 = gen.gen_range(0, u16::from(u8::MAX) + 1);
+                Byte(rand as u8)
+            }
+        }
+
+        fn prop(address: Address, value: Byte) -> TestResult {
+            let address = address.0;
+            let value = value.0;
+
             // Make sure the address is writable. Also, ignore certain registers for now since they
             // aren't implemented fully.
             match address {
-                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFF39 | 0xFF41...0xFF7F => {
+                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFF39 | 0xFF41...0xFF4A |
+                0xFF4C...0xFF7F => {
                     return TestResult::discard();
                 }
                 _ => (),
@@ -550,7 +581,7 @@ mod tests {
             TestResult::from_bool(bus.read_byte(address) == value)
         }
 
-        quickcheck(prop as fn(u16, u8) -> TestResult);
+        quickcheck(prop as fn(Address, Byte) -> TestResult);
     }
 
     #[test]
@@ -600,5 +631,12 @@ mod tests {
         bus.ppu.lcd_status_interrupts.vblank = true;
 
         assert_eq!(bus.read_byte(0xFF41), 0b00010100);
+    }
+
+    #[test]
+    fn window_position() {
+        let mut bus = Bus::default();
+        bus.write_byte(0xFF4B, 7);
+        assert_eq!(bus.ppu.window.x, 0);
     }
 }
