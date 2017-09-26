@@ -16,6 +16,7 @@ extern crate byteorder;
 extern crate image;
 extern crate itertools;
 extern crate regex;
+extern crate rustyline;
 extern crate smallvec;
 
 #[cfg(test)]
@@ -34,10 +35,12 @@ pub mod tui;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io;
 use std::path::Path;
+use std::process;
 
 use image::RgbaImage;
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 use bus::Bus;
 use cpu::{Cpu, Instruction};
@@ -163,14 +166,23 @@ impl Emulator {
         let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
         while self.cpu.clock.t < frame_clock {
             if self.is_paused() {
-                print!("feo debug [{}]: ", tui::COMMANDS);
-                io::stdout().flush()?;
+                let readline = {
+                    let editor = &mut self.debug.as_mut().unwrap().editor;
+                    let prompt = format!("feo debug [{}] >> ", tui::COMMANDS);
+                    editor.readline(&prompt)
+                };
 
-                let mut command = String::new();
-                io::stdin().read_line(&mut command)?;
-                tui::parse_command(self, &command.trim())?;
+                match readline {
+                    Ok(line) => {
+                        self.debug.as_mut().unwrap().editor.add_history_entry(&line);
+                        tui::parse_command(self, &line.trim())?
+                    }
+                    Err(ReadlineError::Interrupted) |
+                    Err(ReadlineError::Eof) => process::exit(0),
+                    Err(err) => panic!("{}", err),
+                }
             } else {
-                self.step();
+                self.step()
             }
         }
 
@@ -218,6 +230,7 @@ impl Default for Emulator {
 
 #[derive(Debug, Default)]
 struct Debugger {
+    editor: Editor<()>,
     breakpoints: HashSet<u16>,
     paused: bool,
 }
@@ -227,6 +240,7 @@ impl Debugger {
         Debugger {
             breakpoints: Default::default(),
             paused: true,
+            editor: Editor::<()>::new(),
         }
     }
 }
