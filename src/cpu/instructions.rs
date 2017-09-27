@@ -1432,15 +1432,44 @@ impl super::Cpu {
 
     pub fn execute_prefix(&mut self, instruction: u8, bus: &mut Bus) {
         match instruction {
-            0x00 => (),
+            0x00 => arithmetic::rlc(&mut self.reg.b, &mut self.reg.f),
+            0x01 => arithmetic::rlc(&mut self.reg.c, &mut self.reg.f),
+            0x02 => arithmetic::rlc(&mut self.reg.d, &mut self.reg.f),
+            0x03 => arithmetic::rlc(&mut self.reg.e, &mut self.reg.f),
+            0x04 => arithmetic::rlc(&mut self.reg.h, &mut self.reg.f),
+            0x05 => arithmetic::rlc(&mut self.reg.l, &mut self.reg.f),
+            0x06 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::rlc(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x07 => arithmetic::rlc(&mut self.reg.a, &mut self.reg.f),
 
             // RL C
             0x11 => arithmetic::rl(&mut self.reg.c, &mut self.reg.f),
-
-            0x17 => {
-                self.reg.f.set(Flags::ZERO, self.reg.a == 0);
-                self.reg.a = self.reg.a.rotate_left(1);
+            0x12 => arithmetic::rl(&mut self.reg.d, &mut self.reg.f),
+            0x13 => arithmetic::rl(&mut self.reg.e, &mut self.reg.f),
+            0x14 => arithmetic::rl(&mut self.reg.h, &mut self.reg.f),
+            0x15 => arithmetic::rl(&mut self.reg.l, &mut self.reg.f),
+            0x16 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::rl(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
             }
+            0x17 => arithmetic::rl(&mut self.reg.a, &mut self.reg.f),
+
+            0x18 => arithmetic::rr(&mut self.reg.b, &mut self.reg.f),
+            0x19 => arithmetic::rr(&mut self.reg.c, &mut self.reg.f),
+            0x1a => arithmetic::rr(&mut self.reg.d, &mut self.reg.f),
+            0x1b => arithmetic::rr(&mut self.reg.e, &mut self.reg.f),
+            0x1c => arithmetic::rr(&mut self.reg.h, &mut self.reg.f),
+            0x1d => arithmetic::rr(&mut self.reg.l, &mut self.reg.f),
+            0x1e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::rr(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x1f => arithmetic::rr(&mut self.reg.a, &mut self.reg.f),
 
             // SET x,B
             0xe0 => self.reg.b = self.reg.b | (1 << 4),
