@@ -1483,26 +1483,128 @@ impl super::Cpu {
                 self.reg.f.set(Flags::ZERO, self.reg.a == 0);
             }
 
-            // BIT b,r
-            0x47 => {
-                self.reg.f.set(Flags::ZERO, self.reg.a & (1 << 0) == 0);
-                self.reg.f.set(Flags::SUBTRACT, false);
-                self.reg.f.set(Flags::HALF_CARRY, true);
-            }
+            // BIT b,A
+            0x47 => arithmetic::bit(self.reg.a, 0, &mut self.reg.f),
+            0x4F => arithmetic::bit(self.reg.a, 1, &mut self.reg.f),
+            0x57 => arithmetic::bit(self.reg.a, 2, &mut self.reg.f),
+            0x5F => arithmetic::bit(self.reg.a, 3, &mut self.reg.f),
+            0x67 => arithmetic::bit(self.reg.a, 4, &mut self.reg.f),
+            0x6F => arithmetic::bit(self.reg.a, 5, &mut self.reg.f),
+            0x77 => arithmetic::bit(self.reg.a, 6, &mut self.reg.f),
+            0x7F => arithmetic::bit(self.reg.a, 7, &mut self.reg.f),
+
+            // BIT b,B
+            0x40 => arithmetic::bit(self.reg.b, 0, &mut self.reg.f),
+            0x48 => arithmetic::bit(self.reg.b, 1, &mut self.reg.f),
+            0x50 => arithmetic::bit(self.reg.b, 2, &mut self.reg.f),
+            0x58 => arithmetic::bit(self.reg.b, 3, &mut self.reg.f),
+            0x60 => arithmetic::bit(self.reg.b, 4, &mut self.reg.f),
+            0x68 => arithmetic::bit(self.reg.b, 5, &mut self.reg.f),
+            0x70 => arithmetic::bit(self.reg.b, 6, &mut self.reg.f),
+            0x78 => arithmetic::bit(self.reg.b, 7, &mut self.reg.f),
+
+            // BIT b,C
+            0x41 => arithmetic::bit(self.reg.c, 0, &mut self.reg.f),
+            0x49 => arithmetic::bit(self.reg.c, 1, &mut self.reg.f),
+            0x51 => arithmetic::bit(self.reg.c, 2, &mut self.reg.f),
+            0x59 => arithmetic::bit(self.reg.c, 3, &mut self.reg.f),
+            0x61 => arithmetic::bit(self.reg.c, 4, &mut self.reg.f),
+            0x69 => arithmetic::bit(self.reg.c, 5, &mut self.reg.f),
+            0x71 => arithmetic::bit(self.reg.c, 6, &mut self.reg.f),
+            0x79 => arithmetic::bit(self.reg.c, 7, &mut self.reg.f),
+
+            // BIT b,D
+            0x42 => arithmetic::bit(self.reg.d, 0, &mut self.reg.f),
+            0x4a => arithmetic::bit(self.reg.d, 1, &mut self.reg.f),
+            0x52 => arithmetic::bit(self.reg.d, 2, &mut self.reg.f),
+            0x5a => arithmetic::bit(self.reg.d, 3, &mut self.reg.f),
+            0x62 => arithmetic::bit(self.reg.d, 4, &mut self.reg.f),
+            0x6a => arithmetic::bit(self.reg.d, 5, &mut self.reg.f),
+            0x72 => arithmetic::bit(self.reg.d, 6, &mut self.reg.f),
+            0x7a => arithmetic::bit(self.reg.d, 7, &mut self.reg.f),
+
+            // BIT b,E
+            0x43 => arithmetic::bit(self.reg.e, 0, &mut self.reg.f),
+            0x4b => arithmetic::bit(self.reg.e, 1, &mut self.reg.f),
+            0x53 => arithmetic::bit(self.reg.e, 2, &mut self.reg.f),
+            0x5b => arithmetic::bit(self.reg.e, 3, &mut self.reg.f),
+            0x63 => arithmetic::bit(self.reg.e, 4, &mut self.reg.f),
+            0x6b => arithmetic::bit(self.reg.e, 5, &mut self.reg.f),
+            0x73 => arithmetic::bit(self.reg.e, 6, &mut self.reg.f),
+            0x7b => arithmetic::bit(self.reg.e, 7, &mut self.reg.f),
+
+            // BIT b,H
+            0x44 => arithmetic::bit(self.reg.h, 0, &mut self.reg.f),
+            0x4c => arithmetic::bit(self.reg.h, 1, &mut self.reg.f),
+            0x54 => arithmetic::bit(self.reg.h, 2, &mut self.reg.f),
+            0x5c => arithmetic::bit(self.reg.h, 3, &mut self.reg.f),
+            0x64 => arithmetic::bit(self.reg.h, 4, &mut self.reg.f),
+            0x6c => arithmetic::bit(self.reg.h, 5, &mut self.reg.f),
+            0x74 => arithmetic::bit(self.reg.h, 6, &mut self.reg.f),
+            0x7c => arithmetic::bit(self.reg.h, 7, &mut self.reg.f),
+
+            // BIT b,L
+            0x45 => arithmetic::bit(self.reg.l, 0, &mut self.reg.f),
+            0x4d => arithmetic::bit(self.reg.l, 1, &mut self.reg.f),
+            0x55 => arithmetic::bit(self.reg.l, 2, &mut self.reg.f),
+            0x5d => arithmetic::bit(self.reg.l, 3, &mut self.reg.f),
+            0x65 => arithmetic::bit(self.reg.l, 4, &mut self.reg.f),
+            0x6d => arithmetic::bit(self.reg.l, 5, &mut self.reg.f),
+            0x75 => arithmetic::bit(self.reg.l, 6, &mut self.reg.f),
+            0x7d => arithmetic::bit(self.reg.l, 7, &mut self.reg.f),
+
+            // BIT b,(HL)
+            0x46 => arithmetic::bit(bus.read_byte(self.reg.hl()), 0, &mut self.reg.f),
+            0x4e => arithmetic::bit(bus.read_byte(self.reg.hl()), 1, &mut self.reg.f),
+            0x56 => arithmetic::bit(bus.read_byte(self.reg.hl()), 2, &mut self.reg.f),
+            0x5e => arithmetic::bit(bus.read_byte(self.reg.hl()), 3, &mut self.reg.f),
+            0x66 => arithmetic::bit(bus.read_byte(self.reg.hl()), 4, &mut self.reg.f),
+            0x6e => arithmetic::bit(bus.read_byte(self.reg.hl()), 5, &mut self.reg.f),
+            0x76 => arithmetic::bit(bus.read_byte(self.reg.hl()), 6, &mut self.reg.f),
+            0x7e => arithmetic::bit(bus.read_byte(self.reg.hl()), 7, &mut self.reg.f),
 
             // SLA
-            0x20 => {
-                self.reg.f.set(Flags::CARRY, self.reg.b >> 7 & 1 != 0);
-                self.reg.b = self.reg.b << 1;
-                self.reg.f.set(Flags::ZERO, self.reg.b == 0);
+            0x20 => arithmetic::sla(&mut self.reg.b, &mut self.reg.f),
+            0x21 => arithmetic::sla(&mut self.reg.c, &mut self.reg.f),
+            0x22 => arithmetic::sla(&mut self.reg.d, &mut self.reg.f),
+            0x23 => arithmetic::sla(&mut self.reg.e, &mut self.reg.f),
+            0x24 => arithmetic::sla(&mut self.reg.h, &mut self.reg.f),
+            0x25 => arithmetic::sla(&mut self.reg.l, &mut self.reg.f),
+            0x26 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::sla(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x27 => arithmetic::sla(&mut self.reg.a, &mut self.reg.f),
+
+            // SRA
+            0x28 => arithmetic::sra(&mut self.reg.b, &mut self.reg.f),
+            0x29 => arithmetic::sra(&mut self.reg.c, &mut self.reg.f),
+            0x2a => arithmetic::sra(&mut self.reg.d, &mut self.reg.f),
+            0x2b => arithmetic::sra(&mut self.reg.e, &mut self.reg.f),
+            0x2c => arithmetic::sra(&mut self.reg.h, &mut self.reg.f),
+            0x2d => arithmetic::sra(&mut self.reg.l, &mut self.reg.f),
+            0x2e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::sra(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
             }
 
-            // BIT 7,H
-            0x7c => {
-                self.reg.f.set(Flags::ZERO, !self.reg.h.has_bit_set(7));
-                self.reg.f.remove(Flags::SUBTRACT);
-                self.reg.f.insert(Flags::HALF_CARRY);
+            0x2f => arithmetic::sra(&mut self.reg.a, &mut self.reg.f),
+
+            // SRL
+            0x38 => arithmetic::srl(&mut self.reg.b, &mut self.reg.f),
+            0x39 => arithmetic::srl(&mut self.reg.c, &mut self.reg.f),
+            0x3a => arithmetic::srl(&mut self.reg.d, &mut self.reg.f),
+            0x3b => arithmetic::srl(&mut self.reg.e, &mut self.reg.f),
+            0x3c => arithmetic::srl(&mut self.reg.h, &mut self.reg.f),
+            0x3d => arithmetic::srl(&mut self.reg.l, &mut self.reg.f),
+            0x3e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::srl(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
             }
+            0x3f => arithmetic::srl(&mut self.reg.a, &mut self.reg.f),
 
             // RES b,A
             0x87 => self.reg.a = self.reg.a & !(1 << 0), // 0,A
@@ -1555,10 +1657,7 @@ impl super::Cpu {
             0xBB => self.reg.e = self.reg.e & !(1 << 7), // 7,E
 
             // RES b,H
-            0x84 => self.reg.h = self.reg.h & !(1 << 0), // 0,H
-            0x94 => self.reg.h = self.reg.h & !(1 << 2), // 2,H
-            0xA4 => self.reg.h = self.reg.h & !(1 << 4), // 4,H
-            0xB4 => self.reg.h = self.reg.h & !(1 << 6), // 6,H
+            0x84 => self.reg.h = self.reg.h & !(1 << 0), // 0,H 0x94 => self.reg.h = self.reg.h & !(1 << 2), // 2,H 0xA4 => self.reg.h = self.reg.h & !(1 << 4), // 4,H 0xB4 => self.reg.h = self.reg.h & !(1 << 6), // 6,H
             0x8C => self.reg.h = self.reg.h & !(1 << 1), // 1,H
             0x9C => self.reg.h = self.reg.h & !(1 << 3), // 3,H
             0xAC => self.reg.h = self.reg.h & !(1 << 5), // 5,H

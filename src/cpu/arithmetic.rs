@@ -125,6 +125,40 @@ pub fn rr(byte: &mut u8, flags: &mut Flags) {
     flags.set(Flags::ZERO, *byte == 0);
 }
 
+/// Tests bit b in register r
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Set if bit b of register r is 0
+/// | Subtract   | Reset.
+/// | Half-carry | Set.
+/// | Carry      | Not affected.
+pub fn bit(byte: u8, b: u8, flags: &mut Flags) {
+    flags.set(Flags::ZERO, !byte.has_bit_set(b));
+    flags.remove(Flags::SUBTRACT);
+    flags.insert(Flags::HALF_CARRY);
+}
+
+pub fn sla(byte: &mut u8, flags: &mut Flags) {
+    flags.set(Flags::CARRY, !byte.has_bit_set(7));
+    *byte <<= 1;
+    flags.set(Flags::ZERO, *byte == 0);
+}
+
+pub fn sra(byte: &mut u8, flags: &mut Flags) {
+    flags.set(Flags::CARRY, !byte.has_bit_set(0));
+    *byte = (*byte as i8 >> 1) as u8;
+    flags.set(Flags::ZERO, *byte == 0);
+}
+
+pub fn srl(byte: &mut u8, flags: &mut Flags) {
+    flags.set(Flags::CARRY, !byte.has_bit_set(0));
+    *byte >>= 1;
+    flags.set(Flags::ZERO, *byte == 0);
+}
+
 #[cfg(test)]
 mod tests {
     use cpu::Flags;
