@@ -385,18 +385,20 @@ impl Ppu {
         }
     }
 
-    pub fn render_tiles(&mut self) {
+    fn render_tiles(&mut self) {
         const TILE_HEIGHT: u16 = 8;
         const TILE_MAP_HEIGHT: u16 = 32;
+
+        debug_assert!(self.line <= 143, "scanline out of range");
 
         // Check if the window is enabled.
         let using_window = self.control.window_enabled && self.window.y <= self.line;
 
         // Calculate the absolute y-position of the pixel in the background map.
         let y_position: u16 = if using_window {
-            (self.window.y + self.line).into()
+            self.window.y.wrapping_add(self.line).into()
         } else {
-            (self.bg_scroll.y + self.line).into()
+            self.bg_scroll.y.wrapping_add(self.line).into()
         };
 
         // Find which row of the 32x32 tile map the tile is in.
@@ -405,9 +407,9 @@ impl Ppu {
         // Draw the line.
         for x in 0..160 {
             let x_position = if using_window && x >= self.window.x {
-                x - self.window.x
+                x.wrapping_sub(self.window.x)
             } else {
-                x + self.bg_scroll.x
+                x.wrapping_add(self.bg_scroll.x)
             };
 
             // Find x-position of the tile in the row of tiles.
@@ -679,5 +681,26 @@ mod tests {
         assert_eq!(ppu.tile_data_address(0), 0x9000);
         assert_eq!(ppu.tile_data_address(37), 0x9250);
         assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
+    }
+
+    #[test]
+    fn tile_wrapping() {
+        let mut ppu = Ppu::new();
+        ppu.control.display_enabled = true;
+        ppu.control.background_enabled = true;
+        ppu.line = 100;
+        ppu.bg_scroll.x = 200;
+        ppu.bg_scroll.y = 200;
+
+        ppu.render_tiles();
+
+        let mut ppu = Ppu::new();
+        ppu.control.display_enabled = true;
+        ppu.control.window_enabled = true;
+        ppu.line = 143;
+        ppu.window.x = 200;
+        ppu.window.y = 143;
+
+        ppu.render_tiles();
     }
 }
