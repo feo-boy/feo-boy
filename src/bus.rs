@@ -343,14 +343,6 @@ impl Bus {
     }
 
     fn write_io_register(&mut self, address: u16, byte: u8) {
-        // let Bus {
-        //     ref mut ppu,
-        //     ref mut mmu,
-        //     ref mut interrupts,
-        //     ref mut button_state,
-        //     ..
-        // } = *self;
-
         match address {
             0xFF00 => {
                 let button_state = &mut self.button_state;
@@ -378,6 +370,11 @@ impl Bus {
                 interrupts.joypad.requested = byte.has_bit_set(4);
             }
 
+            // NR10 - Channel 1 Sweep Register
+            0xFF10 => {
+                warn!("attempted to modify channel 1 sweep (unimplemented)");
+            }
+
             // NR11 - Channel 1 Sound length/Wave pattern duty
             0xFF11 => {
                 warn!("attempted to modify sound channel 1 wave (unimplemented)");
@@ -386,6 +383,16 @@ impl Bus {
             // NR12 - Channel 1 Volume Envelope
             0xFF12 => {
                 warn!("attempted to modify sound channel 1 volume (unimplemented)");
+            }
+
+            // NR13 - Channel 1 Frequency lo data
+            0xFF13 => {
+                warn!("attempted to modify sound channel 1 frequency lo data (unimplemented)");
+            }
+
+            // NR14 - Channel 1 Frequency hi data
+            0xFF14 => {
+                warn!("attempted to modify sound channel 1 frequency hi data (unimplemented)");
             }
 
             // NR21 - Channel 2 Sound Length/Wave Pattery Duty
@@ -408,6 +415,51 @@ impl Bus {
                 warn!("attempted to modify sound channel 2 frequency hi data (unimplemented)");
             }
 
+            // NR30 - Channel 3 Sound on/off
+            0xFF1A => {
+                warn!("attempted to modify channel 3 on/off state (unimplemented)");
+            }
+
+            // NR31 - Channel 3 Sound Length
+            0xFF1B => {
+                warn!("attempted to modify channel 3 sound length (unimplemented)");
+            }
+
+            // NR32 - Channel 3 Select output level
+            0xFF1C => {
+                warn!("attempted to modify channel 3 output level (unimplemented)");
+            }
+
+            // NR33 - Channel 3 Frequency lo data
+            0xFF1D => {
+                warn!("attempted to modify channel 3 frequency lo data (unimplemented)");
+            }
+
+            // NR34 - Channel 3 Frequency hi data
+            0xFF1E => {
+                warn!("attempted to modify channel 3 frequency hi data (unimplemented)");
+            }
+
+            // NR41 - Channel 4 Sound Length
+            0xFF20 => {
+                warn!("attempted to modify channel 4 sound length (unimplemented)");
+            }
+
+            // NR42 - Channel 4 Volume Envelope
+            0xFF21 => {
+                warn!("attempted to modify channel 4 volume envelope (unimplemented)");
+            }
+
+            // NR43 - Channel 4 Polynomial Counter
+            0xFF22 => {
+                warn!("attempted to modify channel 4 polynomial counter (unimplemented)");
+            }
+
+            // NR44 - Channel 4 Counter/consecutive; Initial
+            0xFF23 => {
+                warn!("attempted to modify channel 4 consecutive/initial state (unimplemented)");
+            }
+
             // NR50 - Channel control / ON-OFF / Volume
             0xFF24 => {
                 warn!("attempted to modify master volume (unimplemented)");
@@ -425,6 +477,11 @@ impl Bus {
                     info!("enabling sound controller");
                     warn!("sound controller not implemented");
                 }
+            }
+
+            // Wave Pattern RAM
+            0xFF30...0xFF3F => {
+                warn!("attempted to modify wave pattern RAM (unimplemented)");
             }
 
             // LCDC - LCD Control
@@ -724,5 +781,11 @@ mod tests {
         for i in 0..0xA0 {
             assert_eq!(bus.read_byte(0xFE00 + (i as u16)), i as u8);
         }
+    }
+
+    #[test]
+    fn input() {
+        let mut bus = Bus::default();
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x0F);
     }
 }
