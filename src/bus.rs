@@ -357,6 +357,16 @@ impl Bus {
                 button_state.select = SelectFlags::from_bits_truncate(byte);
             }
 
+            // SB - Serial transfer data
+            0xFF01 => {
+                warn!("serial transfer is unimplemented");
+            }
+
+            // SC - Serial Transfer Control
+            0xFF02 => {
+                warn!("serial transfer is unimplemented");
+            }
+
             // IF - Interrupt Flag
             0xFF0F => {
                 let interrupts = &mut self.interrupts;
