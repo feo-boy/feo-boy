@@ -373,6 +373,26 @@ impl Bus {
                 warn!("attempted to modify sound channel 1 volume (unimplemented)");
             }
 
+            // NR21 - Channel 2 Sound Length/Wave Pattery Duty
+            0xFF16 => {
+                warn!("attempted to modify sound channel 2 wave (unimplemented)");
+            }
+
+            // NR22 - Channel 2 Volume Envelope
+            0xFF17 => {
+                warn!("attempted to modify sound channel 2 volume (unimplemented)");
+            }
+
+            // NR23 - Channel 2 Frequency lo data
+            0xFF18 => {
+                warn!("attempted to modify sound channel 2 frequency lo data (unimplemented)");
+            }
+
+            // NR23 - Channel 2 Frequency hi data
+            0xFF19 => {
+                warn!("attempted to modify sound channel 2 frequency hi data (unimplemented)");
+            }
+
             // NR50 - Channel control / ON-OFF / Volume
             0xFF24 => {
                 warn!("attempted to modify master volume (unimplemented)");
