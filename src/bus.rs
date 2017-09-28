@@ -591,6 +591,9 @@ impl Bus {
                 }
             }
 
+            // Undocumented
+            0xFF7F => (),
+
             // IE - Interrupt Enable
             0xFFFF => {
                 let interrupts = &mut self.interrupts;
