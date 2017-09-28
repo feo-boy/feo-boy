@@ -1,5 +1,7 @@
 //! Inter-component communication.
 
+#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+
 use std::fmt::{self, Display};
 use std::ops::Range;
 
@@ -341,21 +343,24 @@ impl Bus {
     }
 
     fn write_io_register(&mut self, address: u16, byte: u8) {
-        let Bus {
-            ref mut ppu,
-            ref mut mmu,
-            ref mut interrupts,
-            ref mut button_state,
-            ..
-        } = *self;
+        // let Bus {
+        //     ref mut ppu,
+        //     ref mut mmu,
+        //     ref mut interrupts,
+        //     ref mut button_state,
+        //     ..
+        // } = *self;
 
         match address {
             0xFF00 => {
+                let button_state = &mut self.button_state;
                 button_state.select = SelectFlags::from_bits_truncate(byte);
             }
 
             // IF - Interrupt Flag
             0xFF0F => {
+                let interrupts = &mut self.interrupts;
+
                 interrupts.vblank.requested = byte.has_bit_set(0);
                 interrupts.lcd_status.requested = byte.has_bit_set(1);
                 interrupts.timer.requested = byte.has_bit_set(2);
@@ -414,7 +419,7 @@ impl Bus {
 
             // LCDC - LCD Control
             0xFF40 => {
-                let control = &mut ppu.control;
+                let control = &mut self.ppu.control;
 
                 control.display_enabled = byte.has_bit_set(7);
                 control.window_map_start = if byte.has_bit_set(6) {
@@ -444,6 +449,8 @@ impl Bus {
 
             // STAT - LCDC Status
             0xFF41 => {
+                let ppu = &mut self.ppu;
+
                 ppu.lcd_status_interrupts.hblank = byte.has_bit_set(3);
                 ppu.lcd_status_interrupts.vblank = byte.has_bit_set(4);
                 ppu.lcd_status_interrupts.oam = byte.has_bit_set(5);
@@ -451,14 +458,32 @@ impl Bus {
             }
 
             // SCY - Scroll Y
-            0xFF42 => ppu.bg_scroll.y = byte,
+            0xFF42 => {
+                let ppu = &mut self.ppu;
+                ppu.bg_scroll.y = byte;
+            }
 
             // SCX - Scroll X
-            0xFF43 => ppu.bg_scroll.x = byte,
+            0xFF43 => {
+                let ppu = &mut self.ppu;
+                ppu.bg_scroll.x = byte;
+            }
+
+            // DMA Transfer
+            0xFF46 => {
+                // The actual address is 0x100 * the written value, that is, transfer_address
+                // fills the XX in 0xXXNN, where 00 <= NN < A0
+                let transfer_address = u16::from(byte) << 8;
+
+                for i in 0..0xA0 {
+                    let transfer_byte = self.read_byte(transfer_address + (i as u16));
+                    self.write_byte(0xFE00 + (i as u16), transfer_byte);
+                }
+            }
 
             // BGP - BG Palette Data
             0xFF47 => {
-                let palette = &mut ppu.bg_palette;
+                let palette = &mut self.ppu.bg_palette;
 
                 for i in 0..4 {
                     let shade = (byte >> (i * 2)) & 0x3;
@@ -467,19 +492,33 @@ impl Bus {
             }
 
             // OBP0 - Object Palette 0 Data
-            0xFF48 => Self::set_sprite_palette(&mut ppu.sprite_palette[0], byte),
+            0xFF48 => {
+                let ppu = &mut self.ppu;
+                Self::set_sprite_palette(&mut ppu.sprite_palette[0], byte);
+            }
 
             // OBP1 - Object Palette 1 Data
-            0xFF49 => Self::set_sprite_palette(&mut ppu.sprite_palette[1], byte),
+            0xFF49 => {
+                let ppu = &mut self.ppu;
+                Self::set_sprite_palette(&mut ppu.sprite_palette[1], byte);
+            }
 
             // WY - Window Y position
-            0xFF4A => ppu.window.y = byte,
+            0xFF4A => {
+                let ppu = &mut self.ppu;
+                ppu.window.y = byte;
+            }
 
             // WB - Window X position minus 7
-            0xFF4B => ppu.window.x = byte.wrapping_sub(7),
+            0xFF4B => {
+                let ppu = &mut self.ppu;
+                ppu.window.x = byte.wrapping_sub(7);
+            }
 
             // Unmap BIOS
             0xFF50 => {
+                let mmu = &mut self.mmu;
+
                 if mmu.bios_mapped {
                     mmu.unmap_bios();
                 }
@@ -487,6 +526,8 @@ impl Bus {
 
             // IE - Interrupt Enable
             0xFFFF => {
+                let interrupts = &mut self.interrupts;
+
                 interrupts.vblank.enabled = byte.has_bit_set(0);
                 interrupts.lcd_status.enabled = byte.has_bit_set(1);
                 interrupts.timer.enabled = byte.has_bit_set(2);
@@ -658,5 +699,20 @@ mod tests {
         let mut bus = Bus::default();
         bus.write_byte(0xFF4B, 7);
         assert_eq!(bus.ppu.window.x, 0);
+    }
+
+    #[test]
+    fn dma_transfer() {
+        let mut bus = Bus::default();
+
+        for i in 0..0xA0 {
+            bus.write_byte(0x8000 + (i as u16), i as u8);
+        }
+
+        bus.write_byte(0xFF46, 0x80);
+
+        for i in 0..0xA0 {
+            assert_eq!(bus.read_byte(0xFE00 + (i as u16)), i as u8);
+        }
     }
 }
