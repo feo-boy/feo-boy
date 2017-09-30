@@ -65,7 +65,7 @@ fn start_emulator(config: Config) -> Result<()> {
                 _ => None,
             };
 
-            if let Some(ref button) = button {
+            if let Some(button) = button {
                 match args.state {
                     ButtonState::Press => emulator.press(button),
                     ButtonState::Release => emulator.release(button),

@@ -67,30 +67,32 @@ impl Bus {
 
                 register.set_bit(
                     0,
-                    !(button_state.is_pressed(&Button::Right) ||
-                          button_state.is_pressed(&Button::A)),
+                    !(button_state.is_pressed(Button::Right) ||
+                          button_state.is_pressed(Button::A)),
                 );
 
                 register.set_bit(
                     1,
-                    !(button_state.is_pressed(&Button::Left) ||
-                          button_state.is_pressed(&Button::B)),
+                    !(button_state.is_pressed(Button::Left) ||
+                          button_state.is_pressed(Button::B)),
                 );
 
                 register.set_bit(
                     2,
-                    !(button_state.is_pressed(&Button::Up) ||
-                          button_state.is_pressed(&Button::Select)),
+                    !(button_state.is_pressed(Button::Up) ||
+                          button_state.is_pressed(Button::Select)),
                 );
 
                 register.set_bit(
                     3,
-                    !(button_state.is_pressed(&Button::Down) ||
-                          button_state.is_pressed(&Button::Start)),
+                    !(button_state.is_pressed(Button::Down) ||
+                          button_state.is_pressed(Button::Start)),
                 );
 
                 // Sets bits 4 and 5.
                 register |= button_state.select.bits();
+
+                trace!("read {:#06x}", register);
 
                 register
             }
@@ -345,6 +347,7 @@ impl Bus {
     fn write_io_register(&mut self, address: u16, byte: u8) {
         match address {
             0xFF00 => {
+                trace!("writing {:#06x}", byte);
                 let button_state = &mut self.button_state;
                 button_state.select = SelectFlags::from_bits_truncate(byte);
             }
@@ -665,6 +668,7 @@ mod tests {
     use quickcheck::{TestResult, Arbitrary, Gen, quickcheck};
 
     use graphics::Shade;
+    use input::Button;
     use memory::{Addressable, BIOS_SIZE};
 
     #[test]
@@ -787,8 +791,32 @@ mod tests {
     }
 
     #[test]
-    fn input() {
+    fn button_press() {
         let mut bus = Bus::default();
         assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x0F);
+
+        bus.button_state.press(Button::Right);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x0F);
+
+        bus.write_byte(0xFF00, 0x20);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x2E);
+
+        bus.button_state.release(Button::Right);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x2F);
+    }
+
+    #[test]
+    fn multi_press() {
+        let mut bus = Bus::default();
+
+        bus.button_state.press(Button::Left);
+        bus.button_state.press(Button::B);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x0F);
+
+        bus.write_byte(0xFF00, 0x30);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x3D);
+
+        bus.button_state.press(Button::A);
+        assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x3C);
     }
 }

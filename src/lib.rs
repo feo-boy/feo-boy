@@ -151,11 +151,11 @@ impl Emulator {
         }
     }
 
-    pub fn press(&mut self, button: &Button) {
+    pub fn press(&mut self, button: Button) {
         self.bus.button_state.press(button);
     }
 
-    pub fn release(&mut self, button: &Button) {
+    pub fn release(&mut self, button: Button) {
         self.bus.button_state.release(button);
     }
 

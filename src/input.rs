@@ -1,21 +1,30 @@
 bitflags! {
     #[derive(Default)]
     pub struct SelectFlags: u8 {
-        const DIRECTION = 0b00010000;
-        const BUTTON = 0b00100000;
+        const BUTTON    = 0x10;
+        const DIRECTION = 0x20;
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Button {
-    Up,
-    Down,
-    Left,
-    Right,
-    B,
-    A,
-    Start,
-    Select,
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3,
+    B = 4,
+    A = 5,
+    Start = 6,
+    Select = 7,
+}
+
+impl Button {
+    fn is_direction(&self) -> bool {
+        match *self {
+            Button::Up | Button::Down | Button::Right | Button::Left => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -25,38 +34,24 @@ pub struct ButtonState {
 }
 
 impl ButtonState {
-    fn button_to_index(button: &Button) -> usize {
-        use Button::*;
-
-        match *button {
-            Up => 0,
-            Down => 1,
-            Left => 2,
-            Right => 3,
-            B => 4,
-            A => 5,
-            Start => 6,
-            Select => 7,
+    pub fn is_pressed(&self, button: Button) -> bool {
+        if (button.is_direction() && self.select.contains(SelectFlags::DIRECTION)) ||
+            (!button.is_direction() && self.select.contains(SelectFlags::BUTTON))
+        {
+            self.pressed[button as usize]
+        } else {
+            false
         }
     }
 
-    pub fn is_pressed(&self, button: &Button) -> bool {
-        let index = Self::button_to_index(button);
-
-        let direction_pressed = self.select.contains(SelectFlags::DIRECTION) && index <= 3 &&
-            self.pressed[index];
-        let button_pressed = self.select.contains(SelectFlags::BUTTON) && index >= 4 &&
-            self.pressed[index];
-
-        direction_pressed || button_pressed
+    pub fn press(&mut self, button: Button) {
+        trace!("pressed {:?}", button);
+        self.pressed[button as usize] = true;
     }
 
-    pub fn press(&mut self, button: &Button) {
-        self.pressed[Self::button_to_index(button)] = true;
-    }
-
-    pub fn release(&mut self, button: &Button) {
-        self.pressed[Self::button_to_index(button)] = false;
+    pub fn release(&mut self, button: Button) {
+        trace!("released {:?}", button);
+        self.pressed[button as usize] = false;
     }
 }
 
@@ -67,24 +62,24 @@ mod tests {
     #[test]
     fn press() {
         let mut state = ButtonState::default();
-        state.press(&Button::A);
-        assert!(!state.is_pressed(&Button::A));
+        state.press(Button::A);
+        assert!(!state.is_pressed(Button::A));
 
         state.select = SelectFlags::BUTTON;
-        assert!(state.is_pressed(&Button::A));
+        assert!(state.is_pressed(Button::A));
 
-        state.press(&Button::Up);
-        assert!(!state.is_pressed(&Button::Up));
+        state.press(Button::Up);
+        assert!(!state.is_pressed(Button::Up));
 
         state.select = SelectFlags::DIRECTION;
-        assert!(state.is_pressed(&Button::Up));
+        assert!(state.is_pressed(Button::Up));
 
-        assert!(!state.is_pressed(&Button::Down));
+        assert!(!state.is_pressed(Button::Down));
 
         state.select = SelectFlags::BUTTON | SelectFlags::DIRECTION;
-        state.press(&Button::B);
-        state.press(&Button::Left);
-        assert!(state.is_pressed(&Button::B));
-        assert!(state.is_pressed(&Button::Left));
+        state.press(Button::B);
+        state.press(Button::Left);
+        assert!(state.is_pressed(Button::B));
+        assert!(state.is_pressed(Button::Left));
     }
 }
