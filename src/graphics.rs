@@ -383,6 +383,10 @@ impl Ppu {
         if self.control.background_enabled {
             self.render_tiles();
         }
+
+        if self.control.sprites_enabled {
+            self.render_sprite();
+        }
     }
 
     fn render_tiles(&mut self) {
@@ -485,8 +489,8 @@ impl Ppu {
             let index = (sprite as u8) * 4;
             // Get the index of the sprite
             let absolute_index: u16 = SPRITE_START + u16::from(index);
-            let y_position = self.read_byte(absolute_index - 16) - 16;
-            let x_position = self.read_byte(absolute_index - 8) - 8;
+            let y_position = self.read_byte(absolute_index) - 16;
+            let x_position = self.read_byte(absolute_index + 1) - 8;
             let tile_location = self.read_byte(absolute_index + 2);
             let attributes = self.read_byte(absolute_index + 3);
 
@@ -538,7 +542,9 @@ impl Ppu {
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
                     let pixel = x_position + x_pixel;
 
-                    self.pixels.0[self.line as usize][pixel as usize] = shade;
+                    if shade != Shade::Transparent {
+                        self.pixels.0[self.line as usize][pixel as usize] = shade;
+                    }
                 }
             }
         }
