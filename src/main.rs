@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use clap::{App, AppSettings, Arg};
 use piston_window::*;
 
-use feo_boy::Emulator;
+use feo_boy::{Emulator, SCREEN_DIMENSIONS};
 use feo_boy::errors::*;
 
 #[derive(Debug, Clone)]
@@ -41,7 +41,9 @@ fn start_emulator(config: Config) -> Result<()> {
 
     emulator.reset();
 
-    let mut window: PistonWindow = WindowSettings::new("FeO Boy", [512; 2]).build().unwrap();
+    let mut window: PistonWindow = WindowSettings::new("FeO Boy", SCREEN_DIMENSIONS)
+        .build()
+        .unwrap();
     window.set_ups(60);
 
     let mut texture = Texture::from_image(
