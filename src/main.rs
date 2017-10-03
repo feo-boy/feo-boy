@@ -6,12 +6,16 @@ extern crate clap;
 #[macro_use]
 extern crate error_chain;
 
+extern crate image;
 extern crate piston_window;
 extern crate pretty_env_logger;
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use clap::{App, AppSettings, Arg};
+use image::{FilterType, RgbaImage};
+use image::imageops;
 use piston_window::*;
 
 use feo_boy::{Emulator, SCREEN_DIMENSIONS};
@@ -21,6 +25,7 @@ use feo_boy::errors::*;
 struct Config {
     rom: PathBuf,
     bios: Option<PathBuf>,
+    scaling: u8,
     debug: bool,
 }
 
@@ -31,24 +36,30 @@ fn start_emulator(config: Config) -> Result<()> {
         Emulator::new()
     };
 
-    if let Some(bios) = config.bios {
+    if let Some(ref bios) = config.bios {
         emulator.load_bios(bios).chain_err(|| "could not load BIOS")?;
     }
 
-    emulator.load_rom(config.rom).chain_err(
+    emulator.load_rom(&config.rom).chain_err(
         || "could not load ROM",
     )?;
 
     emulator.reset();
 
-    let mut window: PistonWindow = WindowSettings::new("FeO Boy", SCREEN_DIMENSIONS)
+    let scaled_dimensions = [
+        SCREEN_DIMENSIONS.0 * u32::from(config.scaling),
+        SCREEN_DIMENSIONS.1 * u32::from(config.scaling),
+    ];
+    let mut window: PistonWindow = WindowSettings::new("FeO Boy", scaled_dimensions)
         .build()
         .unwrap();
     window.set_ups(60);
 
+    let window_size = window.size();
+
     let mut texture = Texture::from_image(
         &mut window.factory,
-        &emulator.screen_buffer,
+        &RgbaImage::new(window_size.width, window_size.height),
         &TextureSettings::new(),
     ).unwrap();
 
@@ -80,9 +91,21 @@ fn start_emulator(config: Config) -> Result<()> {
         }
 
         if event.render_args().is_some() {
+            let display_buffer = if config.scaling == 1 {
+                Cow::Borrowed(&emulator.screen_buffer)
+            } else {
+                Cow::Owned(imageops::resize(
+                    &emulator.screen_buffer,
+                    window_size.width,
+                    window_size.height,
+                    FilterType::Nearest,
+                ))
+            };
+
             texture
-                .update(&mut window.encoder, &mut emulator.screen_buffer)
+                .update(&mut window.encoder, &display_buffer)
                 .unwrap();
+
             window.draw_2d(&event, |context, graphics| {
                 clear([1.0; 4], graphics);
                 image(&texture, context.transform, graphics);
@@ -108,6 +131,14 @@ fn run() -> Result<()> {
             "a file containing a binary dump of the Game Boy BIOS. If not supplied, the emulator \
             will begin executing the ROM as if the BIOS had succeeded",
         ))
+        .arg(
+            Arg::with_name("scaling")
+                .required(false)
+                .long("scaling")
+                .takes_value(true)
+                .default_value("1")
+                .help("amount to scale the emulator screen by"),
+        )
         .arg(Arg::with_name("debug").long("debug").short("d").help(
             "Enable debug mode",
         ))
@@ -115,11 +146,13 @@ fn run() -> Result<()> {
 
     let bios = matches.value_of("bios").map(PathBuf::from);
     let rom = matches.value_of("rom").unwrap();
+    let scaling = value_t!(matches, "scaling", u8).unwrap_or_else(|e| e.exit());
 
     let config = Config {
-        bios: bios,
+        bios,
         rom: PathBuf::from(rom),
         debug: matches.is_present("debug"),
+        scaling,
     };
 
     start_emulator(config)
