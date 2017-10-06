@@ -489,8 +489,8 @@ impl Ppu {
             let index = (sprite as u8) * 4;
             // Get the index of the sprite
             let absolute_index: u16 = SPRITE_START + u16::from(index);
-            let y_position = self.read_byte(absolute_index) - 16;
-            let x_position = self.read_byte(absolute_index + 1) - 8;
+            let y_position = self.read_byte(absolute_index).wrapping_sub(16);
+            let x_position = self.read_byte(absolute_index + 1).wrapping_sub(8);
             let tile_location = self.read_byte(absolute_index + 2);
             let attributes = self.read_byte(absolute_index + 3);
 
