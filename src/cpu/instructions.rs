@@ -8,7 +8,6 @@ use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
 use bus::Bus;
-use bytes::ByteExt;
 use cpu::{arithmetic, State, Flags};
 use memory::Addressable;
 
@@ -1474,14 +1473,19 @@ impl super::Cpu {
             // SET x,B
             0xe0 => self.reg.b = self.reg.b | (1 << 4),
 
-            // SWAP A
-            0x37 => {
-                self.reg.a = self.reg.a.rotate_left(4);
-                self.reg.f.remove(
-                    Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY,
-                );
-                self.reg.f.set(Flags::ZERO, self.reg.a == 0);
+            // SWAP
+            0x30 => arithmetic::swap(&mut self.reg.b, &mut self.reg.f),
+            0x31 => arithmetic::swap(&mut self.reg.c, &mut self.reg.f),
+            0x32 => arithmetic::swap(&mut self.reg.d, &mut self.reg.f),
+            0x33 => arithmetic::swap(&mut self.reg.e, &mut self.reg.f),
+            0x34 => arithmetic::swap(&mut self.reg.h, &mut self.reg.f),
+            0x35 => arithmetic::swap(&mut self.reg.l, &mut self.reg.f),
+            0x36 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::swap(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
             }
+            0x37 => arithmetic::swap(&mut self.reg.a, &mut self.reg.f),
 
             // BIT b,A
             0x47 => arithmetic::bit(self.reg.a, 0, &mut self.reg.f),

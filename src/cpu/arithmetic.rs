@@ -159,6 +159,12 @@ pub fn srl(byte: &mut u8, flags: &mut Flags) {
     flags.set(Flags::ZERO, *byte == 0);
 }
 
+pub fn swap(byte: &mut u8, flags: &mut Flags) {
+    byte = byte.rotate_left(4);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
+    flags.set(Flags::ZERO, byte == 0);
+}
+
 #[cfg(test)]
 mod tests {
     use cpu::Flags;
