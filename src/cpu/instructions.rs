@@ -1431,6 +1431,7 @@ impl super::Cpu {
 
     pub fn execute_prefix(&mut self, instruction: u8, bus: &mut Bus) {
         match instruction {
+            // RLC n
             0x00 => arithmetic::rlc(&mut self.reg.b, &mut self.reg.f),
             0x01 => arithmetic::rlc(&mut self.reg.c, &mut self.reg.f),
             0x02 => arithmetic::rlc(&mut self.reg.d, &mut self.reg.f),
@@ -1444,7 +1445,22 @@ impl super::Cpu {
             }
             0x07 => arithmetic::rlc(&mut self.reg.a, &mut self.reg.f),
 
+            // RRC n
+            0x08 => arithmetic::rrc(&mut self.reg.b, &mut self.reg.f),
+            0x09 => arithmetic::rrc(&mut self.reg.c, &mut self.reg.f),
+            0x0a => arithmetic::rrc(&mut self.reg.d, &mut self.reg.f),
+            0x0b => arithmetic::rrc(&mut self.reg.e, &mut self.reg.f),
+            0x0c => arithmetic::rrc(&mut self.reg.h, &mut self.reg.f),
+            0x0d => arithmetic::rrc(&mut self.reg.l, &mut self.reg.f),
+            0x0e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::rrc(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x0f => arithmetic::rrc(&mut self.reg.a, &mut self.reg.f),
+
             // RL C
+            0x10 => arithmetic::rl(&mut self.reg.b, &mut self.reg.f),
             0x11 => arithmetic::rl(&mut self.reg.c, &mut self.reg.f),
             0x12 => arithmetic::rl(&mut self.reg.d, &mut self.reg.f),
             0x13 => arithmetic::rl(&mut self.reg.e, &mut self.reg.f),
@@ -1457,6 +1473,7 @@ impl super::Cpu {
             }
             0x17 => arithmetic::rl(&mut self.reg.a, &mut self.reg.f),
 
+            // RR n
             0x18 => arithmetic::rr(&mut self.reg.b, &mut self.reg.f),
             0x19 => arithmetic::rr(&mut self.reg.c, &mut self.reg.f),
             0x1a => arithmetic::rr(&mut self.reg.d, &mut self.reg.f),
@@ -1470,8 +1487,33 @@ impl super::Cpu {
             }
             0x1f => arithmetic::rr(&mut self.reg.a, &mut self.reg.f),
 
-            // SET x,B
-            0xe0 => self.reg.b = self.reg.b | (1 << 4),
+            // SLA n
+            0x20 => arithmetic::sla(&mut self.reg.b, &mut self.reg.f),
+            0x21 => arithmetic::sla(&mut self.reg.c, &mut self.reg.f),
+            0x22 => arithmetic::sla(&mut self.reg.d, &mut self.reg.f),
+            0x23 => arithmetic::sla(&mut self.reg.e, &mut self.reg.f),
+            0x24 => arithmetic::sla(&mut self.reg.h, &mut self.reg.f),
+            0x25 => arithmetic::sla(&mut self.reg.l, &mut self.reg.f),
+            0x26 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::sla(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x27 => arithmetic::sla(&mut self.reg.a, &mut self.reg.f),
+
+            // SRA n
+            0x28 => arithmetic::sra(&mut self.reg.b, &mut self.reg.f),
+            0x29 => arithmetic::sra(&mut self.reg.c, &mut self.reg.f),
+            0x2a => arithmetic::sra(&mut self.reg.d, &mut self.reg.f),
+            0x2b => arithmetic::sra(&mut self.reg.e, &mut self.reg.f),
+            0x2c => arithmetic::sra(&mut self.reg.h, &mut self.reg.f),
+            0x2d => arithmetic::sra(&mut self.reg.l, &mut self.reg.f),
+            0x2e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::sra(&mut byte, &mut self.reg.f);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x2f => arithmetic::sra(&mut self.reg.a, &mut self.reg.f),
 
             // SWAP
             0x30 => arithmetic::swap(&mut self.reg.b, &mut self.reg.f),
@@ -1487,116 +1529,7 @@ impl super::Cpu {
             }
             0x37 => arithmetic::swap(&mut self.reg.a, &mut self.reg.f),
 
-            // BIT b,A
-            0x47 => arithmetic::bit(self.reg.a, 0, &mut self.reg.f),
-            0x4F => arithmetic::bit(self.reg.a, 1, &mut self.reg.f),
-            0x57 => arithmetic::bit(self.reg.a, 2, &mut self.reg.f),
-            0x5F => arithmetic::bit(self.reg.a, 3, &mut self.reg.f),
-            0x67 => arithmetic::bit(self.reg.a, 4, &mut self.reg.f),
-            0x6F => arithmetic::bit(self.reg.a, 5, &mut self.reg.f),
-            0x77 => arithmetic::bit(self.reg.a, 6, &mut self.reg.f),
-            0x7F => arithmetic::bit(self.reg.a, 7, &mut self.reg.f),
-
-            // BIT b,B
-            0x40 => arithmetic::bit(self.reg.b, 0, &mut self.reg.f),
-            0x48 => arithmetic::bit(self.reg.b, 1, &mut self.reg.f),
-            0x50 => arithmetic::bit(self.reg.b, 2, &mut self.reg.f),
-            0x58 => arithmetic::bit(self.reg.b, 3, &mut self.reg.f),
-            0x60 => arithmetic::bit(self.reg.b, 4, &mut self.reg.f),
-            0x68 => arithmetic::bit(self.reg.b, 5, &mut self.reg.f),
-            0x70 => arithmetic::bit(self.reg.b, 6, &mut self.reg.f),
-            0x78 => arithmetic::bit(self.reg.b, 7, &mut self.reg.f),
-
-            // BIT b,C
-            0x41 => arithmetic::bit(self.reg.c, 0, &mut self.reg.f),
-            0x49 => arithmetic::bit(self.reg.c, 1, &mut self.reg.f),
-            0x51 => arithmetic::bit(self.reg.c, 2, &mut self.reg.f),
-            0x59 => arithmetic::bit(self.reg.c, 3, &mut self.reg.f),
-            0x61 => arithmetic::bit(self.reg.c, 4, &mut self.reg.f),
-            0x69 => arithmetic::bit(self.reg.c, 5, &mut self.reg.f),
-            0x71 => arithmetic::bit(self.reg.c, 6, &mut self.reg.f),
-            0x79 => arithmetic::bit(self.reg.c, 7, &mut self.reg.f),
-
-            // BIT b,D
-            0x42 => arithmetic::bit(self.reg.d, 0, &mut self.reg.f),
-            0x4a => arithmetic::bit(self.reg.d, 1, &mut self.reg.f),
-            0x52 => arithmetic::bit(self.reg.d, 2, &mut self.reg.f),
-            0x5a => arithmetic::bit(self.reg.d, 3, &mut self.reg.f),
-            0x62 => arithmetic::bit(self.reg.d, 4, &mut self.reg.f),
-            0x6a => arithmetic::bit(self.reg.d, 5, &mut self.reg.f),
-            0x72 => arithmetic::bit(self.reg.d, 6, &mut self.reg.f),
-            0x7a => arithmetic::bit(self.reg.d, 7, &mut self.reg.f),
-
-            // BIT b,E
-            0x43 => arithmetic::bit(self.reg.e, 0, &mut self.reg.f),
-            0x4b => arithmetic::bit(self.reg.e, 1, &mut self.reg.f),
-            0x53 => arithmetic::bit(self.reg.e, 2, &mut self.reg.f),
-            0x5b => arithmetic::bit(self.reg.e, 3, &mut self.reg.f),
-            0x63 => arithmetic::bit(self.reg.e, 4, &mut self.reg.f),
-            0x6b => arithmetic::bit(self.reg.e, 5, &mut self.reg.f),
-            0x73 => arithmetic::bit(self.reg.e, 6, &mut self.reg.f),
-            0x7b => arithmetic::bit(self.reg.e, 7, &mut self.reg.f),
-
-            // BIT b,H
-            0x44 => arithmetic::bit(self.reg.h, 0, &mut self.reg.f),
-            0x4c => arithmetic::bit(self.reg.h, 1, &mut self.reg.f),
-            0x54 => arithmetic::bit(self.reg.h, 2, &mut self.reg.f),
-            0x5c => arithmetic::bit(self.reg.h, 3, &mut self.reg.f),
-            0x64 => arithmetic::bit(self.reg.h, 4, &mut self.reg.f),
-            0x6c => arithmetic::bit(self.reg.h, 5, &mut self.reg.f),
-            0x74 => arithmetic::bit(self.reg.h, 6, &mut self.reg.f),
-            0x7c => arithmetic::bit(self.reg.h, 7, &mut self.reg.f),
-
-            // BIT b,L
-            0x45 => arithmetic::bit(self.reg.l, 0, &mut self.reg.f),
-            0x4d => arithmetic::bit(self.reg.l, 1, &mut self.reg.f),
-            0x55 => arithmetic::bit(self.reg.l, 2, &mut self.reg.f),
-            0x5d => arithmetic::bit(self.reg.l, 3, &mut self.reg.f),
-            0x65 => arithmetic::bit(self.reg.l, 4, &mut self.reg.f),
-            0x6d => arithmetic::bit(self.reg.l, 5, &mut self.reg.f),
-            0x75 => arithmetic::bit(self.reg.l, 6, &mut self.reg.f),
-            0x7d => arithmetic::bit(self.reg.l, 7, &mut self.reg.f),
-
-            // BIT b,(HL)
-            0x46 => arithmetic::bit(bus.read_byte(self.reg.hl()), 0, &mut self.reg.f),
-            0x4e => arithmetic::bit(bus.read_byte(self.reg.hl()), 1, &mut self.reg.f),
-            0x56 => arithmetic::bit(bus.read_byte(self.reg.hl()), 2, &mut self.reg.f),
-            0x5e => arithmetic::bit(bus.read_byte(self.reg.hl()), 3, &mut self.reg.f),
-            0x66 => arithmetic::bit(bus.read_byte(self.reg.hl()), 4, &mut self.reg.f),
-            0x6e => arithmetic::bit(bus.read_byte(self.reg.hl()), 5, &mut self.reg.f),
-            0x76 => arithmetic::bit(bus.read_byte(self.reg.hl()), 6, &mut self.reg.f),
-            0x7e => arithmetic::bit(bus.read_byte(self.reg.hl()), 7, &mut self.reg.f),
-
-            // SLA
-            0x20 => arithmetic::sla(&mut self.reg.b, &mut self.reg.f),
-            0x21 => arithmetic::sla(&mut self.reg.c, &mut self.reg.f),
-            0x22 => arithmetic::sla(&mut self.reg.d, &mut self.reg.f),
-            0x23 => arithmetic::sla(&mut self.reg.e, &mut self.reg.f),
-            0x24 => arithmetic::sla(&mut self.reg.h, &mut self.reg.f),
-            0x25 => arithmetic::sla(&mut self.reg.l, &mut self.reg.f),
-            0x26 => {
-                let mut byte = bus.read_byte(self.reg.hl());
-                arithmetic::sla(&mut byte, &mut self.reg.f);
-                bus.write_byte(self.reg.hl(), byte);
-            }
-            0x27 => arithmetic::sla(&mut self.reg.a, &mut self.reg.f),
-
-            // SRA
-            0x28 => arithmetic::sra(&mut self.reg.b, &mut self.reg.f),
-            0x29 => arithmetic::sra(&mut self.reg.c, &mut self.reg.f),
-            0x2a => arithmetic::sra(&mut self.reg.d, &mut self.reg.f),
-            0x2b => arithmetic::sra(&mut self.reg.e, &mut self.reg.f),
-            0x2c => arithmetic::sra(&mut self.reg.h, &mut self.reg.f),
-            0x2d => arithmetic::sra(&mut self.reg.l, &mut self.reg.f),
-            0x2e => {
-                let mut byte = bus.read_byte(self.reg.hl());
-                arithmetic::sra(&mut byte, &mut self.reg.f);
-                bus.write_byte(self.reg.hl(), byte);
-            }
-
-            0x2f => arithmetic::sra(&mut self.reg.a, &mut self.reg.f),
-
-            // SRL
+            // SRL n
             0x38 => arithmetic::srl(&mut self.reg.b, &mut self.reg.f),
             0x39 => arithmetic::srl(&mut self.reg.c, &mut self.reg.f),
             0x3a => arithmetic::srl(&mut self.reg.d, &mut self.reg.f),
@@ -1610,106 +1543,309 @@ impl super::Cpu {
             }
             0x3f => arithmetic::srl(&mut self.reg.a, &mut self.reg.f),
 
-            // RES b,A
-            0x87 => self.reg.a = self.reg.a & !(1 << 0), // 0,A
-            0x97 => self.reg.a = self.reg.a & !(1 << 2), // 2,A
-            0xA7 => self.reg.a = self.reg.a & !(1 << 4), // 4,A
-            0xB7 => self.reg.a = self.reg.a & !(1 << 6), // 6,A
-            0x8F => self.reg.a = self.reg.a & !(1 << 1), // 1,A
-            0x9F => self.reg.a = self.reg.a & !(1 << 3), // 3,A
-            0xAF => self.reg.a = self.reg.a & !(1 << 5), // 5,A
-            0xBF => self.reg.a = self.reg.a & !(1 << 7), // 7,A
+            // BIT 0,r
+            0x40 => arithmetic::bit(self.reg.b, 0, &mut self.reg.f),
+            0x41 => arithmetic::bit(self.reg.c, 0, &mut self.reg.f),
+            0x42 => arithmetic::bit(self.reg.d, 0, &mut self.reg.f),
+            0x43 => arithmetic::bit(self.reg.e, 0, &mut self.reg.f),
+            0x44 => arithmetic::bit(self.reg.h, 0, &mut self.reg.f),
+            0x45 => arithmetic::bit(self.reg.l, 0, &mut self.reg.f),
+            0x46 => arithmetic::bit(bus.read_byte(self.reg.hl()), 0, &mut self.reg.f),
+            0x47 => arithmetic::bit(self.reg.a, 0, &mut self.reg.f),
 
-            // RES b,B
-            0x80 => self.reg.b = self.reg.b & !(1 << 0), // 0,B
-            0x90 => self.reg.b = self.reg.b & !(1 << 2), // 2,B
-            0xA0 => self.reg.b = self.reg.b & !(1 << 4), // 4,B
-            0xB0 => self.reg.b = self.reg.b & !(1 << 6), // 6,B
-            0x88 => self.reg.b = self.reg.b & !(1 << 1), // 1,B
-            0x98 => self.reg.b = self.reg.b & !(1 << 3), // 3,B
-            0xA8 => self.reg.b = self.reg.b & !(1 << 5), // 5,B
-            0xB8 => self.reg.b = self.reg.b & !(1 << 7), // 7,B
+            // BIT 1,r
+            0x48 => arithmetic::bit(self.reg.b, 1, &mut self.reg.f),
+            0x49 => arithmetic::bit(self.reg.c, 1, &mut self.reg.f),
+            0x4a => arithmetic::bit(self.reg.d, 1, &mut self.reg.f),
+            0x4b => arithmetic::bit(self.reg.e, 1, &mut self.reg.f),
+            0x4c => arithmetic::bit(self.reg.h, 1, &mut self.reg.f),
+            0x4d => arithmetic::bit(self.reg.l, 1, &mut self.reg.f),
+            0x4e => arithmetic::bit(bus.read_byte(self.reg.hl()), 1, &mut self.reg.f),
+            0x4f => arithmetic::bit(self.reg.a, 1, &mut self.reg.f),
 
-            // RES b,C
-            0x81 => self.reg.c = self.reg.c & !(1 << 0), // 0,C
-            0x91 => self.reg.c = self.reg.c & !(1 << 2), // 2,C
-            0xA1 => self.reg.c = self.reg.c & !(1 << 4), // 4,C
-            0xB1 => self.reg.c = self.reg.c & !(1 << 6), // 6,C
-            0x89 => self.reg.c = self.reg.c & !(1 << 1), // 1,C
-            0x99 => self.reg.c = self.reg.c & !(1 << 3), // 3,C
-            0xA9 => self.reg.c = self.reg.c & !(1 << 5), // 5,C
-            0xB9 => self.reg.c = self.reg.c & !(1 << 7), // 7,C
+            // BIT 2,r
+            0x50 => arithmetic::bit(self.reg.b, 2, &mut self.reg.f),
+            0x51 => arithmetic::bit(self.reg.c, 2, &mut self.reg.f),
+            0x52 => arithmetic::bit(self.reg.d, 2, &mut self.reg.f),
+            0x53 => arithmetic::bit(self.reg.e, 2, &mut self.reg.f),
+            0x54 => arithmetic::bit(self.reg.h, 2, &mut self.reg.f),
+            0x55 => arithmetic::bit(self.reg.l, 2, &mut self.reg.f),
+            0x56 => arithmetic::bit(bus.read_byte(self.reg.hl()), 2, &mut self.reg.f),
+            0x57 => arithmetic::bit(self.reg.a, 2, &mut self.reg.f),
 
-            // RES b,D
-            0x82 => self.reg.d = self.reg.d & !(1 << 0), // 0,D
-            0x92 => self.reg.d = self.reg.d & !(1 << 2), // 2,D
-            0xA2 => self.reg.d = self.reg.d & !(1 << 4), // 4,D
-            0xB2 => self.reg.d = self.reg.d & !(1 << 6), // 6,D
-            0x8A => self.reg.d = self.reg.d & !(1 << 1), // 1,D
-            0x9A => self.reg.d = self.reg.d & !(1 << 3), // 3,D
-            0xAA => self.reg.d = self.reg.d & !(1 << 5), // 5,D
-            0xBA => self.reg.d = self.reg.d & !(1 << 7), // 7,D
+            // BIT 3,r
+            0x58 => arithmetic::bit(self.reg.b, 3, &mut self.reg.f),
+            0x59 => arithmetic::bit(self.reg.c, 3, &mut self.reg.f),
+            0x5a => arithmetic::bit(self.reg.d, 3, &mut self.reg.f),
+            0x5b => arithmetic::bit(self.reg.e, 3, &mut self.reg.f),
+            0x5c => arithmetic::bit(self.reg.h, 3, &mut self.reg.f),
+            0x5d => arithmetic::bit(self.reg.l, 3, &mut self.reg.f),
+            0x5e => arithmetic::bit(bus.read_byte(self.reg.hl()), 3, &mut self.reg.f),
+            0x5f => arithmetic::bit(self.reg.a, 3, &mut self.reg.f),
 
-            // RES b,E
-            0x83 => self.reg.e = self.reg.e & !(1 << 0), // 0,E
-            0x93 => self.reg.e = self.reg.e & !(1 << 2), // 2,E
-            0xA3 => self.reg.e = self.reg.e & !(1 << 4), // 4,E
-            0xB3 => self.reg.e = self.reg.e & !(1 << 6), // 6,E
-            0x8B => self.reg.e = self.reg.e & !(1 << 1), // 1,E
-            0x9B => self.reg.e = self.reg.e & !(1 << 3), // 3,E
-            0xAB => self.reg.e = self.reg.e & !(1 << 5), // 5,E
-            0xBB => self.reg.e = self.reg.e & !(1 << 7), // 7,E
+            // BIT 4,r
+            0x60 => arithmetic::bit(self.reg.b, 4, &mut self.reg.f),
+            0x61 => arithmetic::bit(self.reg.c, 4, &mut self.reg.f),
+            0x62 => arithmetic::bit(self.reg.d, 4, &mut self.reg.f),
+            0x63 => arithmetic::bit(self.reg.e, 4, &mut self.reg.f),
+            0x64 => arithmetic::bit(self.reg.h, 4, &mut self.reg.f),
+            0x65 => arithmetic::bit(self.reg.l, 4, &mut self.reg.f),
+            0x66 => arithmetic::bit(bus.read_byte(self.reg.hl()), 4, &mut self.reg.f),
+            0x67 => arithmetic::bit(self.reg.a, 4, &mut self.reg.f),
 
-            // RES b,H
-            0x84 => self.reg.h = self.reg.h & !(1 << 0), // 0,H 0x94 => self.reg.h = self.reg.h & !(1 << 2), // 2,H 0xA4 => self.reg.h = self.reg.h & !(1 << 4), // 4,H 0xB4 => self.reg.h = self.reg.h & !(1 << 6), // 6,H
-            0x8C => self.reg.h = self.reg.h & !(1 << 1), // 1,H
-            0x9C => self.reg.h = self.reg.h & !(1 << 3), // 3,H
-            0xAC => self.reg.h = self.reg.h & !(1 << 5), // 5,H
-            0xBC => self.reg.h = self.reg.h & !(1 << 7), // 7,H
+            // BIT 5,r
+            0x68 => arithmetic::bit(self.reg.b, 5, &mut self.reg.f),
+            0x69 => arithmetic::bit(self.reg.c, 5, &mut self.reg.f),
+            0x6a => arithmetic::bit(self.reg.d, 5, &mut self.reg.f),
+            0x6b => arithmetic::bit(self.reg.e, 5, &mut self.reg.f),
+            0x6c => arithmetic::bit(self.reg.h, 5, &mut self.reg.f),
+            0x6d => arithmetic::bit(self.reg.l, 5, &mut self.reg.f),
+            0x6e => arithmetic::bit(bus.read_byte(self.reg.hl()), 5, &mut self.reg.f),
+            0x6f => arithmetic::bit(self.reg.a, 5, &mut self.reg.f),
 
-            // RES b,L
-            0x85 => self.reg.l = self.reg.l & !(1 << 0), // 0,L
-            0x95 => self.reg.l = self.reg.l & !(1 << 2), // 2,L
-            0xA5 => self.reg.l = self.reg.l & !(1 << 4), // 4,L
-            0xB5 => self.reg.l = self.reg.l & !(1 << 6), // 6,L
-            0x8D => self.reg.l = self.reg.l & !(1 << 1), // 1,L
-            0x9D => self.reg.l = self.reg.l & !(1 << 3), // 3,L
-            0xAD => self.reg.l = self.reg.l & !(1 << 5), // 5,L
-            0xBD => self.reg.l = self.reg.l & !(1 << 7), // 7,L
+            // BIT 6,r
+            0x70 => arithmetic::bit(self.reg.b, 6, &mut self.reg.f),
+            0x71 => arithmetic::bit(self.reg.c, 6, &mut self.reg.f),
+            0x72 => arithmetic::bit(self.reg.d, 6, &mut self.reg.f),
+            0x73 => arithmetic::bit(self.reg.e, 6, &mut self.reg.f),
+            0x74 => arithmetic::bit(self.reg.h, 6, &mut self.reg.f),
+            0x75 => arithmetic::bit(self.reg.l, 6, &mut self.reg.f),
+            0x76 => arithmetic::bit(bus.read_byte(self.reg.hl()), 6, &mut self.reg.f),
+            0x77 => arithmetic::bit(self.reg.a, 6, &mut self.reg.f),
 
-            // RES b,(HL)
+            // BIT 7,r
+            0x78 => arithmetic::bit(self.reg.b, 7, &mut self.reg.f),
+            0x79 => arithmetic::bit(self.reg.c, 7, &mut self.reg.f),
+            0x7a => arithmetic::bit(self.reg.d, 7, &mut self.reg.f),
+            0x7b => arithmetic::bit(self.reg.e, 7, &mut self.reg.f),
+            0x7c => arithmetic::bit(self.reg.h, 7, &mut self.reg.f),
+            0x7d => arithmetic::bit(self.reg.l, 7, &mut self.reg.f),
+            0x7e => arithmetic::bit(bus.read_byte(self.reg.hl()), 7, &mut self.reg.f),
+            0x7f => arithmetic::bit(self.reg.a, 7, &mut self.reg.f),
+
+            // RES 0,r
+            0x80 => arithmetic::res(&mut self.reg.b, 0),
+            0x81 => arithmetic::res(&mut self.reg.c, 0),
+            0x82 => arithmetic::res(&mut self.reg.d, 0),
+            0x83 => arithmetic::res(&mut self.reg.e, 0),
+            0x84 => arithmetic::res(&mut self.reg.h, 0),
+            0x85 => arithmetic::res(&mut self.reg.l, 0),
             0x86 => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 0);
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 0);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 0,(HL)
+            }
+            0x87 => arithmetic::res(&mut self.reg.a, 0),
+
+            // RES 1,r
+            0x88 => arithmetic::res(&mut self.reg.b, 1),
+            0x89 => arithmetic::res(&mut self.reg.c, 1),
+            0x8a => arithmetic::res(&mut self.reg.d, 1),
+            0x8b => arithmetic::res(&mut self.reg.e, 1),
+            0x8c => arithmetic::res(&mut self.reg.h, 1),
+            0x8d => arithmetic::res(&mut self.reg.l, 1),
+            0x8e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 1);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0x8f => arithmetic::res(&mut self.reg.a, 1),
+
+            // RES 2,r
+            0x90 => arithmetic::res(&mut self.reg.b, 2),
+            0x91 => arithmetic::res(&mut self.reg.c, 2),
+            0x92 => arithmetic::res(&mut self.reg.d, 2),
+            0x93 => arithmetic::res(&mut self.reg.e, 2),
+            0x94 => arithmetic::res(&mut self.reg.h, 2),
+            0x95 => arithmetic::res(&mut self.reg.l, 2),
             0x96 => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 2);
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 2);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 2,(HL)
-            0xA6 => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 4);
+            }
+            0x97 => arithmetic::res(&mut self.reg.a, 2),
+
+            // RES 3,r
+            0x98 => arithmetic::res(&mut self.reg.b, 3),
+            0x99 => arithmetic::res(&mut self.reg.c, 3),
+            0x9a => arithmetic::res(&mut self.reg.d, 3),
+            0x9b => arithmetic::res(&mut self.reg.e, 3),
+            0x9c => arithmetic::res(&mut self.reg.h, 3),
+            0x9d => arithmetic::res(&mut self.reg.l, 3),
+            0x9e => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 3);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 4,(HL)
-            0xB6 => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 6);
+            }
+            0x9f => arithmetic::res(&mut self.reg.a, 3),
+
+            // RES 4,r
+            0xa0 => arithmetic::res(&mut self.reg.b, 4),
+            0xa1 => arithmetic::res(&mut self.reg.c, 4),
+            0xa2 => arithmetic::res(&mut self.reg.d, 4),
+            0xa3 => arithmetic::res(&mut self.reg.e, 4),
+            0xa4 => arithmetic::res(&mut self.reg.h, 4),
+            0xa5 => arithmetic::res(&mut self.reg.l, 4),
+            0xa6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 4);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 6,(HL)
-            0x8E => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 1);
+            }
+            0xa7 => arithmetic::res(&mut self.reg.a, 4),
+
+            // RES 5,r
+            0xa8 => arithmetic::res(&mut self.reg.b, 5),
+            0xa9 => arithmetic::res(&mut self.reg.c, 5),
+            0xaa => arithmetic::res(&mut self.reg.d, 5),
+            0xab => arithmetic::res(&mut self.reg.e, 5),
+            0xac => arithmetic::res(&mut self.reg.h, 5),
+            0xad => arithmetic::res(&mut self.reg.l, 5),
+            0xae => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 5);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 1,(HL)
-            0x9E => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 3);
+            }
+            0xaf => arithmetic::res(&mut self.reg.a, 5),
+
+            // RES 6,r
+            0xb0 => arithmetic::res(&mut self.reg.b, 6),
+            0xb1 => arithmetic::res(&mut self.reg.c, 6),
+            0xb2 => arithmetic::res(&mut self.reg.d, 6),
+            0xb3 => arithmetic::res(&mut self.reg.e, 6),
+            0xb4 => arithmetic::res(&mut self.reg.h, 6),
+            0xb5 => arithmetic::res(&mut self.reg.l, 6),
+            0xb6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 6);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 3,(HL)
-            0xAE => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 5);
+            }
+            0xb7 => arithmetic::res(&mut self.reg.a, 6),
+
+            // RES 7,r
+            0xb8 => arithmetic::res(&mut self.reg.b, 7),
+            0xb9 => arithmetic::res(&mut self.reg.c, 7),
+            0xba => arithmetic::res(&mut self.reg.d, 7),
+            0xbb => arithmetic::res(&mut self.reg.e, 7),
+            0xbc => arithmetic::res(&mut self.reg.h, 7),
+            0xbd => arithmetic::res(&mut self.reg.l, 7),
+            0xbe => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::res(&mut byte, 7);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 5,(HL)
-            0xBE => {
-                let byte = bus.read_byte(self.reg.hl()) & !(1 << 7);
+            }
+            0xbf => arithmetic::res(&mut self.reg.a, 7),
+
+            // SET 0,r
+            0xc0 => arithmetic::set(&mut self.reg.b, 0),
+            0xc1 => arithmetic::set(&mut self.reg.c, 0),
+            0xc2 => arithmetic::set(&mut self.reg.d, 0),
+            0xc3 => arithmetic::set(&mut self.reg.e, 0),
+            0xc4 => arithmetic::set(&mut self.reg.h, 0),
+            0xc5 => arithmetic::set(&mut self.reg.l, 0),
+            0xc6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 0);
                 bus.write_byte(self.reg.hl(), byte);
-            } // 7,(HL)
+            }
+            0xc7 => arithmetic::set(&mut self.reg.a, 0),
+
+            // SET 1,r
+            0xc8 => arithmetic::set(&mut self.reg.b, 1),
+            0xc9 => arithmetic::set(&mut self.reg.c, 1),
+            0xca => arithmetic::set(&mut self.reg.d, 1),
+            0xcb => arithmetic::set(&mut self.reg.e, 1),
+            0xcc => arithmetic::set(&mut self.reg.h, 1),
+            0xcd => arithmetic::set(&mut self.reg.l, 1),
+            0xce => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 1);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xcf => arithmetic::set(&mut self.reg.a, 1),
+
+            // SET 2,r
+            0xd0 => arithmetic::set(&mut self.reg.b, 2),
+            0xd1 => arithmetic::set(&mut self.reg.c, 2),
+            0xd2 => arithmetic::set(&mut self.reg.d, 2),
+            0xd3 => arithmetic::set(&mut self.reg.e, 2),
+            0xd4 => arithmetic::set(&mut self.reg.h, 2),
+            0xd5 => arithmetic::set(&mut self.reg.l, 2),
+            0xd6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 2);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xd7 => arithmetic::set(&mut self.reg.a, 2),
+
+            // SET 3,r
+            0xd8 => arithmetic::set(&mut self.reg.b, 3),
+            0xd9 => arithmetic::set(&mut self.reg.c, 3),
+            0xda => arithmetic::set(&mut self.reg.d, 3),
+            0xdb => arithmetic::set(&mut self.reg.e, 3),
+            0xdc => arithmetic::set(&mut self.reg.h, 3),
+            0xdd => arithmetic::set(&mut self.reg.l, 3),
+            0xde => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 3);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xdf => arithmetic::set(&mut self.reg.a, 3),
+
+            // SET 4,r
+            0xe0 => arithmetic::set(&mut self.reg.b, 4),
+            0xe1 => arithmetic::set(&mut self.reg.c, 4),
+            0xe2 => arithmetic::set(&mut self.reg.d, 4),
+            0xe3 => arithmetic::set(&mut self.reg.e, 4),
+            0xe4 => arithmetic::set(&mut self.reg.h, 4),
+            0xe5 => arithmetic::set(&mut self.reg.l, 4),
+            0xe6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 4);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xe7 => arithmetic::set(&mut self.reg.a, 4),
+
+            // SET 5,r
+            0xe8 => arithmetic::set(&mut self.reg.b, 5),
+            0xe9 => arithmetic::set(&mut self.reg.c, 5),
+            0xea => arithmetic::set(&mut self.reg.d, 5),
+            0xeb => arithmetic::set(&mut self.reg.e, 5),
+            0xec => arithmetic::set(&mut self.reg.h, 5),
+            0xed => arithmetic::set(&mut self.reg.l, 5),
+            0xee => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 5);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xef => arithmetic::set(&mut self.reg.a, 5),
+
+            // SET 6,r
+            0xf0 => arithmetic::set(&mut self.reg.b, 6),
+            0xf1 => arithmetic::set(&mut self.reg.c, 6),
+            0xf2 => arithmetic::set(&mut self.reg.d, 6),
+            0xf3 => arithmetic::set(&mut self.reg.e, 6),
+            0xf4 => arithmetic::set(&mut self.reg.h, 6),
+            0xf5 => arithmetic::set(&mut self.reg.l, 6),
+            0xf6 => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 6);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xf7 => arithmetic::set(&mut self.reg.a, 6),
+
+            // SET 7,r
+            0xf8 => arithmetic::set(&mut self.reg.b, 7),
+            0xf9 => arithmetic::set(&mut self.reg.c, 7),
+            0xfa => arithmetic::set(&mut self.reg.d, 7),
+            0xfb => arithmetic::set(&mut self.reg.e, 7),
+            0xfc => arithmetic::set(&mut self.reg.h, 7),
+            0xfd => arithmetic::set(&mut self.reg.l, 7),
+            0xfe => {
+                let mut byte = bus.read_byte(self.reg.hl());
+                arithmetic::set(&mut byte, 7);
+                bus.write_byte(self.reg.hl(), byte);
+            }
+            0xff => arithmetic::set(&mut self.reg.a, 7),
 
             // error
             catch => {

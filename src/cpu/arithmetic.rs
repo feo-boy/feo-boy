@@ -37,7 +37,6 @@ pub fn inc(byte: &mut u8, flags: &mut Flags) {
 pub fn dec(byte: &mut u8, flags: &mut Flags) {
     let (difference, is_half_carry) = byte.half_carry_sub(1);
     *byte = difference;
-
     flags.set(Flags::ZERO, *byte == 0);
     flags.insert(Flags::SUBTRACT);
     flags.set(Flags::HALF_CARRY, is_half_carry);
@@ -160,9 +159,17 @@ pub fn srl(byte: &mut u8, flags: &mut Flags) {
 }
 
 pub fn swap(byte: &mut u8, flags: &mut Flags) {
-    byte = byte.rotate_left(4);
+    *byte = byte.rotate_left(4);
     flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
-    flags.set(Flags::ZERO, byte == 0);
+    flags.set(Flags::ZERO, *byte == 0);
+}
+
+pub fn res(byte: &mut u8, n: u8) {
+    byte.set_bit(n, false);
+}
+
+pub fn set(byte: &mut u8, n: u8) {
+    byte.set_bit(n, true);
 }
 
 #[cfg(test)]
