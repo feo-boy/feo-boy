@@ -218,6 +218,9 @@ impl Mmu {
             _ => "unknown",
         };
         info!("cartridge type: {}", cartridge_type);
+        if rom[0x147] != 0x00 {
+            error!("ROM is from an unsupported cartridge type. The game may not run properly!");
+        }
 
         let num_banks = match rom[0x148] {
             0x00 => Some(0),
