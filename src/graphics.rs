@@ -311,8 +311,6 @@ impl Ppu {
 
     /// Performs one clock step of the PPU.
     pub fn step(&mut self, cycles: u32, interrupts: &mut Interrupts, buffer: &mut RgbaImage) {
-        // TODO: Set LCD status interrupt request here
-
         self.modeclock += cycles;
 
         // Mode changes are a state machine. This match block returns an option indicating whether
@@ -368,8 +366,27 @@ impl Ppu {
             self.mode = new_mode;
 
             match new_mode {
-                Mode::VerticalBlank => interrupts.vblank.requested = true,
+                Mode::HorizontalBlank => {
+                    if self.lcd_status_interrupts.hblank {
+                        interrupts.lcd_status.requested = true;
+                    }
+                }
+                Mode::VerticalBlank => {
+                    interrupts.vblank.requested = true;
+                    if self.lcd_status_interrupts.vblank {
+                        interrupts.lcd_status.requested = true;
+                    }
+                }
+                Mode::ScanlineOam => {
+                    if self.lcd_status_interrupts.oam {
+                        interrupts.lcd_status.requested = true;
+                    }
+                }
                 _ => (),
+            }
+
+            if self.lcd_status_interrupts.ly_lyc_coincidence && self.line == self.line_compare {
+                interrupts.lcd_status.requested = true;
             }
         }
     }
