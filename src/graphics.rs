@@ -570,13 +570,16 @@ impl Ppu {
 
                     // Find the horizontal position of the pixel on the screen
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
-                    let pixel = x_position + x_pixel;
+                    let pixel = x_position.wrapping_add(x_pixel);
 
                     // If the sprite is behind the background, only show it over white backgrounds
                     let has_priority = !behind_bg ||
                         (self.pixels.0[self.line as usize][pixel as usize] == Shade::White);
 
-                    if (shade != Shade::Transparent) && has_priority {
+                    // Check that the pixel is in the bounds of the screen
+                    let is_onscreen = pixel < 160;
+
+                    if (shade != Shade::Transparent) && has_priority && is_onscreen {
                         self.pixels.0[self.line as usize][pixel as usize] = shade;
                     }
                 }
