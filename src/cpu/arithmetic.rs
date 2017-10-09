@@ -140,34 +140,97 @@ pub fn bit(byte: u8, b: u8, flags: &mut Flags) {
     flags.insert(Flags::HALF_CARRY);
 }
 
+/// Shift n left into Carry. LSB of n set to 0.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Set if result is zero.
+/// | Subtract   | Reset.
+/// | Half-carry | Reset.
+/// | Carry      | Contains old bit 7 data.
 pub fn sla(byte: &mut u8, flags: &mut Flags) {
-    flags.set(Flags::CARRY, !byte.has_bit_set(7));
+    flags.set(Flags::CARRY, byte.has_bit_set(7));
     *byte <<= 1;
     flags.set(Flags::ZERO, *byte == 0);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY);
 }
 
+/// Shift n right into Carry. MSB doesn't change.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Set if result is zero.
+/// | Subtract   | Reset.
+/// | Half-carry | Reset.
+/// | Carry      | Contains old bit 0 data.
 pub fn sra(byte: &mut u8, flags: &mut Flags) {
-    flags.set(Flags::CARRY, !byte.has_bit_set(0));
+    flags.set(Flags::CARRY, byte.has_bit_set(0));
     *byte = (*byte as i8 >> 1) as u8;
     flags.set(Flags::ZERO, *byte == 0);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY);
 }
 
+/// Shift n right into Carry. MSB set to 0.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Set if result is zero.
+/// | Subtract   | Reset.
+/// | Half-carry | Reset.
+/// | Carry      | Contains old bit 0 data.
 pub fn srl(byte: &mut u8, flags: &mut Flags) {
-    flags.set(Flags::CARRY, !byte.has_bit_set(0));
+    flags.set(Flags::CARRY, byte.has_bit_set(0));
     *byte >>= 1;
     flags.set(Flags::ZERO, *byte == 0);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY);
 }
 
+/// Swap upper & lower nibles of n.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Set if result is zero.
+/// | Subtract   | Reset.
+/// | Half-carry | Reset.
+/// | Carry      | Reset.
 pub fn swap(byte: &mut u8, flags: &mut Flags) {
     *byte = byte.rotate_left(4);
-    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
     flags.set(Flags::ZERO, *byte == 0);
+    flags.remove(Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
 }
 
+/// Reset bit b in register r.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Not affected.
+/// | Subtract   | Not affected.
+/// | Half-carry | Not affected.
+/// | Carry      | Not affected.
 pub fn res(byte: &mut u8, n: u8) {
     byte.set_bit(n, false);
 }
 
+/// Set bit b in register r.
+///
+/// # Flags
+///
+/// | Flag       | Result
+/// | ---------- | ---
+/// | Zero       | Not affected.
+/// | Subtract   | Not affected.
+/// | Half-carry | Not affected.
+/// | Carry      | Not affected.
 pub fn set(byte: &mut u8, n: u8) {
     byte.set_bit(n, true);
 }
@@ -289,4 +352,37 @@ mod tests {
         assert_eq!(byte, 0x88);
         assert_eq!(flags, Flags::empty());
     }
+
+    #[test]
+    fn bit() {}
+
+    #[test]
+    fn sla() {
+        let mut byte = 0x80;
+        let mut flags = Flags::empty();
+        super::sla(&mut byte, &mut flags);
+        assert_eq!(byte, 0x00);
+        assert_eq!(flags, Flags::CARRY | Flags::ZERO);
+
+        let mut byte = 0xff;
+        let mut flags = Flags::empty();
+        super::sla(&mut byte, &mut flags);
+        assert_eq!(byte, 0xfe);
+        assert_eq!(flags, Flags::CARRY);
+    }
+
+    #[test]
+    fn sra() {}
+
+    #[test]
+    fn srl() {}
+
+    #[test]
+    fn swap() {}
+
+    #[test]
+    fn res() {}
+
+    #[test]
+    fn set() {}
 }
