@@ -521,6 +521,9 @@ impl Ppu {
             let tile_location = self.read_byte(absolute_index + 2);
             let attributes = self.read_byte(absolute_index + 3);
 
+            // Determine the background priority of the sprite
+            let behind_bg = attributes.has_bit_set(7);
+
             // Determine whether the sprite is flipped horizontally or vertically
             let y_flip = attributes.has_bit_set(6);
             let x_flip = attributes.has_bit_set(5);
@@ -569,7 +572,11 @@ impl Ppu {
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
                     let pixel = x_position + x_pixel;
 
-                    if shade != Shade::Transparent {
+                    // If the sprite is behind the background, only show it over white backgrounds
+                    let has_priority = !behind_bg ||
+                        (self.pixels.0[self.line as usize][pixel as usize] == Shade::White);
+
+                    if (shade != Shade::Transparent) && has_priority {
                         self.pixels.0[self.line as usize][pixel as usize] = shade;
                     }
                 }
@@ -872,6 +879,32 @@ mod tests {
         // Check that the actual output is correct
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[0][i], expected_pixels[i]);
+        }
+
+        // Set the attributes of the sprite to be behind the background
+        ppu.write_byte(0xFE03, 0x80);
+
+        // Set all the pixels to white - sprites should be written over white pixels even when they
+        // don't have priority
+        for i in 0..8 {
+            ppu.pixels.0[0][i] = Shade::White;
+        }
+
+        ppu.render_sprite();
+
+        for i in 0..8 {
+            assert_eq!(ppu.pixels.0[0][i], expected_pixels[i]);
+        }
+
+        // When the pixels are not white, the de-prioritized sprite should not be drawn
+        for i in 0..8 {
+            ppu.pixels.0[0][i] = Shade::Black;
+        }
+
+        ppu.render_sprite();
+
+        for i in 0..8 {
+            assert_eq!(ppu.pixels.0[0][i], Shade::Black);
         }
     }
 }
