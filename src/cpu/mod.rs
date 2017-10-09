@@ -5,6 +5,7 @@
 pub mod arithmetic;
 mod instructions;
 mod registers;
+mod timer;
 
 use std::default::Default;
 use std::fmt;
@@ -14,6 +15,7 @@ use memory::{Addressable, Mmu};
 
 pub use self::instructions::Instruction;
 pub use self::registers::{Registers, Flags};
+pub use self::timer::Timer;
 
 /// Current state of the CPU.
 #[derive(Debug)]
@@ -148,6 +150,7 @@ impl Cpu {
                         // FIXME: The timing for interrupts might be more subtle than this.
                         self.clock.m += 3;
                         self.clock.t += 12;
+                        $bus.timer.tick(3);
 
                         return;
                     }

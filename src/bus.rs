@@ -8,7 +8,7 @@ use std::ops::Range;
 use itertools::Itertools;
 
 use bytes::ByteExt;
-use cpu::Interrupts;
+use cpu::{Interrupts, Timer};
 use graphics::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
 use input::{Button, ButtonState, SelectFlags};
 use memory::{Addressable, Mmu};
@@ -22,6 +22,7 @@ pub struct Bus {
     pub ppu: Ppu,
     pub mmu: Mmu,
     pub interrupts: Interrupts,
+    pub timer: Timer,
     pub button_state: ButtonState,
 }
 
@@ -57,6 +58,7 @@ impl Bus {
             ref ppu,
             ref interrupts,
             ref button_state,
+            ref timer,
             ..
         } = *self;
 
@@ -96,6 +98,18 @@ impl Bus {
 
                 register
             }
+
+            // DIV - Divider Register
+            0xFF04 => timer.reg.divider,
+
+            // TIMA - Timer Counter
+            0xFF05 => timer.reg.counter,
+
+            // TMA - Timer Modulo
+            0xFF06 => timer.reg.modulo,
+
+            // TAC - Timer Control
+            0xFF07 => timer.reg.control,
 
             // IF - Interrupt Flag
             0xFF0F => {
@@ -361,6 +375,18 @@ impl Bus {
             0xFF02 => {
                 warn!("serial transfer is unimplemented");
             }
+
+            // DIV - Divider Register
+            0xFF04 => self.timer.reg.divider = 0,
+
+            // TIMA - Timer Counter
+            0xFF05 => self.timer.reg.counter = byte,
+
+            // TMA - Timer Modulo
+            0xFF06 => self.timer.reg.modulo = byte,
+
+            // TAC - Timer Control
+            0xFF07 => self.timer.reg.control = byte & 0x7,
 
             // IF - Interrupt Flag
             0xFF0F => {
