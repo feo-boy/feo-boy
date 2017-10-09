@@ -782,12 +782,11 @@ mod tests {
     #[test]
     fn stat_register() {
         let mut bus = Bus::default();
-        bus.ppu.control.display_enabled = true;
         bus.ppu.line = 40;
         bus.ppu.line_compare = 40;
         bus.ppu.lcd_status_interrupts.vblank = true;
 
-        assert_eq!(bus.read_byte(0xFF41), 0b00010100);
+        assert_eq!(bus.read_byte(0xFF41), 0b00010101);
     }
 
     #[test]

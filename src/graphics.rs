@@ -229,6 +229,28 @@ impl Default for ScreenBuffer {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+enum Mode {
+    /// Horizontal blank.
+    HorizontalBlank = 0,
+
+    /// Vertical blank.
+    VerticalBlank = 1,
+
+    /// Scanline (accessing OAM).
+    ScanlineOam = 2,
+
+    /// Scanline (accessing VRAM).
+    ScanlineVram = 3,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Mode::VerticalBlank
+    }
+}
+
+
 /// The picture processing unit.
 #[derive(Debug, Default)]
 pub struct Ppu {
@@ -237,14 +259,7 @@ pub struct Ppu {
     pub control: LcdControl,
 
     /// The current mode number of the PPU operation.
-    ///
-    /// | Mode      | Description               |
-    /// | --------- | ------------------------- |
-    /// | 0         | Horizontal blank          |
-    /// | 1         | Vertical blank            |
-    /// | 2         | Scanline (accessing OAM)  |
-    /// | 3         | Scanline (accessing VRAM) |
-    mode: u8,
+    mode: Mode,
 
     /// The number of PPU clock cycles that have been executed for the current
     /// PPU operation.
@@ -300,9 +315,10 @@ impl Ppu {
 
         self.modeclock += cycles;
 
+        // Mode changes are a state machine. This match block returns an option indicating whether
+        // there was a mode change, and if there was, the new mode.
         let new_mode = match self.mode {
-            // Horizontal blank
-            0 if self.modeclock >= 204 => {
+            Mode::HorizontalBlank if self.modeclock >= 204 => {
                 self.modeclock = 0;
                 self.line += 1;
 
@@ -312,65 +328,58 @@ impl Ppu {
                         *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
                     }
 
-                    interrupts.vblank.requested = true;
-
-                    // Enter vertical blank mode.
-                    Some(1)
+                    Some(Mode::VerticalBlank)
                 } else {
-                    // Enter scanline mode.
-                    Some(2)
+                    Some(Mode::ScanlineOam)
                 }
             }
 
-            // Vertical blank
-            1 if self.modeclock >= 456 => {
+            Mode::VerticalBlank if self.modeclock >= 456 => {
                 self.modeclock = 0;
                 self.line += 1;
 
                 if self.line > 153 {
                     self.line = 0;
-
-                    // Enter scanline mode.
-                    Some(2)
+                    Some(Mode::ScanlineOam)
                 } else {
                     None
                 }
             }
 
-            // Scanline mode reading OAM
-            2 if self.modeclock >= 80 => {
+            Mode::ScanlineOam if self.modeclock >= 80 => {
                 self.modeclock = 0;
-
-                // Enter scanline mode reading VRAM.
-                Some(3)
+                Some(Mode::ScanlineVram)
             }
 
-            // Scanline mode reading VRAM
-            3 if self.modeclock >= 172 => {
+            Mode::ScanlineVram if self.modeclock >= 172 => {
                 self.modeclock = 0;
 
                 // Write a scanline to the framebuffer
                 self.renderscan();
 
-                // Enter horizontal blank mode.
-                Some(0)
+                Some(Mode::HorizontalBlank)
             }
 
             _ => None,
         };
 
         if let Some(new_mode) = new_mode {
-            debug!("switching graphics mode to {}", new_mode);
+            debug!("switching graphics mode to {}", new_mode as u8);
             self.mode = new_mode;
+
+            match new_mode {
+                Mode::VerticalBlank => interrupts.vblank.requested = true,
+                _ => (),
+            }
         }
     }
 
     /// Returns the number of the current graphics mode.
     pub fn mode(&self) -> u8 {
         if self.control.display_enabled {
-            self.mode
+            self.mode as u8
         } else {
-            1
+            Mode::VerticalBlank as u8
         }
     }
 
