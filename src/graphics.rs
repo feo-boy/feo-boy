@@ -836,7 +836,7 @@ mod tests {
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ]
+            ],
         ];
 
         // Set the state of the PPU
