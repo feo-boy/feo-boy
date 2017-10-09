@@ -407,7 +407,7 @@ impl Ppu {
             return;
         }
 
-        if self.control.background_enabled {
+        if self.control.background_enabled || self.control.window_enabled {
             self.render_tiles();
         }
 
