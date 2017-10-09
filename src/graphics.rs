@@ -524,9 +524,9 @@ impl Ppu {
                 for tile_pixel in (0..8).rev() {
                     // Get the bit that corresponds to the pixel within the line
                     let color_bit = if x_flip {
-                        (7 - tile_pixel as i8) as u8
-                    } else {
                         tile_pixel as u8
+                    } else {
+                        (7 - tile_pixel as i8) as u8
                     };
 
                     // Determine which sprite palette to use
