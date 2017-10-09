@@ -654,7 +654,7 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::{Ppu, Shade, TileDataStart};
+    use super::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
 
     #[test]
     fn chram() {
@@ -742,5 +742,136 @@ mod tests {
         let ppu = Ppu::new();
         assert!(!ppu.control.display_enabled);
         assert_eq!(ppu.mode(), 1);
+    }
+
+    #[test]
+    fn render_tiles() {
+        let mut ppu = Ppu::new();
+
+        // Set up tiles
+        let tile_row = LittleEndian::read_u16(&[0x4E, 0x8B]);
+        ppu.write_word(0x8010, tile_row);
+
+        // Set up tile map
+        for i in 0u8..32 {
+            ppu.write_byte(0x9800 + u16::from(i), 1);
+        }
+
+        // Create the palette
+        ppu.bg_palette = [
+            Shade::White,
+            Shade::LightGray,
+            Shade::DarkGray,
+            Shade::Black,
+        ];
+
+        // Set the state of the PPU
+        ppu.line = 0;
+        ppu.window.x = 0;
+        ppu.window.y = 0;
+        ppu.bg_scroll.x = 0;
+        ppu.bg_scroll.y = 0;
+        ppu.control.window_enabled = false;
+        ppu.control.background_enabled = true;
+        ppu.control.window_map_start = TileMapStart::Low;
+        ppu.control.bg_map_start = TileMapStart::Low;
+        ppu.control.tile_data_start = TileDataStart::Low;
+
+        // Render
+        ppu.render_tiles();
+
+        // Enumerate the expected output
+        let expected_pixels = [
+            Shade::DarkGray,
+            Shade::LightGray,
+            Shade::White,
+            Shade::White,
+            Shade::Black,
+            Shade::LightGray,
+            Shade::Black,
+            Shade::DarkGray,
+        ];
+
+        // Check that the actual output is correct
+        for i in 0..160 {
+            assert_eq!(ppu.pixels.0[0][i], expected_pixels[i % 8]);
+        }
+    }
+
+    #[test]
+    fn render_sprite() {
+        let mut ppu = Ppu::new();
+
+        // Set up tiles
+        let tile_row = LittleEndian::read_u16(&[0x4E, 0x8B]);
+        ppu.write_word(0x8010, tile_row);
+
+        // Set up sprites
+        let sprite_y = 16;
+        let sprite_x = 8;
+        let sprite_tile = 1;
+        let sprite_attributes = 0x00;
+
+        ppu.write_byte(0xFE00, sprite_y);
+        ppu.write_byte(0xFE01, sprite_x);
+        ppu.write_byte(0xFE02, sprite_tile);
+        ppu.write_byte(0xFE03, sprite_attributes);
+
+        // Create the palette
+        ppu.bg_palette = [
+            Shade::White,
+            Shade::LightGray,
+            Shade::DarkGray,
+            Shade::Black,
+        ];
+        ppu.sprite_palette = [
+            [
+                Shade::Transparent,
+                Shade::LightGray,
+                Shade::DarkGray,
+                Shade::Black,
+            ],
+            [
+                Shade::Transparent,
+                Shade::LightGray,
+                Shade::DarkGray,
+                Shade::Black,
+            ]
+        ];
+
+        // Set the state of the PPU
+        ppu.line = 0;
+        ppu.window.x = 0;
+        ppu.window.y = 0;
+        ppu.bg_scroll.x = 0;
+        ppu.bg_scroll.y = 0;
+        ppu.control.window_enabled = false;
+        ppu.control.background_enabled = true;
+        ppu.control.window_map_start = TileMapStart::Low;
+        ppu.control.bg_map_start = TileMapStart::Low;
+        ppu.control.tile_data_start = TileDataStart::Low;
+        ppu.control.sprite_size = SpriteSize::Large;
+        ppu.control.sprites_enabled = true;
+
+        // Render
+        ppu.render_tiles();
+        ppu.render_sprite();
+
+        // Enumerate the expected output
+        let expected_pixels = [
+            Shade::DarkGray,
+            Shade::LightGray,
+            Shade::White,
+            Shade::White,
+            Shade::Black,
+            Shade::LightGray,
+            Shade::Black,
+            Shade::DarkGray,
+        ];
+
+        // Check that the actual output is correct
+        for i in 0..8 {
+            assert_eq!(ppu.pixels.0[0][i], expected_pixels[i]);
+        }
     }
 }
