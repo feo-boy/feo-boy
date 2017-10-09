@@ -300,76 +300,68 @@ impl Ppu {
 
         self.modeclock += cycles;
 
-        match self.mode {
+        let new_mode = match self.mode {
             // Horizontal blank
-            0 => {
-                if self.modeclock >= 204 {
-                    self.modeclock = 0;
-                    self.line += 1;
+            0 if self.modeclock >= 204 => {
+                self.modeclock = 0;
+                self.line += 1;
 
-                    if self.line > 143 {
-                        // Enter vertical blank mode
-                        self.mode = 1;
-
-                        debug!("set graphics mode to {}", self.mode);
-
-                        // Draw the pixels to the screen.
-                        for (x, y, pixel) in buffer.enumerate_pixels_mut() {
-                            *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
-                        }
-
-                        interrupts.vblank.requested = true;
-                    } else {
-                        // Enter scanline mode
-                        self.mode = 2;
-
-                        debug!("set graphics mode to {}", self.mode);
+                if self.line > 143 {
+                    // Draw the pixels to the screen.
+                    for (x, y, pixel) in buffer.enumerate_pixels_mut() {
+                        *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
                     }
+
+                    interrupts.vblank.requested = true;
+
+                    // Enter vertical blank mode.
+                    Some(1)
+                } else {
+                    // Enter scanline mode.
+                    Some(2)
                 }
             }
 
             // Vertical blank
-            1 => {
-                if self.modeclock >= 456 {
-                    self.modeclock = 0;
-                    self.line += 1;
+            1 if self.modeclock >= 456 => {
+                self.modeclock = 0;
+                self.line += 1;
 
-                    if self.line > 153 {
-                        // Enter scanline mode
-                        self.mode = 2;
-                        self.line = 0;
+                if self.line > 153 {
+                    self.line = 0;
 
-                        debug!("set graphics mode to {}", self.mode);
-                    }
+                    // Enter scanline mode.
+                    Some(2)
+                } else {
+                    None
                 }
             }
 
             // Scanline mode reading OAM
-            2 => {
-                if self.modeclock >= 80 {
-                    // Enter scanline mode reading VRAM
-                    self.modeclock = 0;
-                    self.mode = 3;
+            2 if self.modeclock >= 80 => {
+                self.modeclock = 0;
 
-                    debug!("set graphics mode to {}", self.mode);
-                }
+                // Enter scanline mode reading VRAM.
+                Some(3)
             }
 
             // Scanline mode reading VRAM
-            3 => {
-                if self.modeclock >= 172 {
-                    // Enter horizontal blank mode
-                    self.modeclock = 0;
-                    self.mode = 0;
+            3 if self.modeclock >= 172 => {
+                self.modeclock = 0;
 
-                    // Write a scanline to the framebuffer
-                    self.renderscan();
+                // Write a scanline to the framebuffer
+                self.renderscan();
 
-                    debug!("set graphics mode to {}", self.mode);
-                }
+                // Enter horizontal blank mode.
+                Some(0)
             }
 
-            _ => panic!("unimplemented PPU mode: {:?}", self.mode),
+            _ => None,
+        };
+
+        if let Some(new_mode) = new_mode {
+            debug!("switching graphics mode to {}", new_mode);
+            self.mode = new_mode;
         }
     }
 
