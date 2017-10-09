@@ -244,7 +244,7 @@ pub struct Ppu {
     /// | 1         | Vertical blank            |
     /// | 2         | Scanline (accessing OAM)  |
     /// | 3         | Scanline (accessing VRAM) |
-    pub mode: u8,
+    mode: u8,
 
     /// The number of PPU clock cycles that have been executed for the current
     /// PPU operation.
@@ -370,6 +370,15 @@ impl Ppu {
             }
 
             _ => panic!("unimplemented PPU mode: {:?}", self.mode),
+        }
+    }
+
+    /// Returns the number of the current graphics mode.
+    pub fn mode(&self) -> u8 {
+        if self.control.display_enabled {
+            self.mode
+        } else {
+            1
         }
     }
 
@@ -708,5 +717,12 @@ mod tests {
         ppu.window.y = 143;
 
         ppu.render_tiles();
+    }
+
+    #[test]
+    fn lcd_disabled() {
+        let ppu = Ppu::new();
+        assert!(!ppu.control.display_enabled);
+        assert_eq!(ppu.mode(), 1);
     }
 }

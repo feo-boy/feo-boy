@@ -147,7 +147,7 @@ impl Bus {
                 let mut register = 0u8;
 
                 // Set the lowest two bits to the mode.
-                register |= ppu.mode;
+                register |= ppu.mode();
 
                 // Set bit 2 if LY == LYC
                 register.set_bit(
@@ -782,6 +782,7 @@ mod tests {
     #[test]
     fn stat_register() {
         let mut bus = Bus::default();
+        bus.ppu.control.display_enabled = true;
         bus.ppu.line = 40;
         bus.ppu.line_compare = 40;
         bus.ppu.lcd_status_interrupts.vblank = true;
