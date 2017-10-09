@@ -307,7 +307,7 @@ impl Ppu {
                     self.modeclock = 0;
                     self.line += 1;
 
-                    if self.line == 143 {
+                    if self.line > 143 {
                         // Enter vertical blank mode
                         self.mode = 1;
 
