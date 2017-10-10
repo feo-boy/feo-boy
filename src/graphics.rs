@@ -530,12 +530,12 @@ impl Ppu {
 
             // Determine whether this is an 8x8 or 8x16 sprite
             let y_size = match self.control.sprite_size {
-                SpriteSize::Small => 8,
-                SpriteSize::Large => 16,
+                SpriteSize::Small => 7,
+                SpriteSize::Large => 15,
             };
 
             // Continue if the sprite is on the current line
-            if (self.line >= y_position) && (self.line < (y_position + y_size)) {
+            if (self.line >= y_position) && (self.line <= (y_position + y_size)) {
                 // Get the line of the sprite to be displayed
                 let current_line = if y_flip {
                     (i16::from(y_position) + i16::from(y_size) - i16::from(self.line)) * 2
@@ -860,7 +860,7 @@ mod tests {
         ppu.control.window_map_start = TileMapStart::Low;
         ppu.control.bg_map_start = TileMapStart::Low;
         ppu.control.tile_data_start = TileDataStart::Low;
-        ppu.control.sprite_size = SpriteSize::Large;
+        ppu.control.sprite_size = SpriteSize::Small;
         ppu.control.sprites_enabled = true;
 
         // Render
@@ -908,6 +908,29 @@ mod tests {
 
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[0][i], Shade::Black);
+        }
+
+        // Set the attributes of the sprite to reverse it horizontally
+        ppu.write_byte(0xFE03, 0x20);
+
+        for i in 0..8 {
+            ppu.pixels.0[0][i] = Shade::White;
+        }
+
+        ppu.render_sprite();
+
+        for i in 0..8 {
+            assert_eq!(ppu.pixels.0[0][i], *expected_pixels.iter().rev().nth(i).unwrap());
+        }
+
+        // Set the attributes of the sprite to reverse it vertically
+        ppu.write_byte(0xFE03, 0x40);
+
+        ppu.line = 7;
+        ppu.render_sprite();
+
+        for i in 0..8 {
+            assert_eq!(ppu.pixels.0[7][i], expected_pixels[i]);
         }
     }
 }
