@@ -10,6 +10,8 @@ use byteorder::{BigEndian, LittleEndian, ByteOrder};
 
 use errors::*;
 
+mod mbc;
+
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
