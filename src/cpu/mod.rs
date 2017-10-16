@@ -18,7 +18,7 @@ pub use self::registers::{Registers, Flags};
 pub use self::timer::Timer;
 
 /// Current state of the CPU.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum State {
     /// The CPU is executing code.
     Running,
@@ -137,15 +137,43 @@ impl Cpu {
     /// Execute any enabled interrupt requests.
     pub fn handle_interrupts(&mut self, bus: &mut Bus) {
         if !bus.interrupts.enabled {
-            return;
+            match self.state {
+                State::Running => return,
+                State::Halted => {
+                    let interrupts = [
+                        &bus.interrupts.vblank,
+                        &bus.interrupts.lcd_status,
+                        &bus.interrupts.timer,
+                        &bus.interrupts.serial,
+                        &bus.interrupts.joypad,
+                    ];
+
+                    if interrupts.iter().any(|int| int.requested) {
+                        self.state = State::Running;
+
+                        // Handle "HALT bug"
+                        self.reg.pc += 1;
+                    }
+
+                    return;
+                }
+                _ => unimplemented!(),
+            }
         }
 
         macro_rules! handle_interrupts {
             ( $bus:expr; $( $interrupt:ident, $vector:expr ; )* ) => {
                 $(
                     if $bus.interrupts.$interrupt.enabled && $bus.interrupts.$interrupt.requested {
+                        debug!(concat!("handling ", stringify!($interrupt), " interrupt"));
+
+                        if let State::Halted = self.state {
+                            self.state = State::Running;
+                        }
+
                         $bus.interrupts.enabled = false;
                         $bus.interrupts.$interrupt.requested = false;
+
                         self.rst($vector, $bus);
 
                         // FIXME: The timing for interrupts might be more subtle than this.

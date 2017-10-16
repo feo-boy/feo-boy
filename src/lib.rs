@@ -258,6 +258,7 @@ impl Debugger {
 mod tests {
     use super::Emulator;
     use super::cpu::State;
+    use super::memory::Addressable;
 
     #[test]
     fn tick_while_halted() {
@@ -274,5 +275,42 @@ mod tests {
         }
 
         assert!(emulator.bus.timer.reg.divider > 0);
+    }
+
+    #[test]
+    fn wake_from_halt() {
+        let mut emulator = Emulator::new();
+
+        // Load a test program into RAM
+        emulator.cpu.reg.pc = 0xC000;
+
+        assert!(!emulator.bus.interrupts.enabled);
+
+        let test_program = [
+            0x76,   // HALT
+            0x00,   // NOP
+            0x00,   // NOP
+        ];
+
+        for (offset, byte) in test_program.into_iter().enumerate() {
+            emulator.bus.write_byte(
+                emulator.cpu.reg.pc + offset as u16,
+                *byte,
+            );
+        }
+
+        emulator.step();
+
+        assert_eq!(emulator.cpu.state, State::Halted);
+        assert_eq!(emulator.cpu.reg.pc, 0xC001);
+
+        // Request an interrupt
+        emulator.bus.interrupts.timer.enabled = true;
+        emulator.bus.interrupts.timer.requested = true;
+
+        // The notorious "HALT bug". When an interrupt is requested and the emulator is halted, the
+        // Game Boy skips the next instruction.
+        emulator.step();
+        assert_eq!(emulator.cpu.reg.pc, 0xC002);
     }
 }
