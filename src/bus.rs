@@ -100,7 +100,7 @@ impl Bus {
             }
 
             // DIV - Divider Register
-            0xFF04 => timer.reg.divider,
+            0xFF04 => timer.reg.divider(),
 
             // TIMA - Timer Counter
             0xFF05 => timer.reg.counter,
@@ -377,7 +377,7 @@ impl Bus {
             }
 
             // DIV - Divider Register
-            0xFF04 => self.timer.reg.divider = 0,
+            0xFF04 => self.timer.reset_divider(),
 
             // TIMA - Timer Counter
             0xFF05 => self.timer.reg.counter = byte,

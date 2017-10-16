@@ -4,10 +4,18 @@ use bytes::ByteExt;
 
 #[derive(Debug, Default)]
 pub struct TimerRegisters {
-    pub divider: u8,
     pub counter: u8,
     pub modulo: u8,
     pub control: u8,
+
+    divider: u8,
+}
+
+impl TimerRegisters {
+    /// Returns the value of the divider register.
+    pub fn divider(&self) -> u8 {
+        self.divider
+    }
 }
 
 #[derive(Debug, Default)]
@@ -64,6 +72,11 @@ impl Timer {
         }
     }
 
+    pub fn reset_divider(&mut self) {
+        self.reg.divider = 0;
+        self.div = 0;
+    }
+
     pub fn is_enabled(&self) -> bool {
         self.reg.control.has_bit_set(2)
     }
@@ -83,12 +96,33 @@ mod tests {
             timer.tick(1);
         }
 
-        assert_eq!(timer.reg.divider, 1);
+        assert_eq!(timer.reg.divider(), 1);
 
         for _ in 0..128 {
             timer.tick(1);
         }
 
-        assert_eq!(timer.reg.divider, 3);
+        assert_eq!(timer.reg.divider(), 3);
+    }
+
+    #[test]
+    fn reset_div() {
+        let mut timer = Timer::default();
+
+        for _ in 0..63 {
+            timer.tick(1);
+        }
+        assert_eq!(timer.reg.divider(), 0);
+
+        timer.reset_divider();
+        assert_eq!(timer.reg.divider(), 0);
+
+        for _ in 0..63 {
+            timer.tick(1);
+        }
+        assert_eq!(timer.reg.divider(), 0);
+
+        timer.tick(1);
+        assert_eq!(timer.reg.divider(), 1);
     }
 }
