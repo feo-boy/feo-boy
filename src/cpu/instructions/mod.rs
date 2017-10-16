@@ -1813,6 +1813,23 @@ mod tests {
     }
 
     #[test]
+    fn execute() {
+        let mut bus = Bus::default();
+        let mut cpu = Cpu::new();
+
+        let nop = Instruction {
+            def: &INSTRUCTIONS[0x00],
+            ..Default::default()
+        };
+
+        let cycles = cpu.execute(nop, &mut bus);
+
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.clock.m, 1);
+        assert_eq!(cpu.clock.t, 4);
+    }
+
+    #[test]
     fn rst() {
         let mut bus = Bus::default();
         let mut cpu = Cpu::new();
