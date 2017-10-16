@@ -8,6 +8,7 @@ use regex::{Regex, NoExpand};
 use smallvec::SmallVec;
 
 use bus::Bus;
+use bytes::WordExt;
 use cpu::{arithmetic, State, Flags};
 use memory::Addressable;
 
@@ -367,7 +368,8 @@ impl super::Cpu {
             // POP AF
             0xf1 => {
                 let af = self.pop(bus);
-                self.reg.af_mut().write(af);
+                self.reg.a = af.hi();
+                self.reg.f = Flags::from_bits_truncate(af.lo());
             }
 
             // LD (BC),A
@@ -2052,5 +2054,23 @@ mod tests {
         cpu.execute(instruction, &mut bus);
 
         assert_eq!(cpu.reg.sp, 0xbeef);
+    }
+
+    #[test]
+    fn pop_af() {
+        let mut bus = Bus::default();
+        let mut cpu = Cpu::new();
+        cpu.reg.sp = 0xFFFD;
+        bus.write_word(cpu.reg.sp, 0xFFFF);
+
+        let instruction = Instruction {
+            def: &INSTRUCTIONS[0xF1],
+            ..Default::default()
+        };
+        cpu.execute(instruction, &mut bus);
+
+        assert_eq!(cpu.reg.a, 0xFF);
+        assert_eq!(cpu.reg.f.bits(), 0xF0);
+        assert_eq!(cpu.reg.f, Flags::all());
     }
 }

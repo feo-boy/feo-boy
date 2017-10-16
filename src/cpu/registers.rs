@@ -107,6 +107,11 @@ impl<'a> SubAssign<u16> for RegisterPairMut<'a> {
 /// the high byte, and the right register is the low byte. The `Registers` struct provides methods
 /// for accessing these pairs mutably and immutably.
 ///
+/// **Note**: There is no `af_mut()` function provided to access the `AF` register pair mutably.
+/// Writing to this pair is only required by one instruction (`POP AF`), and has some
+/// implementation tricks (the flag register bits must be truncated before write). The pair is
+/// handled manually in the instruction implementation.
+///
 /// ```
 /// use feo_boy::cpu::Registers;
 ///
@@ -204,14 +209,6 @@ impl Registers {
     /// Returns register pair `AF`.
     pub fn af(&self) -> u16 {
         BigEndian::read_u16(&[self.a, self.f.bits])
-    }
-
-    /// Returns a mutable reference to register pair `AF`.
-    pub fn af_mut(&mut self) -> RegisterPairMut {
-        RegisterPairMut {
-            hi: &mut self.a,
-            lo: &mut self.f.bits,
-        }
     }
 
     /// Returns register pair `BC`.
