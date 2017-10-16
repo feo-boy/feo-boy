@@ -12,9 +12,11 @@ pub struct TimerRegisters {
 
 #[derive(Debug, Default)]
 pub struct Timer {
-    main: u8,
-    sub: u8,
+    /// Divider internal counter. Increments the divider register once it reaches `64` M-cycles.
     div: u8,
+
+    /// Timer internal counter.
+    timer_counter: u16,
 
     pub reg: TimerRegisters,
 }
@@ -24,33 +26,31 @@ impl Timer {
     ///
     /// Returns whether the timer interrupt should be triggered.
     pub fn tick(&mut self, mtime: u8) -> bool {
-        self.sub += mtime;
+        self.div += mtime;
 
-        if self.sub >= 4 {
-            self.main = self.main.wrapping_add(1);
-            self.sub -= 4;
-
-            self.div += 1;
-            if self.div == 16 {
-                self.reg.divider = self.reg.divider.wrapping_add(1);
-                self.div = 0;
-            }
+        // The divider is always counting, regardless of whether the timer is enabled.
+        if self.div >= 64 {
+            self.div %= 64;
+            self.reg.divider = self.reg.divider.wrapping_add(1);
         }
 
-        if !self.reg.control.has_bit_set(2) {
+        if !self.is_enabled() {
             return false;
         }
 
-        let threshold = match self.reg.control & 0x3 {
-            0 => 64,    // 4K
-            1 => 1,     // 256K
-            2 => 4,     // 64K
-            3 => 16,    // 16K
+        self.timer_counter += u16::from(mtime);
+
+        // The timer will increment at a frequency determined by the control register.
+        let threshold: u16 = match self.reg.control & 0x3 {
+            0 => 256,       // 4KHz
+            1 => 4,         // 256KHz
+            2 => 16,        // 64KHz
+            3 => 64,        // 16KHz
             _ => unreachable!(),
         };
 
-        if self.main >= threshold {
-            self.main = 0;
+        if self.timer_counter >= threshold {
+            self.timer_counter %= threshold;
 
             let (counter, overflow) = match self.reg.counter.checked_add(1) {
                 Some(counter) => (counter, false),
@@ -62,5 +62,33 @@ impl Timer {
         } else {
             false
         }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.reg.control.has_bit_set(2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bus::Bus;
+
+    use super::Timer;
+
+    #[test]
+    fn div() {
+        let mut timer = Timer::default();
+
+        for _ in 0..64 {
+            timer.tick(1);
+        }
+
+        assert_eq!(timer.reg.divider, 1);
+
+        for _ in 0..128 {
+            timer.tick(1);
+        }
+
+        assert_eq!(timer.reg.divider, 3);
     }
 }
