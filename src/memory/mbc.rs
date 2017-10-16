@@ -1,6 +1,4 @@
 
-use super::Memory;
-
 //const RAM_SIZE: usize = 32 * 0x400 * 0x400;
 const RAM_SIZE: usize = 0x2000 * 4;
 const RTC_SIZE: usize = 0x2000 * 5;
@@ -60,7 +58,10 @@ impl<'a> super::Addressable for Mbc3<'a> {
             }
 
             // Error Read
-            _ => 0x00,
+            _ => {
+                warn!("Bad read!");
+                0x00
+            }
 
         }
     }
@@ -72,7 +73,7 @@ impl<'a> super::Addressable for Mbc3<'a> {
                 match value {
                     0x00 => self.ram_timer_enabled = false,
                     0x0a => self.ram_timer_enabled = true,
-                    _ => panic!("Bad RAM and Time Enable Setting"),
+                    _ => warn!("Bad RAM and Time Enable Setting"),
                 }
             }
 
@@ -91,7 +92,7 @@ impl<'a> super::Addressable for Mbc3<'a> {
                 match value {
                     0x00...0x03 => self.ram_rtc_select = RamRtcSelect::Ram(value),
                     0x08...0x0c => self.ram_rtc_select = RamRtcSelect::Rtc(value - 0x08),
-                    _ => panic!("Bad RAM Bank / RTC Register"),
+                    _ => warn!("Bad RAM Bank / RTC Register"),
                 }
             }
 
@@ -115,11 +116,11 @@ impl<'a> super::Addressable for Mbc3<'a> {
                         let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
                         self.ram[addr as usize] = value;
                     }
-                    _ => panic!("Bad Ram Rtc setting"),
+                    _ => warn!("Bad Ram Rtc setting"),
                 }
             }
 
-            _ => (),
+            _ => warn!("Bad write!"),
         }
     }
 }
