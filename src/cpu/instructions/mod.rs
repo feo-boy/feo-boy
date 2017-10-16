@@ -1370,10 +1370,6 @@ impl super::Cpu {
         self.clock.t += cycles;
         self.clock.m += cycles / 4;
 
-        if bus.timer.tick(cycles as u8 / 4) {
-            bus.interrupts.timer.requested = true;
-        }
-
         cycles
     }
 

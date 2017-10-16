@@ -139,11 +139,17 @@ impl Emulator {
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
         let cycles = self.cpu.step(&mut self.bus);
+
         self.bus.ppu.step(
             cycles,
             &mut self.bus.interrupts,
             &mut self.screen_buffer,
         );
+
+        if self.bus.timer.tick(cycles as u8 / 4) {
+            self.bus.interrupts.timer.requested = true;
+        }
+
         self.cpu.handle_interrupts(&mut self.bus);
 
         if let Some(ref mut debugger) = self.debug {
@@ -245,5 +251,28 @@ impl Debugger {
             paused: true,
             editor: Editor::<()>::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Emulator;
+    use super::cpu::State;
+
+    #[test]
+    fn tick_while_halted() {
+        // TODO: There should be a way to load multiple instructions into ROM for testing purposes.
+
+        let mut emulator = Emulator::new();
+        emulator.cpu.state = State::Halted;
+
+        assert_eq!(emulator.bus.timer.reg.divider, 0);
+
+        // Step at least enough times for the divider to increase.
+        for _ in 0..64 {
+            emulator.step();
+        }
+
+        assert!(emulator.bus.timer.reg.divider > 0);
     }
 }

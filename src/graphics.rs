@@ -920,7 +920,10 @@ mod tests {
         ppu.render_sprite();
 
         for i in 0..8 {
-            assert_eq!(ppu.pixels.0[0][i], *expected_pixels.iter().rev().nth(i).unwrap());
+            assert_eq!(
+                ppu.pixels.0[0][i],
+                *expected_pixels.iter().rev().nth(i).unwrap()
+            );
         }
 
         // Set the attributes of the sprite to reverse it vertically

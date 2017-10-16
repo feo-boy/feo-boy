@@ -112,7 +112,7 @@ pub struct Cpu {
     pub clock: Clock,
 
     /// The state of execution.
-    state: State,
+    pub state: State,
 }
 
 impl Cpu {
@@ -125,12 +125,13 @@ impl Cpu {
     /// Returns the number of cycles the instruction takes.
     pub fn step(&mut self, bus: &mut Bus) -> u32 {
         match self.state {
-            State::Running => (),
-            _ => return 0,
+            State::Running => {
+                let instruction = self.fetch(bus);
+                self.execute(instruction, bus)
+            }
+            State::Halted => 4,     // Return the duration of the shortest instruction.
+            _ => unimplemented!(),
         }
-
-        let instruction = self.fetch(bus);
-        self.execute(instruction, bus)
     }
 
     /// Execute any enabled interrupt requests.
