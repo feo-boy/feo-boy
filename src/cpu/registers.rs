@@ -372,30 +372,29 @@ impl Registers {
     /// Performs a decimal adjust (DAA) operation on register A so that the correct representation
     /// of Binary Coded Decimal (BCD) is obtained.
     pub fn daa(&mut self) {
-        let mut correction = 0;
-        let a = self.a;
+        let n = self.f.contains(Flags::SUBTRACT);
+        let c = self.f.contains(Flags::CARRY);
+        let h = self.f.contains(Flags::HALF_CARRY);
 
-        if self.a > 0x99 || self.f.contains(Flags::CARRY) {
-            correction += 0x60;
-            self.f.insert(Flags::CARRY);
-        }
-
-        if (self.a & 0xf) > 0x9 || self.f.contains(Flags::HALF_CARRY) {
-            correction += 0x6;
-        }
-
-        if self.f.contains(Flags::SUBTRACT) {
-            self.a = self.a.wrapping_sub(correction);
+        if n {
+            if c {
+                self.a = self.a.wrapping_sub(0x60);
+            }
+            if h {
+                self.a = self.a.wrapping_sub(0x06);
+            }
         } else {
-            self.a = self.a.wrapping_add(correction);
+            if c || (self.a & 0xFF) > 0x99 {
+                self.a = self.a.wrapping_add(0x60);
+                self.f.insert(Flags::CARRY);
+            }
+            if h || (self.a & 0x0F) > 0x09 {
+                self.a = self.a.wrapping_add(0x06);
+            }
         }
 
-        // Set the half carry flag if there has been a carry/borrow between bits 3 and 4
-        self.f.set(
-            Flags::HALF_CARRY,
-            ((a & 0x10) ^ (self.a & 0x10)) == 0,
-        );
         self.f.set(Flags::ZERO, self.a == 0);
+        self.f.remove(Flags::HALF_CARRY);
     }
 
     /// Rotates register A left one bit and sets the flags appropriately.
