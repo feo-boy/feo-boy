@@ -466,7 +466,7 @@ impl super::Cpu {
             0x23 => self.reg.hl_mut().add_assign(1),
 
             // INC SP
-            0x33 => self.reg.sp.add_assign(1),
+            0x33 => self.reg.sp = self.reg.sp.wrapping_add(1),
 
             // LD B,E
             0x43 => self.reg.b = self.reg.e,
@@ -1046,7 +1046,7 @@ impl super::Cpu {
             0x2b => self.reg.hl_mut().sub_assign(1),
 
             // DEC SP
-            0x3b => self.reg.sp -= 1,
+            0x3b => self.reg.sp = self.reg.sp.wrapping_sub(1),
 
             // LD C,E
             0x4b => self.reg.c = self.reg.e,
