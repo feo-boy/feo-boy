@@ -177,10 +177,8 @@ impl super::Cpu {
 
     /// Executes an instruction.
     ///
-    /// All necessary side effects are performed, including updating the program counter, flag
-    /// registers, and CPU clock.
-    ///
-    /// Returns the number of clock cycles the instruction takes.
+    /// All necessary side effects are performed, including updating the program counter and flag
+    /// registers. Returns the number of T-cycles executed by the instruction.
     pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) -> u32 {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
@@ -197,7 +195,9 @@ impl super::Cpu {
         //
         // This how the actual hardware handles the PC, as relative jumps and other PC-related
         // instructions assume that PC is pointing at the *next* instruction.
-        self.reg.pc += 1 + instruction.operands.len() as u16;
+        self.reg.pc = self.reg.pc.wrapping_add(
+            1 + instruction.operands.len() as u16,
+        );
 
         // Execute the instruction.
         match instruction.def.byte {
@@ -1367,9 +1367,6 @@ impl super::Cpu {
             _ => u32::from(instruction.cycles()),
         };
 
-        self.clock.t += cycles;
-        self.clock.m += cycles / 4;
-
         cycles
     }
 
@@ -1823,10 +1820,7 @@ mod tests {
         };
 
         let cycles = cpu.execute(nop, &mut bus);
-
         assert_eq!(cycles, 4);
-        assert_eq!(cpu.clock.m, 1);
-        assert_eq!(cpu.clock.t, 4);
     }
 
     #[test]
@@ -1859,18 +1853,18 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
-        cpu.execute(instruction, &mut bus);
+        let cycles = cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
-        assert_eq!(cpu.clock.t, 12);
+        assert_eq!(cycles, 12);
 
         // Move backward 10
         let instruction = Instruction {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
-        cpu.execute(instruction, &mut bus);
+        let cycles = cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
-        assert_eq!(cpu.clock.t, 24);
+        assert_eq!(cycles, 12);
 
         // Do not jump
         cpu.reg.f.insert(Flags::ZERO);
@@ -1878,9 +1872,9 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
-        cpu.execute(instruction, &mut bus);
+        let cycles = cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 6);
-        assert_eq!(cpu.clock.t, 32);
+        assert_eq!(cycles, 8);
     }
 
     #[test]

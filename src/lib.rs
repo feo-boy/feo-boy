@@ -69,6 +69,9 @@ pub struct Emulator {
     pub screen_buffer: RgbaImage,
 
     debug: Option<Debugger>,
+
+    /// Any clock cycles that were not accounted for since the last update.
+    leftover_clocks: u32,
 }
 
 impl Emulator {
@@ -88,6 +91,7 @@ impl Emulator {
             bus,
             screen_buffer: RgbaImage::new(width, height),
             debug: None,
+            leftover_clocks: 0,
         }
     }
 
@@ -137,7 +141,9 @@ impl Emulator {
     }
 
     /// Fetch and execute a single instruction.
-    pub fn step(&mut self) {
+    ///
+    /// Returns the number of clock cycles (T-cycles) executed.
+    pub fn step(&mut self) -> u32 {
         let cycles = self.cpu.step(&mut self.bus);
 
         self.bus.ppu.step(
@@ -158,6 +164,8 @@ impl Emulator {
                 debugger.paused = true;
             }
         }
+
+        cycles
     }
 
     pub fn press(&mut self, button: Button) {
@@ -172,9 +180,9 @@ impl Emulator {
     ///
     /// If the debugger is enabled, debug commands will be read from stdin.
     pub fn update(&mut self) -> Result<()> {
-        let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
-        while self.cpu.clock.t < frame_clock {
-            if self.is_paused() {
+        let mut clocks_this_update = self.leftover_clocks;
+        while clocks_this_update < CYCLES_PER_FRAME {
+            let clocks = if self.is_paused() {
                 let readline = {
                     let editor = &mut self.debug.as_mut().unwrap().editor;
                     let prompt = format!("feo debug [{}] >> ", tui::COMMANDS);
@@ -192,8 +200,12 @@ impl Emulator {
                 }
             } else {
                 self.step()
-            }
+            };
+
+            clocks_this_update += clocks;
         }
+
+        self.leftover_clocks = clocks_this_update % CYCLES_PER_FRAME;
 
         Ok(())
     }
@@ -256,6 +268,8 @@ impl Debugger {
 
 #[cfg(test)]
 mod tests {
+    use std::u32;
+
     use super::Emulator;
     use super::cpu::State;
     use super::memory::Addressable;

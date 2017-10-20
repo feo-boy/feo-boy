@@ -2,10 +2,10 @@
 //!
 //! Contains an implementation of the registers and instruction set.
 
-pub mod arithmetic;
 mod instructions;
 mod registers;
 mod timer;
+pub mod arithmetic;
 
 use std::default::Default;
 use std::fmt;
@@ -36,26 +36,6 @@ pub enum State {
 impl Default for State {
     fn default() -> State {
         State::Running
-    }
-}
-
-/// The clock.
-#[derive(Debug, Default)]
-pub struct Clock {
-    /// Machine cycle state. One machine cycle = 4 clock cycles.
-    pub m: u32,
-    /// Clock cycle state.
-    pub t: u32,
-}
-
-impl Clock {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn reset(&mut self) {
-        self.m = 0;
-        self.t = 0;
     }
 }
 
@@ -108,9 +88,6 @@ pub struct Cpu {
     /// Registers
     pub reg: Registers,
 
-    /// The clock corresponding to the last instruction cycle.
-    pub clock: Clock,
-
     /// The state of execution.
     pub state: State,
 }
@@ -135,10 +112,12 @@ impl Cpu {
     }
 
     /// Execute any enabled interrupt requests.
-    pub fn handle_interrupts(&mut self, bus: &mut Bus) {
+    ///
+    /// Returns any cycles executed by handling an `RST`.
+    pub fn handle_interrupts(&mut self, bus: &mut Bus) -> u32 {
         if !bus.interrupts.enabled {
             match self.state {
-                State::Running => return,
+                State::Running => return 0,
                 State::Halted => {
                     let interrupts = [
                         &bus.interrupts.vblank,
@@ -155,7 +134,7 @@ impl Cpu {
                         self.reg.pc += 1;
                     }
 
-                    return;
+                    return 0;
                 }
                 _ => unimplemented!(),
             }
@@ -177,11 +156,9 @@ impl Cpu {
                         self.rst($vector, $bus);
 
                         // FIXME: The timing for interrupts might be more subtle than this.
-                        self.clock.m += 3;
-                        self.clock.t += 12;
-                        $bus.timer.tick(3);
-
-                        return;
+                        let cycles = 12;
+                        $bus.timer.tick(cycles / 4);
+                        return u32::from(cycles);
                     }
                 )*
             }
@@ -195,6 +172,8 @@ impl Cpu {
             serial, 0x0058;
             joypad, 0x0060;
         }
+
+        0
     }
 
     /// Push a value onto the stack.

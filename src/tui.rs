@@ -9,14 +9,14 @@ use Emulator;
 pub static COMMANDS: &str = "sblrpdcq?";
 
 /// Parse and execute a debugger command from a line of input.
-pub fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
+///
+/// Returns the number of clock cycles executed.
+pub fn parse_command(emulator: &mut Emulator, command: &str) -> Result<u32> {
     match &command[..1] {
         "s" => {
             let step = parse_step(command)?.unwrap_or_else(|| 1);
 
-            for _ in 0..step {
-                emulator.step();
-            }
+            return Ok((0..step).into_iter().map(|_| emulator.step()).sum());
         }
         "b" => {
             let breakpoint = parse_breakpoint(command)?;
@@ -54,7 +54,7 @@ pub fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
         _ => println!("unknown command"),
     }
 
-    Ok(())
+    Ok(0)
 }
 
 fn parse_step(command: &str) -> Result<Option<i32>> {
