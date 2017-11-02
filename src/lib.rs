@@ -31,6 +31,7 @@ pub mod bytes;
 pub mod cpu;
 pub mod errors;
 pub mod graphics;
+pub mod audio;
 pub mod input;
 pub mod memory;
 pub mod tui;
@@ -49,6 +50,7 @@ use bus::Bus;
 use cpu::{Cpu, Instruction};
 use errors::*;
 use graphics::Ppu;
+use audio::SoundController;
 use memory::Mmu;
 
 pub use graphics::SCREEN_DIMENSIONS;
@@ -77,6 +79,7 @@ impl Emulator {
         let cpu = Cpu::new();
         let bus = Bus {
             ppu: Ppu::new(),
+            audio: SoundController::new(),
             mmu: Mmu::new(),
             ..Default::default()
         };

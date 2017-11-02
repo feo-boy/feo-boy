@@ -10,6 +10,7 @@ use itertools::Itertools;
 use bytes::ByteExt;
 use cpu::{Interrupts, Timer};
 use graphics::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
+use audio::SoundController;
 use input::{Button, ButtonState, SelectFlags};
 use memory::{Addressable, Mmu};
 
@@ -20,6 +21,7 @@ use memory::{Addressable, Mmu};
 #[derive(Debug, Default)]
 pub struct Bus {
     pub ppu: Ppu,
+    pub audio: SoundController,
     pub mmu: Mmu,
     pub interrupts: Interrupts,
     pub timer: Timer,
