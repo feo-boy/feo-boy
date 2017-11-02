@@ -69,6 +69,71 @@ impl Addressable for SoundController {
         }
 
         match address {
+            // NR50: Channel control / ON-OFF / Volume
+            // Specifies the master volume for Left/Right sound output.
+            //
+            // Bit 7    - Output Vin to SO2 terminal (1=Enable)
+            // Bits 6-4 - SO2 output level (volume)  (0-7)
+            // Bit 3    - Output Vin to SO1 terminal (1=Enable)
+            // Bits 2-0 - SO1 output level (volume)  (0-7)
+            0xFF24 => {
+                let mut byte: u8 = self.so2_vol << 4;
+                byte |= self.so1_vol;
+
+                byte.set_bit(3, self.vin_so1);
+                byte.set_bit(7, self.vin_so2);
+
+                byte
+            }
+
+            // NR51: Selection of sound output terminal
+            //
+            // Bit 7 - Output sound 4 to SO2 terminal
+            // Bit 6 - Output sound 3 to SO2 terminal
+            // Bit 5 - Output sound 2 to SO2 terminal
+            // Bit 4 - Output sound 1 to SO2 terminal
+            // Bit 3 - Output sound 4 to SO1 terminal
+            // Bit 2 - Output sound 3 to SO1 terminal
+            // Bit 1 - Output sound 2 to SO1 terminal
+            // Bit 0 - Output sound 1 to SO1 terminal
+            0xFF25 => {
+                let mut byte: u8 = 0;
+
+                byte.set_bit(0, self.sound_1.so1_enabled);
+                byte.set_bit(4, self.sound_1.so2_enabled);
+
+                byte.set_bit(1, self.sound_2.so1_enabled);
+                byte.set_bit(5, self.sound_2.so2_enabled);
+
+                byte.set_bit(2, self.sound_3.so1_enabled);
+                byte.set_bit(6, self.sound_3.so2_enabled);
+
+                byte.set_bit(3, self.sound_4.so1_enabled);
+                byte.set_bit(7, self.sound_4.so2_enabled);
+
+                byte
+            }
+
+            // NR52: Sound on/off
+            // Readable bits are:
+            // Bit 7 - All sound on/off
+            // Bit 3 - Sound 4 on flag
+            // Bit 2 - Sound 3 on flag
+            // Bit 1 - Sound 2 on flag
+            // Bit 0 - sound 1 on flag
+            0xFF26 => {
+                let mut byte: u8 = 0;
+
+                byte.set_bit(0, self.sound_1.is_on);
+                byte.set_bit(1, self.sound_2.is_on);
+                byte.set_bit(2, self.sound_3.is_on);
+                byte.set_bit(3, self.sound_4.is_on);
+
+                byte.set_bit(7, self.sound_enabled);
+
+                byte
+            }
+
             _ => panic!("read out-of-range address in the sound controller: {:#0x}", address),
         }
     }
