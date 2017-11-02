@@ -65,6 +65,8 @@ impl Addressable for SoundController {
     fn read_byte(&self, address: u16) -> u8 {
         // Access to sound registers, aside from 0xFF26, is disabled unless the sound is on.
         if !self.sound_enabled && address != 0xFF26 {
+            // TODO: Currently assumes that unreadable addresses will be read as 0, but that might
+            // not be the case.
             return 0;
         }
 
@@ -115,7 +117,7 @@ impl Addressable for SoundController {
             }
 
             // NR52: Sound on/off
-            // Readable bits are:
+            //
             // Bit 7 - All sound on/off
             // Bit 3 - Sound 4 on flag
             // Bit 2 - Sound 3 on flag
@@ -201,6 +203,50 @@ impl Addressable for SoundController {
             }
 
             _ => panic!("write out-of-range address in the sound controller: {:#0x}", address),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::u8;
+
+    use bytes::ByteExt;
+
+    use memory::Addressable;
+
+    use super::SoundController;
+
+    #[test]
+    fn ff26_read() {
+        let mut sc = SoundController::new();
+
+        // Just test every possible value
+        for i in 0u8..32 {
+            let mut expected: u8 = i & 0x0F;
+            expected.set_bit(7, i.has_bit_set(4));
+
+            sc.sound_1.is_on = i.has_bit_set(0);
+            sc.sound_2.is_on = i.has_bit_set(1);
+            sc.sound_3.is_on = i.has_bit_set(2);
+            sc.sound_4.is_on = i.has_bit_set(3);
+            sc.sound_enabled = i.has_bit_set(4);
+
+            assert_eq!(sc.read_byte(0xFF26), expected);
+        }
+    }
+
+    #[test]
+    fn ff26_write() {
+        let mut sc = SoundController::new();
+
+        // Just test every possible write attempt
+        for i_large in 0usize..256 {
+            let i = i_large as u8;
+
+            sc.write_byte(0xFF26, i);
+
+            assert_eq!(sc.sound_enabled, i.has_bit_set(7));
         }
     }
 }
