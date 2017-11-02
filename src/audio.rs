@@ -218,10 +218,88 @@ mod tests {
     use super::SoundController;
 
     #[test]
+    fn ff25_read() {
+        let mut sc = SoundController::new();
+
+        for i_large in 0usize..256 {
+            let i = i_large as u8;
+
+            sc.sound_1.so1_enabled = i.has_bit_set(0);
+            sc.sound_1.so2_enabled = i.has_bit_set(4);
+
+            sc.sound_2.so1_enabled = i.has_bit_set(1);
+            sc.sound_2.so2_enabled = i.has_bit_set(5);
+
+            sc.sound_3.so1_enabled = i.has_bit_set(2);
+            sc.sound_3.so2_enabled = i.has_bit_set(6);
+
+            sc.sound_4.so1_enabled = i.has_bit_set(3);
+            sc.sound_4.so2_enabled = i.has_bit_set(7);
+
+            sc.sound_enabled = false;
+            assert_eq!(sc.read_byte(0xFF25), 0x0);
+
+            sc.sound_enabled = true;
+            assert_eq!(sc.read_byte(0xFF25), i);
+        }
+    }
+
+    #[test]
+    fn ff25_write() {
+        let mut sc = SoundController::new();
+
+        for i_large in 0usize..256 {
+            let i = i_large as u8;
+
+            // Make up a default state - writing with sound disabled shouldn't change this
+            sc.sound_1.so1_enabled = false;
+            sc.sound_1.so2_enabled = false;
+
+            sc.sound_2.so1_enabled = true;
+            sc.sound_2.so2_enabled = false;
+
+            sc.sound_3.so1_enabled = false;
+            sc.sound_3.so2_enabled = true;
+
+            sc.sound_4.so1_enabled = true;
+            sc.sound_4.so2_enabled = true;
+
+            sc.sound_enabled = false;
+            sc.write_byte(0xFF25, i);
+
+            assert_eq!(sc.sound_1.so1_enabled, false);
+            assert_eq!(sc.sound_1.so2_enabled, false);
+
+            assert_eq!(sc.sound_2.so1_enabled, true);
+            assert_eq!(sc.sound_2.so2_enabled, false);
+
+            assert_eq!(sc.sound_3.so1_enabled, false);
+            assert_eq!(sc.sound_3.so2_enabled, true);
+
+            assert_eq!(sc.sound_4.so1_enabled, true);
+            assert_eq!(sc.sound_4.so2_enabled, true);
+
+            sc.sound_enabled = true;
+            sc.write_byte(0xFF25, i);
+
+            assert_eq!(sc.sound_1.so1_enabled, i.has_bit_set(0));
+            assert_eq!(sc.sound_1.so2_enabled, i.has_bit_set(4));
+
+            assert_eq!(sc.sound_2.so1_enabled, i.has_bit_set(1));
+            assert_eq!(sc.sound_2.so2_enabled, i.has_bit_set(5));
+
+            assert_eq!(sc.sound_3.so1_enabled, i.has_bit_set(2));
+            assert_eq!(sc.sound_3.so2_enabled, i.has_bit_set(6));
+
+            assert_eq!(sc.sound_4.so1_enabled, i.has_bit_set(3));
+            assert_eq!(sc.sound_4.so2_enabled, i.has_bit_set(7));
+        }
+    }
+
+    #[test]
     fn ff26_read() {
         let mut sc = SoundController::new();
 
-        // Just test every possible value
         for i in 0u8..32 {
             let mut expected: u8 = i & 0x0F;
             expected.set_bit(7, i.has_bit_set(4));
@@ -240,7 +318,6 @@ mod tests {
     fn ff26_write() {
         let mut sc = SoundController::new();
 
-        // Just test every possible write attempt
         for i_large in 0usize..256 {
             let i = i_large as u8;
 
