@@ -436,7 +436,7 @@ impl Ppu {
         let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
 
         // Draw the line.
-        for x in 0..160 {
+        for x in 0..SCREEN_WIDTH as u8 {
             let x_position = if using_window && x >= self.window.x {
                 x.wrapping_sub(self.window.x)
             } else {
@@ -572,14 +572,17 @@ impl Ppu {
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
                     let pixel = x_position.wrapping_add(x_pixel);
 
-                    // If the sprite is behind the background, only show it over white backgrounds
+                    // Bail if the pixel isn't on the screen.
+                    if pixel >= SCREEN_WIDTH as u8 {
+                        continue;
+                    }
+
+                    // Check that the pixel is visible and should be drawn over the background.
+                    let is_visible = shade != Shade::Transparent;
                     let has_priority = !behind_bg ||
-                        (self.pixels.0[self.line as usize][pixel as usize] == Shade::White);
+                        self.pixels.0[self.line as usize][pixel as usize] == Shade::White;
 
-                    // Check that the pixel is in the bounds of the screen
-                    let is_onscreen = pixel < 160;
-
-                    if (shade != Shade::Transparent) && has_priority && is_onscreen {
+                    if is_visible && has_priority {
                         self.pixels.0[self.line as usize][pixel as usize] = shade;
                     }
                 }
@@ -662,6 +665,7 @@ mod tests {
 
     use byteorder::{ByteOrder, LittleEndian};
 
+    use bytes::ByteExt;
     use memory::Addressable;
 
     use super::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
@@ -935,5 +939,69 @@ mod tests {
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[7][i], expected_pixels[i]);
         }
+    }
+
+    #[test]
+    fn sprite_out_of_bounds() {
+        let mut ppu = Ppu::new();
+
+        // Set up tiles
+        let tile_row = LittleEndian::read_u16(&[0x4E, 0x8B]);
+        ppu.write_word(0x8010, tile_row);
+
+        // Set up sprites
+        let sprite_y = 16;
+        let sprite_x = 0xFF;
+        let sprite_tile = 1;
+        let mut sprite_attributes = 0x00;
+        sprite_attributes.set_bit(7, true);
+
+        ppu.write_byte(0xFE00, sprite_y);
+        ppu.write_byte(0xFE01, sprite_x);
+        ppu.write_byte(0xFE02, sprite_tile);
+        ppu.write_byte(0xFE03, sprite_attributes);
+
+        // Create the palette
+        ppu.bg_palette = [
+            Shade::White,
+            Shade::LightGray,
+            Shade::DarkGray,
+            Shade::Black,
+        ];
+        ppu.sprite_palette = [
+            [
+                Shade::Transparent,
+                Shade::LightGray,
+                Shade::DarkGray,
+                Shade::Black,
+            ],
+            [
+                Shade::Transparent,
+                Shade::LightGray,
+                Shade::DarkGray,
+                Shade::Black,
+            ],
+        ];
+
+        // Set the state of the PPU
+        ppu.line = 0;
+        ppu.window.x = 0;
+        ppu.window.y = 0;
+        ppu.bg_scroll.x = 0;
+        ppu.bg_scroll.y = 0;
+        ppu.control.window_enabled = false;
+        ppu.control.background_enabled = true;
+        ppu.control.window_map_start = TileMapStart::Low;
+        ppu.control.bg_map_start = TileMapStart::Low;
+        ppu.control.tile_data_start = TileDataStart::Low;
+        ppu.control.sprite_size = SpriteSize::Small;
+        ppu.control.sprites_enabled = true;
+
+        // Render
+        ppu.render_sprite();
+
+        let line = ppu.pixels.0[0].to_vec();
+        let expected_line = vec![Shade::White; 160];
+        assert_eq!(line, expected_line);
     }
 }
