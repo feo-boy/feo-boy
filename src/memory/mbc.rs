@@ -1,5 +1,6 @@
 
 use std::fmt::{self, Debug, Formatter};
+use super::Addressable;
 
 //const RAM_SIZE: usize = 32 * 0x400 * 0x400;
 const RAM_SIZE: usize = 0x2000 * 4;
@@ -32,6 +33,10 @@ impl Mbc3 {
         }
     }
 }
+
+pub trait Mbc: Addressable + Debug {}
+
+impl<M: Addressable + Debug> Mbc for M {}
 
 impl super::Addressable for Mbc3 {
     fn read_byte(&self, address: u16) -> u8 {

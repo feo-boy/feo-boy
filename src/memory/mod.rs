@@ -12,13 +12,13 @@ use errors::*;
 
 mod mbc;
 
-use self::mbc::Mbc3;
+use self::mbc::{Mbc3, Mbc};
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
 /// Operations for memory-like structs.
-pub trait Addressable: Debug {
+pub trait Addressable {
     /// Returns the byte at a given memory address.
     fn read_byte(&self, address: u16) -> u8;
 
@@ -118,7 +118,7 @@ pub struct Mmu {
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Vec<u8>,
 
-    mbc: Option<Box<Addressable>>,
+    mbc: Option<Box<Mbc>>,
 }
 
 impl Mmu {
