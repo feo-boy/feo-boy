@@ -41,20 +41,20 @@ impl super::Addressable for Mbc3 {
 
             // ROM Bank 01-7f (RO)
             0x4000...0x7fff => {
-                let addr: u16 = (self.rom_select as u16) * 0x4000 + address - 0x4000;
-                self.rom[addr as usize]
+                let addr: usize = (self.rom_select as usize) * 0x4000 + (address as usize) - 0x4000;
+                self.rom[addr]
             }
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
             0xa000...0xbfff => {
                 match self.ram_rtc_select {
                     RamRtcSelect::Ram(x) if x <= 3 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize]
+                        let addr: usize = (x as usize) * 0x2000 + (address as usize) - 0xa000;
+                        self.ram[addr]
                     }
                     RamRtcSelect::Rtc(x) if x <= 4 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize]
+                        let addr: usize = (x as usize) * 0x2000 + (address as usize) - 0xa000;
+                        self.ram[addr]
                     }
                     _ => panic!("Bad Ram Rtc setting"),
                 }
@@ -76,7 +76,7 @@ impl super::Addressable for Mbc3 {
                 match value {
                     0x00 => self.ram_timer_enabled = false,
                     0x0a => self.ram_timer_enabled = true,
-                    _ => warn!("Bad RAM and Time Enable Setting"),
+                    _ => (),//warn!("Bad RAM and Time Enable Setting"),
                 }
             }
 
@@ -95,16 +95,16 @@ impl super::Addressable for Mbc3 {
                 match value {
                     0x00...0x03 => self.ram_rtc_select = RamRtcSelect::Ram(value),
                     0x08...0x0c => self.ram_rtc_select = RamRtcSelect::Rtc(value - 0x08),
-                    _ => warn!("Bad RAM Bank / RTC Register"),
+                    _ => (),//warn!("Bad RAM Bank / RTC Register"),
                 }
             }
 
             // Latch Clock Data (WO)
             0x6000...0x7fff => {
                 match value {
-                    0x00 => unimplemented!(),
-                    0x01 => unimplemented!(),
-                    _ => unimplemented!(),
+                    0x00 => (),//unimplemented!(),
+                    0x01 => (),//unimplemented!(),
+                    _ => (),//unimplemented!(),
                 }
             }
 
@@ -112,14 +112,14 @@ impl super::Addressable for Mbc3 {
             0xa000...0xbfff => {
                 match self.ram_rtc_select {
                     RamRtcSelect::Ram(x) if x <= 3 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize] = value;
+                        let addr: usize = (x as usize) * 0x2000 + (address as usize) - 0xa000;
+                        self.ram[addr] = value;
                     }
                     RamRtcSelect::Rtc(x) if x <= 4 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize] = value;
+                        let addr: usize = (x as usize) * 0x2000 + (address as usize) - 0xa000;
+                        self.ram[addr] = value;
                     }
-                    _ => warn!("Bad Ram Rtc setting"),
+                    _ => (),//warn!("Bad Ram Rtc setting"),
                 }
             }
 
