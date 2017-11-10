@@ -1,15 +1,18 @@
 
+use std::fmt::{self, Debug, Formatter};
+
 //const RAM_SIZE: usize = 32 * 0x400 * 0x400;
 const RAM_SIZE: usize = 0x2000 * 4;
 const RTC_SIZE: usize = 0x2000 * 5;
 
+#[derive(Debug)]
 enum RamRtcSelect {
     Ram(u8), // 0-3
     Rtc(u8), // 8-c -> 0-4
 }
 
-struct Mbc3<'a> {
-    rom: &'a [u8],
+pub struct Mbc3 {
+    rom: Vec<u8>,
     ram: [u8; RAM_SIZE],
     rtc: [u8; RTC_SIZE],
     ram_timer_enabled: bool,
@@ -17,8 +20,8 @@ struct Mbc3<'a> {
     ram_rtc_select: RamRtcSelect,
 }
 
-impl<'a> Mbc3<'a> {
-    fn new(rom: &[u8]) -> Mbc3 {
+impl Mbc3 {
+    pub fn new(rom: Vec<u8>) -> Mbc3 {
         Mbc3 {
             rom,
             ram: [0; RAM_SIZE],
@@ -30,7 +33,7 @@ impl<'a> Mbc3<'a> {
     }
 }
 
-impl<'a> super::Addressable for Mbc3<'a> {
+impl super::Addressable for Mbc3 {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             // ROM Bank 00 (RO)
@@ -122,5 +125,21 @@ impl<'a> super::Addressable for Mbc3<'a> {
 
             _ => warn!("Bad write!"),
         }
+    }
+}
+
+impl Debug for Mbc3 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let ram: &[u8] = &self.ram;
+        let rtc: &[u8] = &self.rtc;
+
+        f.debug_struct("Mbc3")
+            .field("bios", &self.rom)
+            .field("rom", &ram)
+            .field("rtc", &rtc)
+            .field("ram_timer_enabled", &self.ram_timer_enabled)
+            .field("rom_select", &self.rom_select)
+            .field("ram_rtc_select", &self.ram_rtc_select)
+            .finish()
     }
 }
