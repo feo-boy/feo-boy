@@ -58,6 +58,7 @@ impl Bus {
     fn read_io_register(&self, address: u16) -> u8 {
         let Bus {
             ref ppu,
+            ref audio,
             ref interrupts,
             ref button_state,
             ref timer,
@@ -127,6 +128,9 @@ impl Bus {
 
                 register
             }
+
+            // Sound memory
+            0xFF10...0xFF3F => audio.read_byte(address),
 
             // LCDC - LCD Control
             0xFF40 => {
@@ -401,119 +405,8 @@ impl Bus {
                 interrupts.joypad.requested = byte.has_bit_set(4);
             }
 
-            // NR10 - Channel 1 Sweep Register
-            0xFF10 => {
-                warn!("attempted to modify channel 1 sweep (unimplemented)");
-            }
-
-            // NR11 - Channel 1 Sound length/Wave pattern duty
-            0xFF11 => {
-                warn!("attempted to modify sound channel 1 wave (unimplemented)");
-            }
-
-            // NR12 - Channel 1 Volume Envelope
-            0xFF12 => {
-                warn!("attempted to modify sound channel 1 volume (unimplemented)");
-            }
-
-            // NR13 - Channel 1 Frequency lo data
-            0xFF13 => {
-                warn!("attempted to modify sound channel 1 frequency lo data (unimplemented)");
-            }
-
-            // NR14 - Channel 1 Frequency hi data
-            0xFF14 => {
-                warn!("attempted to modify sound channel 1 frequency hi data (unimplemented)");
-            }
-
-            // NR21 - Channel 2 Sound Length/Wave Pattery Duty
-            0xFF16 => {
-                warn!("attempted to modify sound channel 2 wave (unimplemented)");
-            }
-
-            // NR22 - Channel 2 Volume Envelope
-            0xFF17 => {
-                warn!("attempted to modify sound channel 2 volume (unimplemented)");
-            }
-
-            // NR23 - Channel 2 Frequency lo data
-            0xFF18 => {
-                warn!("attempted to modify sound channel 2 frequency lo data (unimplemented)");
-            }
-
-            // NR23 - Channel 2 Frequency hi data
-            0xFF19 => {
-                warn!("attempted to modify sound channel 2 frequency hi data (unimplemented)");
-            }
-
-            // NR30 - Channel 3 Sound on/off
-            0xFF1A => {
-                warn!("attempted to modify channel 3 on/off state (unimplemented)");
-            }
-
-            // NR31 - Channel 3 Sound Length
-            0xFF1B => {
-                warn!("attempted to modify channel 3 sound length (unimplemented)");
-            }
-
-            // NR32 - Channel 3 Select output level
-            0xFF1C => {
-                warn!("attempted to modify channel 3 output level (unimplemented)");
-            }
-
-            // NR33 - Channel 3 Frequency lo data
-            0xFF1D => {
-                warn!("attempted to modify channel 3 frequency lo data (unimplemented)");
-            }
-
-            // NR34 - Channel 3 Frequency hi data
-            0xFF1E => {
-                warn!("attempted to modify channel 3 frequency hi data (unimplemented)");
-            }
-
-            // NR41 - Channel 4 Sound Length
-            0xFF20 => {
-                warn!("attempted to modify channel 4 sound length (unimplemented)");
-            }
-
-            // NR42 - Channel 4 Volume Envelope
-            0xFF21 => {
-                warn!("attempted to modify channel 4 volume envelope (unimplemented)");
-            }
-
-            // NR43 - Channel 4 Polynomial Counter
-            0xFF22 => {
-                warn!("attempted to modify channel 4 polynomial counter (unimplemented)");
-            }
-
-            // NR44 - Channel 4 Counter/consecutive; Initial
-            0xFF23 => {
-                warn!("attempted to modify channel 4 consecutive/initial state (unimplemented)");
-            }
-
-            // NR50 - Channel control / ON-OFF / Volume
-            0xFF24 => {
-                warn!("attempted to modify master volume (unimplemented)");
-            }
-
-            // NR51 - Selection of Sound output terminal
-            0xFF25 => {
-                warn!("attempted to modify sound output terminal (unimplemented)");
-            }
-
-            // Sound on/off
-            0xFF26 => {
-                // Only the high bit is writable.
-                if byte.has_bit_set(7) {
-                    info!("enabling sound controller");
-                    warn!("sound controller not implemented");
-                }
-            }
-
-            // Wave Pattern RAM
-            0xFF30...0xFF3F => {
-                warn!("attempted to modify wave pattern RAM (unimplemented)");
-            }
+            // Sound control registers
+            0xFF10...0xFF30 => self.audio.write_byte(address, byte),
 
             // LCDC - LCD Control
             0xFF40 => {

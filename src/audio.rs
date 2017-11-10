@@ -136,7 +136,12 @@ impl Addressable for SoundController {
                 byte
             }
 
-            _ => panic!("read out-of-range address in the sound controller: {:#0x}", address),
+            _ => {
+                panic!(
+                    "read out-of-range address in the sound controller: {:#0x}",
+                    address
+                )
+            }
         }
     }
 
@@ -152,6 +157,96 @@ impl Addressable for SoundController {
         }
 
         match address {
+            // NR10 - Channel 1 Sweep Register
+            0xFF10 => {
+                warn!("attempted to modify channel 1 sweep (unimplemented)");
+            }
+
+            // NR11 - Channel 1 Sound length/Wave pattern duty
+            0xFF11 => {
+                warn!("attempted to modify sound channel 1 wave (unimplemented)");
+            }
+
+            // NR12 - Channel 1 Volume Envelope
+            0xFF12 => {
+                warn!("attempted to modify sound channel 1 volume (unimplemented)");
+            }
+
+            // NR13 - Channel 1 Frequency lo data
+            0xFF13 => {
+                warn!("attempted to modify sound channel 1 frequency lo data (unimplemented)");
+            }
+
+            // NR14 - Channel 1 Frequency hi data
+            0xFF14 => {
+                warn!("attempted to modify sound channel 1 frequency hi data (unimplemented)");
+            }
+
+            // NR21 - Channel 2 Sound Length/Wave Pattery Duty
+            0xFF16 => {
+                warn!("attempted to modify sound channel 2 wave (unimplemented)");
+            }
+
+            // NR22 - Channel 2 Volume Envelope
+            0xFF17 => {
+                warn!("attempted to modify sound channel 2 volume (unimplemented)");
+            }
+
+            // NR23 - Channel 2 Frequency lo data
+            0xFF18 => {
+                warn!("attempted to modify sound channel 2 frequency lo data (unimplemented)");
+            }
+
+            // NR23 - Channel 2 Frequency hi data
+            0xFF19 => {
+                warn!("attempted to modify sound channel 2 frequency hi data (unimplemented)");
+            }
+
+            // NR30 - Channel 3 Sound on/off
+            0xFF1A => {
+                warn!("attempted to modify channel 3 on/off state (unimplemented)");
+            }
+
+            // NR31 - Channel 3 Sound Length
+            0xFF1B => {
+                warn!("attempted to modify channel 3 sound length (unimplemented)");
+            }
+
+            // NR32 - Channel 3 Select output level
+            0xFF1C => {
+                warn!("attempted to modify channel 3 output level (unimplemented)");
+            }
+
+            // NR33 - Channel 3 Frequency lo data
+            0xFF1D => {
+                warn!("attempted to modify channel 3 frequency lo data (unimplemented)");
+            }
+
+            // NR34 - Channel 3 Frequency hi data
+            0xFF1E => {
+                warn!("attempted to modify channel 3 frequency hi data (unimplemented)");
+            }
+
+            // NR41 - Channel 4 Sound Length
+            0xFF20 => {
+                warn!("attempted to modify channel 4 sound length (unimplemented)");
+            }
+
+            // NR42 - Channel 4 Volume Envelope
+            0xFF21 => {
+                warn!("attempted to modify channel 4 volume envelope (unimplemented)");
+            }
+
+            // NR43 - Channel 4 Polynomial Counter
+            0xFF22 => {
+                warn!("attempted to modify channel 4 polynomial counter (unimplemented)");
+            }
+
+            // NR44 - Channel 4 Counter/consecutive; Initial
+            0xFF23 => {
+                warn!("attempted to modify channel 4 consecutive/initial state (unimplemented)");
+            }
+
             // NR50: Channel control / ON-OFF / Volume
             // Specifies the master volume for Left/Right sound output.
             //
@@ -202,7 +297,17 @@ impl Addressable for SoundController {
                 // registers.
             }
 
-            _ => panic!("write out-of-range address in the sound controller: {:#0x}", address),
+            // Wave Pattern RAM
+            0xFF30...0xFF3F => {
+                warn!("attempted to modify wave pattern RAM (unimplemented)");
+            }
+
+            _ => {
+                panic!(
+                    "write out-of-range address in the sound controller: {:#0x}",
+                    address
+                )
+            }
         }
     }
 }
@@ -216,6 +321,84 @@ mod tests {
     use memory::Addressable;
 
     use super::SoundController;
+
+    #[test]
+    fn ff24_read() {
+        let mut sc = SoundController::new();
+
+        for so1_vol in 0..8 {
+            for so2_vol in 0..8 {
+                for vin_so1 in vec![false, true] {
+                    for vin_so2 in vec![false, true] {
+                        sc.so1_vol = so1_vol;
+                        sc.so2_vol = so2_vol;
+                        sc.vin_so1 = vin_so1;
+                        sc.vin_so2 = vin_so2;
+
+                        let mut expected = 0;
+                        expected.set_bit(0, so1_vol.has_bit_set(0));
+                        expected.set_bit(1, so1_vol.has_bit_set(1));
+                        expected.set_bit(2, so1_vol.has_bit_set(2));
+                        expected.set_bit(3, vin_so1);
+                        expected.set_bit(4, so2_vol.has_bit_set(0));
+                        expected.set_bit(5, so2_vol.has_bit_set(1));
+                        expected.set_bit(6, so2_vol.has_bit_set(2));
+                        expected.set_bit(7, vin_so2);
+
+                        sc.sound_enabled = false;
+                        assert_eq!(sc.read_byte(0xFF24), 0);
+
+                        sc.sound_enabled = true;
+                        assert_eq!(sc.read_byte(0xFF24), expected);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ff24_write() {
+        let mut sc = SoundController::new();
+
+        for so1_vol in 0..8 {
+            for so2_vol in 0..8 {
+                for vin_so1 in vec![false, true] {
+                    for vin_so2 in vec![false, true] {
+                        sc.so1_vol = 0;
+                        sc.so2_vol = 0;
+                        sc.vin_so1 = false;
+                        sc.vin_so2 = false;
+
+                        let mut byte = so1_vol & (so2_vol << 4);
+                        byte.set_bit(0, so1_vol.has_bit_set(0));
+                        byte.set_bit(1, so1_vol.has_bit_set(1));
+                        byte.set_bit(2, so1_vol.has_bit_set(2));
+                        byte.set_bit(3, vin_so1);
+                        byte.set_bit(4, so2_vol.has_bit_set(0));
+                        byte.set_bit(5, so2_vol.has_bit_set(1));
+                        byte.set_bit(6, so2_vol.has_bit_set(2));
+                        byte.set_bit(7, vin_so2);
+
+                        sc.sound_enabled = false;
+                        sc.write_byte(0xFF24, byte);
+
+                        assert_eq!(sc.so1_vol, 0);
+                        assert_eq!(sc.so2_vol, 0);
+                        assert_eq!(sc.vin_so1, false);
+                        assert_eq!(sc.vin_so2, false);
+
+                        sc.sound_enabled = true;
+                        sc.write_byte(0xFF24, byte);
+
+                        assert_eq!(sc.so1_vol, so1_vol);
+                        assert_eq!(sc.so2_vol, so2_vol);
+                        assert_eq!(sc.vin_so1, vin_so1);
+                        assert_eq!(sc.vin_so2, vin_so2);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn ff25_read() {
