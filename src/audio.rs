@@ -6,6 +6,37 @@ use bytes::ByteExt;
 
 use memory::Addressable;
 
+/// The sweep register data for a channel.
+#[derive(Debug, Default)]
+pub struct Sweep {
+    /// The sweep time.
+    pub time: u8,
+
+    /// Whether the sweep increases (if false) or decreases (if true) the frequency.
+    pub decrease: bool,
+
+    /// The sweep shift number.
+    pub shift: u8,
+}
+
+impl Sweep {
+    /// Gets the result of reading the sweep register for the current sweep state.
+    pub fn read(&self) -> u8 {
+        let mut byte = self.time << 4;
+        byte |= self.shift;
+        byte.set_bit(3, self.decrease);
+
+        byte
+    }
+
+    /// Modifies the sweep state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.shift = byte & 0x7;
+        self.decrease = byte.has_bit_set(3);
+        self.time = (byte >> 4) & 0x7;
+    }
+}
+
 /// A single GameBoy sound channel.
 #[derive(Debug, Default)]
 pub struct Sound {
@@ -17,6 +48,9 @@ pub struct Sound {
 
     /// Whether to output this sound to SO2 terminal.
     pub so2_enabled: bool,
+
+    /// The sweep register data.
+    pub sweep: Sweep,
 }
 
 /// The controller for the four sound channels output by the GameBoy.
@@ -71,6 +105,14 @@ impl Addressable for SoundController {
         }
 
         match address {
+            // NR10: Sound 1 sweep register
+            // Bit 6-4 - Sweep time
+            // Bit 3   - Sweep Increase/Decrease
+            //            0: Addition    (frequency increases)
+            //            1: Subtraction (frequency decreases)
+            // Bit 2-0 - Number of sweep shift (n: 0-7)
+            0xFF10 => self.sound_1.sweep.read(),
+
             // NR50: Channel control / ON-OFF / Volume
             // Specifies the master volume for Left/Right sound output.
             //
@@ -158,9 +200,7 @@ impl Addressable for SoundController {
 
         match address {
             // NR10 - Channel 1 Sweep Register
-            0xFF10 => {
-                warn!("attempted to modify channel 1 sweep (unimplemented)");
-            }
+            0xFF10 => self.sound_1.sweep.write(byte),
 
             // NR11 - Channel 1 Sound length/Wave pattern duty
             0xFF11 => {
@@ -320,7 +360,7 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::SoundController;
+    use super::{Sweep, SoundController};
 
     #[test]
     fn ff24_read() {
