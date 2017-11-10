@@ -1,15 +1,21 @@
 
-//const RAM_SIZE: usize = 32 * 0x400 * 0x400;
+use std::fmt::{self, Debug, Formatter};
+use std::rc::Rc;
+use super::Addressable;
+
 const RAM_SIZE: usize = 0x2000 * 4;
 const RTC_SIZE: usize = 0x2000 * 5;
+const ROM_BANK_SIZE: usize = 0x4000;
+const RAM_BANK_RTC_REG_SIZE: usize = 0x2000;
 
+#[derive(Debug, Copy, Clone)]
 enum RamRtcSelect {
     Ram(u8), // 0-3
     Rtc(u8), // 8-c -> 0-4
 }
 
-struct Mbc3<'a> {
-    rom: &'a [u8],
+pub struct Mbc3 {
+    rom: Rc<Vec<u8>>,
     ram: [u8; RAM_SIZE],
     rtc: [u8; RTC_SIZE],
     ram_timer_enabled: bool,
@@ -17,8 +23,8 @@ struct Mbc3<'a> {
     ram_rtc_select: RamRtcSelect,
 }
 
-impl<'a> Mbc3<'a> {
-    fn new(rom: &[u8]) -> Mbc3 {
+impl Mbc3 {
+    pub fn new(rom: Rc<Vec<u8>>) -> Mbc3 {
         Mbc3 {
             rom,
             ram: [0; RAM_SIZE],
@@ -30,7 +36,11 @@ impl<'a> Mbc3<'a> {
     }
 }
 
-impl<'a> super::Addressable for Mbc3<'a> {
+pub trait Mbc: Addressable + Debug {}
+
+impl<M: Addressable + Debug> Mbc for M {}
+
+impl super::Addressable for Mbc3 {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             // ROM Bank 00 (RO)
@@ -38,31 +48,31 @@ impl<'a> super::Addressable for Mbc3<'a> {
 
             // ROM Bank 01-7f (RO)
             0x4000...0x7fff => {
-                let addr: u16 = (self.rom_select as u16) * 0x4000 + address - 0x4000;
-                self.rom[addr as usize]
+                let addr: usize = (self.rom_select as usize) * ROM_BANK_SIZE +
+                    (address as usize) - 0x4000;
+                self.rom[addr]
             }
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
             0xa000...0xbfff => {
                 match self.ram_rtc_select {
-                    RamRtcSelect::Ram(x) if x <= 3 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize]
+                    RamRtcSelect::Ram(bank_num) => {
+                        debug_assert!(bank_num <= 3);
+                        let addr: usize = (bank_num as usize) * RAM_BANK_RTC_REG_SIZE +
+                            (address as usize) - 0xa000;
+                        self.ram[addr]
                     }
-                    RamRtcSelect::Rtc(x) if x <= 4 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize]
+                    RamRtcSelect::Rtc(rtc_num) => {
+                        debug_assert!(rtc_num <= 4);
+                        let addr: usize = (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE +
+                            (address as usize) - 0xa000;
+                        self.rtc[addr]
                     }
-                    _ => panic!("Bad Ram Rtc setting"),
                 }
             }
 
             // Error Read
-            _ => {
-                warn!("Bad read!");
-                0x00
-            }
-
+            _ => unreachable!(),
         }
     }
 
@@ -70,29 +80,28 @@ impl<'a> super::Addressable for Mbc3<'a> {
         match address {
             // RAM and Time Enable (WO)
             0x0000...0x1fff => {
-                match value {
-                    0x00 => self.ram_timer_enabled = false,
-                    0x0a => self.ram_timer_enabled = true,
-                    _ => warn!("Bad RAM and Time Enable Setting"),
+                self.ram_timer_enabled = match value {
+                    0x00 => false,
+                    0x0a => true,
+                    _ => self.ram_timer_enabled,
                 }
             }
 
             // ROM Bank Number (WO)
             0x2000...0x3fff => {
                 // only cares about lower 7-bits
-                let val = value & !0x80;
-                match val {
-                    0x00 => self.rom_select = 0x01,
-                    x => self.rom_select = x,
+                self.rom_select = value & !0x80;
+                if self.rom_select == 0x00 {
+                    self.rom_select = 0x01;
                 }
             }
 
             // RAM Bank Number || RTC Register Select (WO)
             0x4000...0x5fff => {
-                match value {
-                    0x00...0x03 => self.ram_rtc_select = RamRtcSelect::Ram(value),
-                    0x08...0x0c => self.ram_rtc_select = RamRtcSelect::Rtc(value - 0x08),
-                    _ => warn!("Bad RAM Bank / RTC Register"),
+                self.ram_rtc_select = match value {
+                    0x00...0x03 => RamRtcSelect::Ram(value),
+                    0x08...0x0c => RamRtcSelect::Rtc(value - 0x08),
+                    _ => self.ram_rtc_select,
                 }
             }
 
@@ -108,19 +117,38 @@ impl<'a> super::Addressable for Mbc3<'a> {
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
             0xa000...0xbfff => {
                 match self.ram_rtc_select {
-                    RamRtcSelect::Ram(x) if x <= 3 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize] = value;
+                    RamRtcSelect::Ram(bank_num) => {
+                        debug_assert!(bank_num <= 3);
+                        let addr: usize = (bank_num as usize) * RAM_BANK_RTC_REG_SIZE +
+                            (address as usize) - 0xa000;
+                        self.ram[addr] = value;
                     }
-                    RamRtcSelect::Rtc(x) if x <= 4 => {
-                        let addr: u16 = (x as u16) * 0x2000 + address - 0xa000;
-                        self.ram[addr as usize] = value;
+                    RamRtcSelect::Rtc(rtc_num) => {
+                        debug_assert!(rtc_num <= 4);
+                        let addr: usize = (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE +
+                            (address as usize) - 0xa000;
+                        self.rtc[addr] = value;
                     }
-                    _ => warn!("Bad Ram Rtc setting"),
                 }
             }
 
-            _ => warn!("Bad write!"),
+            _ => unreachable!(),
         }
+    }
+}
+
+impl Debug for Mbc3 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let ram: &[u8] = &self.ram;
+        let rtc: &[u8] = &self.rtc;
+
+        f.debug_struct("Mbc3")
+            .field("bios", &self.rom)
+            .field("rom", &ram)
+            .field("rtc", &rtc)
+            .field("ram_timer_enabled", &self.ram_timer_enabled)
+            .field("rom_select", &self.rom_select)
+            .field("ram_rtc_select", &self.ram_rtc_select)
+            .finish()
     }
 }

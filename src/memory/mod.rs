@@ -2,6 +2,7 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
+use std::rc::Rc;
 use std::default::Default;
 use std::fmt::{self, Debug, Formatter};
 use std::num::Wrapping;
@@ -11,6 +12,8 @@ use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use errors::*;
 
 mod mbc;
+
+use self::mbc::{Mbc3, Mbc};
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
@@ -114,7 +117,9 @@ pub struct Mmu {
     pub bios_mapped: bool,
 
     /// The entire ROM contained on the inserted cartridge.
-    cartridge_rom: Vec<u8>,
+    cartridge_rom: Rc<Vec<u8>>,
+
+    mbc: Option<Box<Mbc>>,
 }
 
 impl Mmu {
@@ -125,7 +130,8 @@ impl Mmu {
         Mmu {
             mem: Memory::default(),
             bios_mapped: true,
-            cartridge_rom: vec![],
+            cartridge_rom: Rc::new(vec![]),
+            mbc: None,
         }
     }
 
@@ -158,7 +164,7 @@ impl Mmu {
             bail!(ErrorKind::InvalidCartridge("size too small".into()))
         }
 
-        self.cartridge_rom = rom.to_vec();
+        self.cartridge_rom = Rc::new(rom.to_vec());
 
         let initial_banks = &self.cartridge_rom[..self.mem.rom.len()];
         self.mem.rom.copy_from_slice(initial_banks);
@@ -204,7 +210,10 @@ impl Mmu {
             0x10 => "MBC3+TIMER+RAM+BATTERY",
             0x11 => "MBC3",
             0x12 => "MBC3+RAM",
-            0x13 => "MBC3+RAM+BATTERY",
+            0x13 => {
+                self.mbc = Some(Box::new(Mbc3::new(self.cartridge_rom.clone())));
+                "MBC3+RAM+BATTERY"
+            }
             0x19 => "MBC5",
             0x1A => "MBC5+RAM",
             0x1B => "MBC4+RAM+BATTERY",
@@ -314,7 +323,12 @@ impl Mmu {
             }
 
             // ROM Banks
-            0x0000...0x7FFF => self.mem.rom[address as usize],
+            0x0000...0x7FFF => {
+                match self.mbc {
+                    Some(ref mbc) => mbc.read_byte(address),
+                    None => self.mem.rom[address as usize],
+                }
+            }
 
             // Graphics RAM
             0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
@@ -363,11 +377,17 @@ impl Mmu {
             0x0000...0x7FFF => {
                 // While BIOS and ROM are read-only, if the cartridge has a memory bank controller,
                 // writes to this region will trigger a bank switch.
-                warn!(
-                    "attempted to write {:#04x} to read-only memory at {:#06x}",
-                    byte,
-                    address
-                );
+
+                match self.mbc {
+                    Some(ref mut mbc) => mbc.write_byte(address, byte),
+                    None => {
+                        warn!(
+                            "attempted to write {:#04x} to read-only memory at {:#06x}",
+                            byte,
+                            address
+                        )
+                    }
+                }
             }
 
             // Graphics RAM
