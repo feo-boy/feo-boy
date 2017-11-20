@@ -37,6 +37,32 @@ impl Sweep {
     }
 }
 
+/// The sound length/wave pattern duty for a channel.
+#[derive(Debug, Default)]
+pub struct Wave {
+    /// Wave pattern duty (0-3).
+    pattern: u8,
+
+    /// Sound length (0-63).
+    length: u8,
+}
+
+impl Wave {
+    /// Gets the result of reading the wave register for the current register state.
+    pub fn read(&self) -> u8 {
+        let mut byte = self.pattern << 6;
+        byte |= self.length;
+
+        byte
+    }
+
+    /// Modifies the wave state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.length = byte & 0x3F;
+        self.pattern = byte >> 6;
+    }
+}
+
 /// A single GameBoy sound channel.
 #[derive(Debug, Default)]
 pub struct Sound {
@@ -51,6 +77,9 @@ pub struct Sound {
 
     /// The sweep register data.
     pub sweep: Sweep,
+
+    /// The sound length/wave pattern data.
+    pub wave: Wave,
 }
 
 /// The controller for the four sound channels output by the GameBoy.
@@ -99,9 +128,8 @@ impl Addressable for SoundController {
     fn read_byte(&self, address: u16) -> u8 {
         // Access to sound registers, aside from 0xFF26, is disabled unless the sound is on.
         if !self.sound_enabled && address != 0xFF26 {
-            // TODO: Currently assumes that unreadable addresses will be read as 0, but that might
-            // not be the case.
-            return 0;
+            // TODO: Currently assumes that unreadable addresses will be read as 0xFF
+            return 0xFF;
         }
 
         match address {
@@ -112,6 +140,19 @@ impl Addressable for SoundController {
             //            1: Subtraction (frequency decreases)
             // Bit 2-0 - Number of sweep shift (n: 0-7)
             0xFF10 => self.sound_1.sweep.read(),
+
+            // NR11: Sound 1 Sound length/Wave pattern duty
+            // Bit 7-6 - Wave pattern duty
+            // Bit 5-0 - Sound length data (Write only)
+            0xFF11 => self.sound_1.wave.read(),
+
+            0xFF12...0xFF23 => {
+                warn!(
+                    "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
+                    address
+                );
+                return 0xFF;
+            }
 
             // NR50: Channel control / ON-OFF / Volume
             // Specifies the master volume for Left/Right sound output.
@@ -202,10 +243,10 @@ impl Addressable for SoundController {
             // NR10 - Channel 1 Sweep Register
             0xFF10 => self.sound_1.sweep.write(byte),
 
-            // NR11 - Channel 1 Sound length/Wave pattern duty
-            0xFF11 => {
-                warn!("attempted to modify sound channel 1 wave (unimplemented)");
-            }
+            // NR11: Sound 1 Sound length/Wave pattern duty
+            // Bit 7-6 - Wave pattern duty
+            // Bit 5-0 - Sound length data (Write only)
+            0xFF11 => self.sound_1.wave.write(byte),
 
             // NR12 - Channel 1 Volume Envelope
             0xFF12 => {
@@ -360,7 +401,86 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::{Sweep, SoundController};
+    use super::{Sweep, Wave, SoundController};
+
+    #[test]
+    fn sweep_read() {
+        let mut sweep = Sweep::default();
+
+        for shift_num in 0..8 {
+            for inc_dec in 0..2 {
+                for time in 0..8 {
+                    let expected = (time << 4) | (inc_dec << 3) | shift_num;
+
+                    sweep.time = time;
+                    sweep.decrease = if inc_dec == 1 { true } else { false };
+                    sweep.shift = shift_num;
+
+                    assert_eq!(sweep.read(), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sweep_write() {
+        let mut sweep = Sweep::default();
+
+        for shift_num in 0..8 {
+            for inc_dec in 0..2 {
+                for time in 0..8 {
+                    for extra in 0..2 {
+                        let byte = (extra << 7) | (time << 4) | (inc_dec << 3) | shift_num;
+
+                        let expected_time = time;
+                        let expected_decrease = if inc_dec == 1 { true } else { false };
+                        let expected_shift = shift_num;
+
+                        sweep.write(byte);
+
+                        assert_eq!(sweep.time, expected_time);
+                        assert_eq!(sweep.decrease, expected_decrease);
+                        assert_eq!(sweep.shift, expected_shift);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn wave_read() {
+        let mut wave = Wave::default();
+
+        for pattern in 0..4 {
+            for length in 0..64 {
+                let expected = (pattern << 6) | length;
+
+                wave.pattern = pattern;
+                wave.length = length;
+
+                assert_eq!(wave.read(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn wave_write() {
+        let mut wave = Wave::default();
+
+        for pattern in 0..4 {
+            for length in 0..64 {
+                let byte = (pattern << 6) | length;
+
+                let expected_pattern = pattern;
+                let expected_length = length;
+
+                wave.write(byte);
+
+                assert_eq!(wave.pattern, expected_pattern);
+                assert_eq!(wave.length, expected_length);
+            }
+        }
+    }
 
     #[test]
     fn ff24_read() {
@@ -386,7 +506,7 @@ mod tests {
                         expected.set_bit(7, vin_so2);
 
                         sc.sound_enabled = false;
-                        assert_eq!(sc.read_byte(0xFF24), 0);
+                        assert_eq!(sc.read_byte(0xFF24), 0xFF);
 
                         sc.sound_enabled = true;
                         assert_eq!(sc.read_byte(0xFF24), expected);
@@ -460,7 +580,7 @@ mod tests {
             sc.sound_4.so2_enabled = i.has_bit_set(7);
 
             sc.sound_enabled = false;
-            assert_eq!(sc.read_byte(0xFF25), 0x0);
+            assert_eq!(sc.read_byte(0xFF25), 0xFF);
 
             sc.sound_enabled = true;
             assert_eq!(sc.read_byte(0xFF25), i);
