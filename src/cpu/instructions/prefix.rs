@@ -25,7 +25,7 @@ macro_rules! prefix_instructions {
 
                 prefix_instructions[$byte] = PrefixInstructionDef {
                     byte: $byte,
-                    description: $description,
+                    description: Some($description),
                     cycles,
                 };
             )*
@@ -45,7 +45,8 @@ pub struct PrefixInstructionDef {
     pub byte: u8,
 
     /// A short, human readable representation of the prefix instruction in Z80 assembly syntax.
-    pub description: &'static str,
+    // FIXME THis should not be an option once all instructions have descriptions.
+    pub description: Option<&'static str>,
 
     /// The number of clock cycles it takes to execute this instruction.
     ///
@@ -58,7 +59,7 @@ impl Default for PrefixInstructionDef {
     fn default() -> PrefixInstructionDef {
         PrefixInstructionDef {
             byte: 0,
-            description: "UNDEFINED PREFIX INSTRUCTION",
+            description: None,
             cycles: 8,
         }
     }
@@ -504,6 +505,24 @@ lazy_static! {
     pub static ref PREFIX_INSTRUCTIONS: Vec<PrefixInstructionDef> = prefix_instructions! {
         // byte     description
         0x11,       "RL C";
+        0x42,       "BIT 0,D";
         0x86,       "RES 0,(HL)";
+        0x37,       "SWAP A";
+        0x47,       "BIT 0,A";
+        0x57,       "BIT 2,A";
+        0x77,       "BIT 6,A";
+        0x87,       "RES 0,A";
+        0x97,       "RES 2,A";
+        0x38,       "SRL B";
+        0x19,       "RR C";
+        0x1a,       "RR D";
+        0x7c,       "BIT 7,H";
+        0xae,       "RES 5,(HL)";
+        0xde,       "SET 3,(HL)";
+        0x4f,       "BIT 1,A";
+        0x6f,       "BIT 5,A";
+        0x7f,       "BIT 7,A";
+        0x8f,       "RES 1,A";
+        0xff,       "SET 7,A";
     };
 }
