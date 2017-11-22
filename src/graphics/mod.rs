@@ -5,11 +5,15 @@
 use std::fmt::{self, Debug, Formatter};
 
 use byteorder::{ByteOrder, LittleEndian};
-use image::{Rgba, RgbaImage};
+use image::RgbaImage;
 
 use bytes::ByteExt;
 use cpu::Interrupts;
 use memory::Addressable;
+
+mod palette;
+
+pub use self::palette::{Shade, BackgroundPalette, SpritePalette};
 
 /// The width and height of the Game Boy screen.
 pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
@@ -17,57 +21,6 @@ pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 pub const SPRITE_START: u16 = 0xFE00;
 pub const SPRITE_TILE_DATA_START: u16 = 0x8000;
-
-/// The colors that can be displayed by the DMG.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Shade {
-    White,
-    LightGray,
-    DarkGray,
-    Black,
-
-    /// A shade that is only used by sprites.
-    // FIXME: Should this be represented by `None`?
-    Transparent,
-}
-
-impl Shade {
-    /// Returns a pixel that represents the color of a `Shade`.
-    pub fn to_rgba(&self) -> Rgba<u8> {
-        use self::Shade::*;
-
-        // This uses the GameBoy Pocket palette.
-        // TODO: Support more palettes.
-        match *self {
-            White => Rgba([0xFF, 0xFF, 0xFF, 0xFF]),
-            LightGray => Rgba([0xA9, 0xA9, 0xA9, 0xFF]),
-            DarkGray => Rgba([0x54, 0x54, 0x54, 0xFF]),
-            Black => Rgba([0x00, 0x00, 0x00, 0xFF]),
-
-            Transparent => panic!("transparent pixels cannot be displayed"),
-        }
-    }
-}
-
-impl Default for Shade {
-    fn default() -> Shade {
-        Shade::White
-    }
-}
-
-impl From<u8> for Shade {
-    fn from(val: u8) -> Shade {
-        use self::Shade::*;
-
-        match val {
-            0 => White,
-            1 => LightGray,
-            2 => DarkGray,
-            3 => Black,
-            _ => panic!("only 0-3 correspond to valid shades"),
-        }
-    }
-}
 
 /// Memory managed by the PPU.
 struct Memory {
@@ -266,16 +219,10 @@ pub struct Ppu {
     modeclock: u32,
 
     /// The background palette.
-    ///
-    /// This array can be thought of as a map from color number to shade, where the color numbers
-    /// are those used by the Background and Window tiles.
-    pub bg_palette: [Shade; 4],
+    pub bg_palette: BackgroundPalette,
 
     /// The two object palettes.
-    ///
-    /// Each array can be thought of as a map from color number to shade, where the color numbers
-    /// are those used by the sprite tiles. Note that color 0 is always transparent for sprites.
-    pub sprite_palette: [[Shade; 4]; 2],
+    pub sprite_palette: [SpritePalette; 2],
 
     /// The current line position of the PPU. The last line is 143.
     pub line: u8,
@@ -461,13 +408,12 @@ impl Ppu {
             // row of the tile takes two bytes.
             let tile_line = (y_position % TILE_HEIGHT) * 2;
 
-            let shade = *Self::shade(
+            let shade_number = Self::shade_number(
                 self.read_word(tile_address + tile_line as u16),
                 x_position % 8,
-                &self.bg_palette,
             );
 
-            self.pixels.0[self.line as usize][x as usize] = shade;
+            self.pixels.0[self.line as usize][x as usize] = self.bg_palette.get(shade_number);
         }
     }
 
@@ -490,8 +436,8 @@ impl Ppu {
         start.address() + offset * TILE_DATA_ROW_SIZE
     }
 
-    /// Gets the shade for rendering a particular pixel of the screen, using the given palette.
-    fn shade(tile_row: u16, tile_x: u8, palette: &[Shade]) -> &Shade {
+    /// Gets the shade number for a particular pixel on the screen.
+    fn shade_number(tile_row: u16, tile_x: u8) -> u8 {
         // Every two bytes represents one row of 8 pixels. The bits of each byte correspond to one
         // pixel. The first byte contains the lower order bit of the color number, while the second
         // byte contains the higher order bit.
@@ -504,9 +450,7 @@ impl Ppu {
         let mut color_num = 0;
         color_num.set_bit(0, bytes[0].has_bit_set(color_bit));
         color_num.set_bit(1, bytes[1].has_bit_set(color_bit));
-
-        // Map the color number to the shade to display on the screen
-        &palette[color_num as usize]
+        color_num
     }
 
     /// Render the sprites on the screen.
@@ -566,8 +510,6 @@ impl Ppu {
                         &self.sprite_palette[0]
                     };
 
-                    let shade = *Self::shade(color_row, color_bit, sprite_palette);
-
                     // Find the horizontal position of the pixel on the screen
                     let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
                     let pixel = x_position.wrapping_add(x_pixel);
@@ -577,13 +519,14 @@ impl Ppu {
                         continue;
                     }
 
-                    // Check that the pixel is visible and should be drawn over the background.
-                    let is_visible = shade != Shade::Transparent;
-                    let has_priority = !behind_bg ||
-                        self.pixels.0[self.line as usize][pixel as usize] == Shade::White;
+                    let shade_number = Self::shade_number(color_row, color_bit);
 
-                    if is_visible && has_priority {
-                        self.pixels.0[self.line as usize][pixel as usize] = shade;
+                    if let Some(shade) = sprite_palette.get(shade_number) {
+
+                        if !behind_bg ||
+                            self.pixels.0[self.line as usize][pixel as usize] == Shade::White {
+                            self.pixels.0[self.line as usize][pixel as usize] = shade;
+                        }
                     }
                 }
             }
@@ -668,7 +611,7 @@ mod tests {
     use bytes::ByteExt;
     use memory::Addressable;
 
-    use super::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
+    use super::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize, BackgroundPalette, SpritePalette};
 
     #[test]
     fn chram() {
@@ -698,21 +641,21 @@ mod tests {
 
         let tile_row = LittleEndian::read_u16(&[0x4E, 0x8B]);
 
-        ppu.bg_palette = [
+        ppu.bg_palette = BackgroundPalette::new([
             Shade::White,
             Shade::LightGray,
             Shade::DarkGray,
             Shade::Black,
-        ];
+        ]);
 
-        assert_eq!(*Ppu::shade(tile_row, 0, &ppu.bg_palette), Shade::DarkGray);
-        assert_eq!(*Ppu::shade(tile_row, 1, &ppu.bg_palette), Shade::LightGray);
-        assert_eq!(*Ppu::shade(tile_row, 2, &ppu.bg_palette), Shade::White);
-        assert_eq!(*Ppu::shade(tile_row, 3, &ppu.bg_palette), Shade::White);
-        assert_eq!(*Ppu::shade(tile_row, 4, &ppu.bg_palette), Shade::Black);
-        assert_eq!(*Ppu::shade(tile_row, 5, &ppu.bg_palette), Shade::LightGray);
-        assert_eq!(*Ppu::shade(tile_row, 6, &ppu.bg_palette), Shade::Black);
-        assert_eq!(*Ppu::shade(tile_row, 7, &ppu.bg_palette), Shade::DarkGray);
+        assert_eq!(Ppu::shade_number(tile_row, 0), 2);
+        assert_eq!(Ppu::shade_number(tile_row, 1), 1);
+        assert_eq!(Ppu::shade_number(tile_row, 2), 0);
+        assert_eq!(Ppu::shade_number(tile_row, 3), 0);
+        assert_eq!(Ppu::shade_number(tile_row, 4), 3);
+        assert_eq!(Ppu::shade_number(tile_row, 5), 1);
+        assert_eq!(Ppu::shade_number(tile_row, 6), 3);
+        assert_eq!(Ppu::shade_number(tile_row, 7), 2);
     }
 
     #[test]
@@ -772,12 +715,12 @@ mod tests {
         }
 
         // Create the palette
-        ppu.bg_palette = [
+        ppu.bg_palette = BackgroundPalette::new([
             Shade::White,
             Shade::LightGray,
             Shade::DarkGray,
             Shade::Black,
-        ];
+        ]);
 
         // Set the state of the PPU
         ppu.line = 0;
@@ -832,25 +775,24 @@ mod tests {
         ppu.write_byte(0xFE03, sprite_attributes);
 
         // Create the palette
-        ppu.bg_palette = [
+        ppu.bg_palette = BackgroundPalette::new([
             Shade::White,
             Shade::LightGray,
             Shade::DarkGray,
             Shade::Black,
-        ];
-        ppu.sprite_palette = [
-            [
-                Shade::Transparent,
+        ]);
+        ppu.sprite_palette = [SpritePalette::new([
+                Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ],
-            [
-                Shade::Transparent,
+            ]),
+            SpritePalette::new([
+                Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ],
+            ]),
         ];
 
         // Set the state of the PPU
@@ -962,25 +904,25 @@ mod tests {
         ppu.write_byte(0xFE03, sprite_attributes);
 
         // Create the palette
-        ppu.bg_palette = [
+        ppu.bg_palette = BackgroundPalette::new([
             Shade::White,
             Shade::LightGray,
             Shade::DarkGray,
             Shade::Black,
-        ];
+        ]);
         ppu.sprite_palette = [
-            [
-                Shade::Transparent,
+            SpritePalette::new([
+                Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ],
-            [
-                Shade::Transparent,
+            ]),
+            SpritePalette::new([
+                Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ],
+            ])
         ];
 
         // Set the state of the PPU

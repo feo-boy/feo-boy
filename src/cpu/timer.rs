@@ -84,8 +84,6 @@ impl Timer {
 
 #[cfg(test)]
 mod tests {
-    use bus::Bus;
-
     use super::Timer;
 
     #[test]

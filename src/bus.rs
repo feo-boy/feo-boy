@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 use bytes::ByteExt;
 use cpu::{Interrupts, Timer};
-use graphics::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize};
+use graphics::{Ppu, TileMapStart, TileDataStart, SpriteSize};
 use audio::SoundController;
 use input::{Button, ButtonState, SelectFlags};
 use memory::{Addressable, Mmu};
@@ -183,6 +183,15 @@ impl Bus {
 
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
+
+            // BGP - BG Palette Data
+            0xFF47 => ppu.bg_palette.as_byte(),
+
+            // OBP0 - Object Palette 0 Data
+            0xFF48 => ppu.sprite_palette[0].as_byte(),
+
+            // OBP1 - Object Palette 1 Data
+            0xFF49 => ppu.sprite_palette[1].as_byte(),
 
             // WX - Window X Position minus 7
             0xFF4B => ppu.window.x.wrapping_add(7),
@@ -473,26 +482,13 @@ impl Bus {
             }
 
             // BGP - BG Palette Data
-            0xFF47 => {
-                let palette = &mut self.ppu.bg_palette;
-
-                for i in 0..4 {
-                    let shade = (byte >> (i * 2)) & 0x3;
-                    palette[i] = shade.into();
-                }
-            }
+            0xFF47 => self.ppu.bg_palette = byte.into(),
 
             // OBP0 - Object Palette 0 Data
-            0xFF48 => {
-                let ppu = &mut self.ppu;
-                Self::set_sprite_palette(&mut ppu.sprite_palette[0], byte);
-            }
+            0xFF48 => self.ppu.sprite_palette[0] = byte.into(),
 
             // OBP1 - Object Palette 1 Data
-            0xFF49 => {
-                let ppu = &mut self.ppu;
-                Self::set_sprite_palette(&mut ppu.sprite_palette[1], byte);
-            }
+            0xFF49 => self.ppu.sprite_palette[1] = byte.into(),
 
             // WY - Window Y position
             0xFF4A => {
@@ -530,14 +526,6 @@ impl Bus {
             }
 
             _ => error!("write to unimplemented I/O register {:#02x}", address),
-        }
-    }
-
-    fn set_sprite_palette(palette: &mut [Shade], shades: u8) {
-        palette[0] = Shade::Transparent;
-        for i in 1..4 {
-            let shade = (shades >> (i * 2)) & 0x3;
-            palette[i] = shade.into();
         }
     }
 }
@@ -591,7 +579,7 @@ mod tests {
     use quickcheck::{QuickCheck, StdGen, TestResult};
     use rand;
 
-    use graphics::Shade;
+    use graphics::{BackgroundPalette, Shade};
     use input::Button;
     use memory::{Addressable, BIOS_SIZE};
 
@@ -665,12 +653,12 @@ mod tests {
 
         assert_eq!(
             bus.ppu.bg_palette,
-            [
+            BackgroundPalette::new([
                 Shade::Black,
                 Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
-            ]
+            ])
         );
     }
 
