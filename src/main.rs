@@ -53,7 +53,6 @@ fn start_emulator(config: Config) -> Result<()> {
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", scaled_dimensions)
         .build()
         .unwrap();
-    window.set_ups(60);
 
     let window_size = window.size();
 
@@ -86,8 +85,8 @@ fn start_emulator(config: Config) -> Result<()> {
             }
         }
 
-        if event.update_args().is_some() {
-            emulator.update()?;
+        if let Some(args) = event.update_args() {
+            emulator.update(args.dt)?;
         }
 
         if event.render_args().is_some() {

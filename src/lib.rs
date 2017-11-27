@@ -56,7 +56,7 @@ use memory::Mmu;
 pub use graphics::SCREEN_DIMENSIONS;
 pub use input::Button;
 
-const CYCLES_PER_FRAME: u32 = 70224;
+const MICROSECONDS_PER_CYCLE: f64 = 0.2384;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug)]
@@ -141,15 +141,15 @@ impl Emulator {
 
     /// Fetch and execute a single instruction.
     pub fn step(&mut self) {
-        let cycles = self.cpu.step(&mut self.bus);
+        self.cpu.step(&mut self.bus);
 
         self.bus.ppu.step(
-            cycles,
+            self.cpu.clock.diff(),
             &mut self.bus.interrupts,
             &mut self.screen_buffer,
         );
 
-        if self.bus.timer.tick(cycles as u8 / 4) {
+        if self.bus.timer.tick(self.cpu.clock.diff() as u8 / 4) {
             self.bus.interrupts.timer.requested = true;
         }
 
@@ -171,12 +171,16 @@ impl Emulator {
         self.bus.button_state.release(button);
     }
 
-    /// Step the emulation state for 1/60 of a second.
+    /// Step the emulation state for the given time in seconds.
     ///
     /// If the debugger is enabled, debug commands will be read from stdin.
-    pub fn update(&mut self) -> Result<()> {
-        let frame_clock = self.cpu.clock.t + CYCLES_PER_FRAME;
-        while self.cpu.clock.t < frame_clock {
+    pub fn update(&mut self, dt: f64) -> Result<()> {
+        let microseconds = dt * 1_000_000.0;
+        let cycles_to_execute = (microseconds / MICROSECONDS_PER_CYCLE) as u32;
+
+        let mut cycles_executed = 0;
+
+        while cycles_executed < cycles_to_execute {
             if self.is_paused() {
                 let readline = {
                     let editor = &mut self.debug.as_mut().unwrap().editor;
@@ -194,7 +198,8 @@ impl Emulator {
                     Err(err) => panic!("{}", err),
                 }
             } else {
-                self.step()
+                self.step();
+                cycles_executed += self.cpu.clock.diff();
             }
         }
 

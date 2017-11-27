@@ -3,6 +3,7 @@
 //! Contains an implementation of the registers and instruction set.
 
 pub mod arithmetic;
+mod clock;
 mod instructions;
 mod registers;
 mod timer;
@@ -13,6 +14,7 @@ use std::fmt;
 use bus::Bus;
 use memory::{Addressable, Mmu};
 
+pub use self::clock::Clock;
 pub use self::instructions::Instruction;
 pub use self::registers::{Registers, Flags};
 pub use self::timer::Timer;
@@ -36,26 +38,6 @@ pub enum State {
 impl Default for State {
     fn default() -> State {
         State::Running
-    }
-}
-
-/// The clock.
-#[derive(Debug, Default)]
-pub struct Clock {
-    /// Machine cycle state. One machine cycle = 4 clock cycles.
-    pub m: u32,
-    /// Clock cycle state.
-    pub t: u32,
-}
-
-impl Clock {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn reset(&mut self) {
-        self.m = 0;
-        self.t = 0;
     }
 }
 
@@ -121,15 +103,13 @@ impl Cpu {
     }
 
     /// Fetch and execute a single instruction.
-    ///
-    /// Returns the number of cycles the instruction takes.
-    pub fn step(&mut self, bus: &mut Bus) -> u32 {
+    pub fn step(&mut self, bus: &mut Bus) {
         match self.state {
             State::Running => {
                 let instruction = self.fetch(bus);
                 self.execute(instruction, bus)
             }
-            State::Halted => 4,     // Return the duration of the shortest instruction.
+            State::Halted => self.clock.tick(4),    // Tick the duration of a NOP.
             _ => unimplemented!(),
         }
     }
@@ -177,8 +157,7 @@ impl Cpu {
                         self.rst($vector, $bus);
 
                         // FIXME: The timing for interrupts might be more subtle than this.
-                        self.clock.m += 3;
-                        self.clock.t += 12;
+                        self.clock.tick(12);
                         $bus.timer.tick(3);
 
                         return;

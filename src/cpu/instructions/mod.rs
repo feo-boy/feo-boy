@@ -184,9 +184,7 @@ impl super::Cpu {
     ///
     /// All necessary side effects are performed, including updating the program counter, flag
     /// registers, and CPU clock.
-    ///
-    /// Returns the number of clock cycles the instruction takes.
-    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) -> u32 {
+    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -1372,10 +1370,7 @@ impl super::Cpu {
             _ => u32::from(instruction.cycles()),
         };
 
-        self.clock.t += cycles;
-        self.clock.m += cycles / 4;
-
-        cycles
+        self.clock.tick(cycles);
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
@@ -1827,11 +1822,8 @@ mod tests {
             ..Default::default()
         };
 
-        let cycles = cpu.execute(nop, &mut bus);
-
-        assert_eq!(cycles, 4);
-        assert_eq!(cpu.clock.m, 1);
-        assert_eq!(cpu.clock.t, 4);
+        cpu.execute(nop, &mut bus);
+        assert_eq!(cpu.clock.diff(), 4);
     }
 
     #[test]
@@ -1866,7 +1858,7 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
-        assert_eq!(cpu.clock.t, 12);
+        assert_eq!(cpu.clock.diff(), 12);
 
         // Move backward 10
         let instruction = Instruction {
@@ -1875,7 +1867,7 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
-        assert_eq!(cpu.clock.t, 24);
+        assert_eq!(cpu.clock.diff(), 12);
 
         // Do not jump
         cpu.reg.f.insert(Flags::ZERO);
@@ -1885,7 +1877,7 @@ mod tests {
         };
         cpu.execute(instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 6);
-        assert_eq!(cpu.clock.t, 32);
+        assert_eq!(cpu.clock.diff(), 8);
     }
 
     #[test]
