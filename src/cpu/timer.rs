@@ -123,4 +123,16 @@ mod tests {
         timer.tick(1);
         assert_eq!(timer.reg.divider(), 1);
     }
+
+    #[test]
+    fn tima() {
+        let mut timer = Timer::default();
+        timer.reg.control = 0x07;
+
+        for _ in 0..64 {
+            timer.tick(1);
+        }
+
+        assert_eq!(timer.reg.counter, 1);
+    }
 }
