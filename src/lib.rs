@@ -6,7 +6,7 @@
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -29,7 +29,6 @@ extern crate rand;
 pub mod bus;
 pub mod bytes;
 pub mod cpu;
-pub mod errors;
 pub mod graphics;
 pub mod audio;
 pub mod input;
@@ -42,13 +41,13 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::process;
 
+use failure::{Error, ResultExt};
 use image::RgbaImage;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use bus::Bus;
 use cpu::{Cpu, Instruction};
-use errors::*;
 use graphics::Ppu;
 use audio::SoundController;
 use memory::Mmu;
@@ -57,6 +56,9 @@ pub use graphics::SCREEN_DIMENSIONS;
 pub use input::Button;
 
 const MICROSECONDS_PER_CYCLE: f64 = 0.2384;
+
+pub type Result<T> = std::result::Result<T, Error>;
+pub(crate) type StdResult<T, E> = std::result::Result<T, E>;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug)]
@@ -111,7 +113,7 @@ impl Emulator {
     pub fn load_bios<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         info!("loading BIOS from file '{}'", path.as_ref().display());
 
-        let mut file = File::open(path)?;
+        let mut file = File::open(path).context("could not open BIOS file")?;
 
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
@@ -127,7 +129,7 @@ impl Emulator {
     pub fn load_rom<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         info!("loading ROM from file '{}'", path.as_ref().display());
 
-        let mut file = File::open(path)?;
+        let mut file = File::open(path).context("could not open ROM file")?;
 
         let mut buf = vec![];
         file.read_to_end(&mut buf)?;
@@ -191,6 +193,7 @@ impl Emulator {
                 match readline {
                     Ok(line) => {
                         self.debug.as_mut().unwrap().editor.add_history_entry(&line);
+                        // FIXME: Don't propagate this error.
                         tui::parse_command(self, &line.trim())?
                     }
                     Err(ReadlineError::Interrupted) |

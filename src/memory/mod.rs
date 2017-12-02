@@ -2,21 +2,35 @@
 //!
 //! Contains the implementation of the memory manager unit (MMU).
 
-use std::rc::Rc;
+mod mbc;
+
 use std::default::Default;
 use std::fmt::{self, Debug, Formatter};
 use std::num::Wrapping;
+use std::rc::Rc;
 
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 
-use errors::*;
-
-mod mbc;
-
+use StdResult;
 use self::mbc::{Mbc3, Mbc};
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
+
+#[derive(Debug, Fail)]
+pub enum BiosError {
+    #[fail(display = "the BIOS must be exactly 256 bytes")]
+    InvalidSize,
+}
+
+#[derive(Debug, Fail)]
+pub enum CartridgeError {
+    #[fail(display = "the size of the ROM must be at least 32KB")]
+    InvalidSize,
+
+    #[fail(display = "the header checksum {:#02} is not equal to sum {:#02}", checksum, sum)]
+    BadChecksum { checksum: u8, sum: u8 },
+}
 
 /// Operations for memory-like structs.
 pub trait Addressable {
@@ -138,10 +152,9 @@ impl Mmu {
     /// Loads a byte slice containing the BIOS into memory.
     ///
     /// Returns an error if the slice is not the correct length.
-    pub fn load_bios(&mut self, bios: &[u8]) -> Result<()> {
+    pub fn load_bios(&mut self, bios: &[u8]) -> StdResult<(), BiosError> {
         if bios.len() != BIOS_SIZE {
-            let msg = format!("must be exactly {} bytes", BIOS_SIZE);
-            bail!(ErrorKind::InvalidBios(msg));
+            return Err(BiosError::InvalidSize);
         }
 
         let mut bios_memory = [0; BIOS_SIZE];
@@ -159,9 +172,9 @@ impl Mmu {
     /// Returns an error if the header checksum is invalid.
     ///
     /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
-    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+    pub fn load_rom(&mut self, rom: &[u8]) -> StdResult<(), CartridgeError> {
         if rom.len() < self.mem.rom.len() {
-            bail!(ErrorKind::InvalidCartridge("size too small".into()))
+            return Err(CartridgeError::InvalidSize);
         }
 
         self.cartridge_rom = Rc::new(rom.to_vec());
@@ -185,12 +198,10 @@ impl Mmu {
         };
         let header_checksum = rom[0x14D];
         if header_sum != header_checksum {
-            let msg = format!(
-                "header checksum {:#02} is not equal to sum {:#02}",
-                header_checksum,
-                header_sum
-            );
-            bail!(ErrorKind::InvalidCartridge(msg))
+            return Err(CartridgeError::BadChecksum {
+                checksum: header_checksum,
+                sum: header_sum,
+            });
         }
         info!("header checksum OK");
 

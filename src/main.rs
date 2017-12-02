@@ -3,23 +3,22 @@ extern crate feo_boy;
 #[macro_use]
 extern crate clap;
 
-#[macro_use]
-extern crate error_chain;
-
+extern crate failure;
 extern crate image;
 extern crate piston_window;
 extern crate pretty_env_logger;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
+use std::process;
 
 use clap::{App, AppSettings, Arg};
+use failure::ResultExt;
 use image::{FilterType, RgbaImage};
 use image::imageops;
 use piston_window::*;
 
-use feo_boy::{Emulator, SCREEN_DIMENSIONS};
-use feo_boy::errors::*;
+use feo_boy::{Emulator, Result, SCREEN_DIMENSIONS};
 
 #[derive(Debug, Clone)]
 struct Config {
@@ -37,12 +36,10 @@ fn start_emulator(config: Config) -> Result<()> {
     };
 
     if let Some(ref bios) = config.bios {
-        emulator.load_bios(bios).chain_err(|| "could not load BIOS")?;
+        emulator.load_bios(bios).context("could not load BIOS")?;
     }
 
-    emulator.load_rom(&config.rom).chain_err(
-        || "could not load ROM",
-    )?;
+    emulator.load_rom(&config.rom).context("could not load ROM")?;
 
     emulator.reset();
 
@@ -157,4 +154,14 @@ fn run() -> Result<()> {
     start_emulator(config)
 }
 
-quick_main!(run);
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("fatal error");
+
+        for cause in e.causes() {
+            eprintln!("cause: {}", cause);
+        }
+
+        process::exit(1);
+    }
+}

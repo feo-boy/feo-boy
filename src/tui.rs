@@ -2,8 +2,9 @@
 
 use std::process;
 
-use errors::*;
-use Emulator;
+use failure::ResultExt;
+
+use {Emulator, Result};
 
 /// The commands that are available to the debugger.
 pub static COMMANDS: &str = "sblrpdcq?";
@@ -66,9 +67,7 @@ fn parse_step(command: &str) -> Result<Option<i32>> {
         _ => bail!("`s` takes a single optional argument"),
     }
 
-    let step = components[1].parse().chain_err(
-        || "could not parse step count",
-    )?;
+    let step = components[1].parse::<i32>().context("could not parse step count")?;
 
     Ok(Some(step))
 }
@@ -85,8 +84,8 @@ fn parse_breakpoint(command: &str) -> Result<u16> {
         bail!("breakpoint must start with '0x'");
     }
 
-    let breakpoint = u16::from_str_radix(&breakpoint[2..], 16).chain_err(
-        || "could not parse hexadecimal number",
+    let breakpoint = u16::from_str_radix(&breakpoint[2..], 16).context(
+        "could not parse hexadecimal number",
     )?;
     Ok(breakpoint)
 }
