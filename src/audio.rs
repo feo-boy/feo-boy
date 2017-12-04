@@ -41,10 +41,10 @@ impl Sweep {
 #[derive(Debug, Default)]
 pub struct Wave {
     /// Wave pattern duty (0-3).
-    pattern: u8,
+    pub pattern: u8,
 
     /// Sound length (0-63).
-    length: u8,
+    pub length: u8,
 }
 
 impl Wave {
@@ -60,6 +60,73 @@ impl Wave {
     pub fn write(&mut self, byte: u8) {
         self.length = byte & 0x3F;
         self.pattern = byte >> 6;
+    }
+}
+
+/// The volume envelope for a channel.
+#[derive(Debug, Default)]
+pub struct Envelope {
+    /// The initial volume of the envelope (0-15).
+    pub initial_vol: u8,
+
+    /// The direction of the envelope - `true` means increase, `false` means decrease.
+    pub direction_increase: bool,
+
+    /// Number of envelope sweep (0-7). The length of one step of the sweep is n * (1/64).
+    pub number: u8,
+}
+
+impl Envelope {
+    /// Gets the result of reading the envelope register for the current register state.
+    pub fn read(&self) -> u8 {
+        let mut byte = self.initial_vol << 4;
+        byte.set_bit(3, self.direction_increase);
+        byte |= self.number;
+
+        byte
+    }
+
+    /// Modifies the envelope state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.initial_vol = byte >> 4;
+        self.direction_increase = byte.has_bit_set(3);
+        self.number = byte & 0x7;
+    }
+}
+
+/// The frequency data for a channel.
+#[derive(Debug, Default)]
+pub struct Frequency {
+    /// Initial (`true` = restart sound) (Write only).
+    pub initial: bool,
+
+    /// Counter/conscutive selection (`true` = stop output when length in wave pattern duty
+    /// expires).
+    pub counter: bool,
+
+    /// The 11-bit frequency (Write only).
+    pub frequency: u16,
+}
+
+impl Frequency {
+    /// Modifies the lower 8 bits of the 11-bit frequency according to the written byte.
+    pub fn write_lo(&mut self, byte: u8) {
+        self.frequency = (self.frequency & 0xFF00) | (byte as u16);
+    }
+
+    /// Gets the result of reading the high bits of the frequency data.
+    pub fn read_hi(&self) -> u8 {
+        let mut byte = 0xFF;
+        byte.set_bit(6, self.counter);
+
+        byte
+    }
+
+    /// Modifies the high bits of the frequency data according to the written byte.
+    pub fn write_hi(&mut self, byte: u8) {
+        self.initial = byte.has_bit_set(7);
+        self.counter = byte.has_bit_set(6);
+        self.frequency = (((byte & 0x7) as u16) << 8) | (self.frequency & 0xFF);
     }
 }
 
@@ -80,6 +147,12 @@ pub struct Sound {
 
     /// The sound length/wave pattern data.
     pub wave: Wave,
+
+    /// The volume envelope data.
+    pub envelope: Envelope,
+
+    /// The frequency data.
+    pub frequency: Frequency,
 }
 
 /// The controller for the four sound channels output by the GameBoy.
@@ -146,7 +219,17 @@ impl Addressable for SoundController {
             // Bit 5-0 - Sound length data (Write only)
             0xFF11 => self.sound_1.wave.read(),
 
-            0xFF12...0xFF23 => {
+            // NR12: Channel 1 volume envelope
+            // Bit 7-4 - Initial volume of the envelope (0-15) (0 = no sound)
+            // Bit 3   - Envelope direction (0 = decrease, 1 = increase)
+            // Bit 2-0 - Number of envelope sweep (n: 0-7) (If 0, stop the envelope operation)
+            0xFF12 => self.sound_1.envelope.read(),
+
+            // NR13: Channel 1 frequency low
+            // Unreadable.
+            0xFF13 => 0xFF,
+
+            0xFF13...0xFF23 => {
                 warn!(
                     "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
                     address
@@ -240,7 +323,12 @@ impl Addressable for SoundController {
         }
 
         match address {
-            // NR10 - Channel 1 Sweep Register
+            // NR10: Sound 1 sweep register
+            // Bit 6-4 - Sweep time
+            // Bit 3   - Sweep Increase/Decrease
+            //            0: Addition    (frequency increases)
+            //            1: Subtraction (frequency decreases)
+            // Bit 2-0 - Number of sweep shift (n: 0-7)
             0xFF10 => self.sound_1.sweep.write(byte),
 
             // NR11: Sound 1 Sound length/Wave pattern duty
@@ -248,15 +336,15 @@ impl Addressable for SoundController {
             // Bit 5-0 - Sound length data (Write only)
             0xFF11 => self.sound_1.wave.write(byte),
 
-            // NR12 - Channel 1 Volume Envelope
-            0xFF12 => {
-                warn!("attempted to modify sound channel 1 volume (unimplemented)");
-            }
+            // NR12: Channel 1 volume envelope
+            // Bit 7-4 - Initial volume of the envelope (0-15) (0 = no sound)
+            // Bit 3   - Envelope direction (0 = decrease, 1 = increase)
+            // Bit 2-0 - Number of envelope sweep (n: 0-7) (If 0, stop the envelope operation)
+            0xFF12 => self.sound_1.envelope.write(byte),
 
-            // NR13 - Channel 1 Frequency lo data
-            0xFF13 => {
-                warn!("attempted to modify sound channel 1 frequency lo data (unimplemented)");
-            }
+            // NR13: Channel 1 Frequency low
+            // Lower 8 bits of the 11-bit frequency
+            0xFF13 => self.sound_1.frequency.write_lo(byte),
 
             // NR14 - Channel 1 Frequency hi data
             0xFF14 => {
@@ -401,7 +489,7 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::{Sweep, Wave, SoundController};
+    use super::{Sweep, Wave, Envelope, Frequency, SoundController};
 
     #[test]
     fn sweep_read() {
@@ -478,6 +566,111 @@ mod tests {
 
                 assert_eq!(wave.pattern, expected_pattern);
                 assert_eq!(wave.length, expected_length);
+            }
+        }
+    }
+
+    #[test]
+    fn envelope_read() {
+        let mut envelope = Envelope::default();
+
+        for initial_vol in 0..16 {
+            for direction_increase in 0..2 {
+                for number in 0..8 {
+                    let expected = (initial_vol << 4) | (direction_increase << 3) | number;
+
+                    envelope.initial_vol = initial_vol;
+                    envelope.direction_increase =
+                        if direction_increase == 1 { true } else { false };
+                    envelope.number = number;
+
+                    assert_eq!(envelope.read(), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn envelope_write() {
+        let mut envelope = Envelope::default();
+
+        for initial_vol in 0..16 {
+            for direction_increase in 0..2 {
+                for number in 0..8 {
+                    let byte = (initial_vol << 4) | (direction_increase << 3) | number;
+
+                    let expected_initial_vol = initial_vol;
+                    let expected_direction_increase =
+                        if direction_increase == 1 { true } else { false };
+                    let expected_number = number;
+
+                    envelope.write(byte);
+
+                    assert_eq!(envelope.initial_vol, expected_initial_vol);
+                    assert_eq!(envelope.direction_increase, expected_direction_increase);
+                    assert_eq!(envelope.number, expected_number);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn frequency_write_low() {
+        let mut frequency = Frequency::default();
+
+        for freq in 0..4096 {
+            let byte = (freq & 0xFF) as u8;
+
+            frequency.write_lo(byte);
+
+            assert_eq!((frequency.frequency & 0xFF) as u8, byte);
+
+            frequency.frequency = 4095;
+            frequency.write_lo(byte);
+
+            assert_eq!((frequency.frequency & 0xFF) as u8, byte);
+        }
+    }
+
+    #[test]
+    fn frequency_read_high() {
+        let mut frequency = Frequency::default();
+
+        for initial in 0..2 {
+            for counter in 0..2 {
+                for freq in 0..4096 {
+                    let mut expected = 0xFF;
+                    expected.set_bit(6, counter == 1);
+
+                    frequency.initial = if initial == 1 { true } else { false };
+                    frequency.counter = if counter == 1 { true } else { false };
+                    frequency.frequency = freq;
+
+                    assert_eq!(frequency.read_hi(), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn frequency_write_high() {
+        let mut frequency = Frequency::default();
+
+        for initial in 0..2 {
+            for counter in 0..2 {
+                for freq in 0..4096 {
+                    let byte = (initial << 7) | (counter << 6) | ((freq >> 8) as u8);
+
+                    let expected_initial = if initial == 1 { true } else { false };
+                    let expected_counter = if counter == 1 { true } else { false };
+                    let expected_frequency = freq & 0xFF00;
+
+                    frequency.write_hi(byte);
+
+                    // assert_eq!(frequency.initial, expected_initial);
+                    // assert_eq!(frequency.counter, expected_counter);
+                    // assert_eq!(frequency.frequency, expected_frequency);
+                }
             }
         }
     }
