@@ -8,6 +8,54 @@ const RTC_SIZE: usize = 0x2000 * 5;
 const ROM_BANK_SIZE: usize = 0x4000;
 const RAM_BANK_RTC_REG_SIZE: usize = 0x2000;
 
+pub trait Mbc: Addressable + Debug {}
+
+impl<M: Addressable + Debug> Mbc for M {}
+
+#[derive(Debug)]
+pub struct Mbc1 {
+    rom: Rc<Vec<u8>>,
+    bank_num: u8,
+}
+
+impl Mbc1 {
+    pub fn new(rom: Rc<Vec<u8>>) -> Mbc1 {
+        Mbc1 {
+            rom,
+            bank_num: 1,
+        }
+    }
+}
+
+impl super::Addressable for Mbc1 {
+    fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0x0000...0x3FFF => self.rom[address as usize],
+            0x4000...0x7FFF => {
+                let bank_start = u32::from(self.bank_num) * ROM_BANK_SIZE as u32;
+                let address_offset = u32::from(address) - 0x4000;
+                self.rom[(bank_start + address_offset) as usize]
+            },
+            0xA000...0xBFFF => unimplemented!(),  // TODO: support RAM
+            _ => unreachable!(),
+        }
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8) {
+        match address {
+            0x0000...0x1FFF => unimplemented!(),  // TODO: support RAM
+            0x2000...0x3FFF => {
+                self.bank_num = value & 0x1F;
+                if self.bank_num == 0x00
+                    || self.bank_num == 0x20 || self.bank_num == 0x40 || self.bank_num == 0x60 {
+                    self.bank_num += 1;
+                }
+            },
+            _ => unimplemented!(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 enum RamRtcSelect {
     Ram(u8), // 0-3
@@ -35,10 +83,6 @@ impl Mbc3 {
         }
     }
 }
-
-pub trait Mbc: Addressable + Debug {}
-
-impl<M: Addressable + Debug> Mbc for M {}
 
 impl super::Addressable for Mbc3 {
     fn read_byte(&self, address: u16) -> u8 {

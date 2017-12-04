@@ -12,7 +12,7 @@ use std::rc::Rc;
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 
 use StdResult;
-use self::mbc::{Mbc3, Mbc};
+use self::mbc::{Mbc1, Mbc3, Mbc};
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
@@ -207,7 +207,10 @@ impl Mmu {
 
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
-            0x01 => "MBC1",
+            0x01 => {
+                self.mbc = Some(Box::new(Mbc1::new(self.cartridge_rom.clone())));
+                "MBC1"
+            },
             0x02 => "MBC1+RAM",
             0x03 => "MBC1+RAM+BATTERY",
             0x05 => "MBC2",
@@ -240,7 +243,7 @@ impl Mmu {
             _ => "unknown",
         };
         info!("cartridge type: {}", cartridge_type);
-        if rom[0x147] != 0x00 {
+        if rom[0x147] != 0x00 && self.mbc.is_none() {
             error!("ROM is from an unsupported cartridge type. The game may not run properly!");
         }
 
