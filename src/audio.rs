@@ -236,7 +236,29 @@ impl Addressable for SoundController {
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF14 => self.sound_1.frequency.read_hi(),
 
-            0xFF16...0xFF23 => {
+            // NR21: Sound 2 Sound length/Wave pattern duty
+            // Bit 7-6 - Wave pattern duty
+            // Bit 5-0 - Sound length data (Write only)
+            0xFF16 => self.sound_2.wave.read(),
+
+            // NR22: Channel 2 volume envelope
+            // Bit 7-4 - Initial volume of the envelope (0-15) (0 = no sound)
+            // Bit 3   - Envelope direction (0 = decrease, 1 = increase)
+            // Bit 2-0 - Number of envelope sweep (n: 0-7) (If 0, stop the envelope operation)
+            0xFF17 => self.sound_2.envelope.read(),
+
+            // NR23: Channel 2 frequency low
+            // Unreadable.
+            0xFF18 => 0xFF,
+
+            // NR24: Channel 2 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF19 => self.sound_2.frequency.read_hi(),
+
+            0xFF1A...0xFF23 => {
                 warn!(
                     "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
                     address
@@ -360,25 +382,27 @@ impl Addressable for SoundController {
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF14 => self.sound_1.frequency.write_hi(byte),
 
-            // NR21 - Channel 2 Sound Length/Wave Pattery Duty
-            0xFF16 => {
-                warn!("attempted to modify sound channel 2 wave (unimplemented)");
-            }
+            // NR21: Sound 2 Sound length/Wave pattern duty
+            // Bit 7-6 - Wave pattern duty
+            // Bit 5-0 - Sound length data (Write only)
+            0xFF16 => self.sound_2.wave.write(byte),
 
-            // NR22 - Channel 2 Volume Envelope
-            0xFF17 => {
-                warn!("attempted to modify sound channel 2 volume (unimplemented)");
-            }
+            // NR22: Channel 2 volume envelope
+            // Bit 7-4 - Initial volume of the envelope (0-15) (0 = no sound)
+            // Bit 3   - Envelope direction (0 = decrease, 1 = increase)
+            // Bit 2-0 - Number of envelope sweep (n: 0-7) (If 0, stop the envelope operation)
+            0xFF17 => self.sound_2.envelope.write(byte),
 
-            // NR23 - Channel 2 Frequency lo data
-            0xFF18 => {
-                warn!("attempted to modify sound channel 2 frequency lo data (unimplemented)");
-            }
+            // NR23: Channel 2 frequency low
+            // Unreadable.
+            0xFF18 => self.sound_2.frequency.write_lo(byte),
 
-            // NR23 - Channel 2 Frequency hi data
-            0xFF19 => {
-                warn!("attempted to modify sound channel 2 frequency hi data (unimplemented)");
-            }
+            // NR24: Channel 2 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF19 => self.sound_2.frequency.write_hi(byte),
 
             // NR30 - Channel 3 Sound on/off
             0xFF1A => {
