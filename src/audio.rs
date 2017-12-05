@@ -253,7 +253,7 @@ impl Addressable for SoundController {
 
             // NR24: Channel 2 frequency high
             // Bit 7   - Initial (1 = restart sound) (write only)
-            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR21
             //           expires)
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF19 => self.sound_2.frequency.read_hi(),
@@ -399,7 +399,7 @@ impl Addressable for SoundController {
 
             // NR24: Channel 2 frequency high
             // Bit 7   - Initial (1 = restart sound) (write only)
-            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR21
             //           expires)
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF19 => self.sound_2.frequency.write_hi(byte),
