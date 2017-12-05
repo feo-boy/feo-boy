@@ -51,7 +51,7 @@ impl Wave {
     /// Gets the result of reading the wave register for the current register state.
     pub fn read(&self) -> u8 {
         let mut byte = self.pattern << 6;
-        byte |= self.length;
+        byte |= 0x3F;
 
         byte
     }
@@ -100,7 +100,7 @@ pub struct Frequency {
     /// Initial (`true` = restart sound) (Write only).
     pub initial: bool,
 
-    /// Counter/conscutive selection (`true` = stop output when length in wave pattern duty
+    /// Counter/consecutive selection (`true` = stop output when length in wave pattern duty
     /// expires).
     pub counter: bool,
 
@@ -193,7 +193,7 @@ impl SoundController {
 }
 
 impl Addressable for SoundController {
-    /// Reads a byte of audio memory.
+    /// Reads a byte of audio memory. Unreadable memory is always read as 1s.
     ///
     /// # Panics
     ///
@@ -229,7 +229,14 @@ impl Addressable for SoundController {
             // Unreadable.
             0xFF13 => 0xFF,
 
-            0xFF13...0xFF23 => {
+            // NR14: Channel 1 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF14 => self.sound_1.frequency.read_hi(),
+
+            0xFF16...0xFF23 => {
                 warn!(
                     "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
                     address
@@ -346,10 +353,12 @@ impl Addressable for SoundController {
             // Lower 8 bits of the 11-bit frequency
             0xFF13 => self.sound_1.frequency.write_lo(byte),
 
-            // NR14 - Channel 1 Frequency hi data
-            0xFF14 => {
-                warn!("attempted to modify sound channel 1 frequency hi data (unimplemented)");
-            }
+            // NR14: Channel 1 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF14 => self.sound_1.frequency.write_hi(byte),
 
             // NR21 - Channel 2 Sound Length/Wave Pattery Duty
             0xFF16 => {
@@ -541,7 +550,7 @@ mod tests {
 
         for pattern in 0..4 {
             for length in 0..64 {
-                let expected = (pattern << 6) | length;
+                let expected = (pattern << 6) | 0x3F;
 
                 wave.pattern = pattern;
                 wave.length = length;
@@ -659,17 +668,17 @@ mod tests {
         for initial in 0..2 {
             for counter in 0..2 {
                 for freq in 0..4096 {
-                    let byte = (initial << 7) | (counter << 6) | ((freq >> 8) as u8);
+                    let byte = (initial << 7) | (counter << 6) | (((freq >> 8) as u8) & 0x7);
 
                     let expected_initial = if initial == 1 { true } else { false };
                     let expected_counter = if counter == 1 { true } else { false };
-                    let expected_frequency = freq & 0xFF00;
+                    let expected_frequency = freq & 0x0700;
 
                     frequency.write_hi(byte);
 
-                    // assert_eq!(frequency.initial, expected_initial);
-                    // assert_eq!(frequency.counter, expected_counter);
-                    // assert_eq!(frequency.frequency, expected_frequency);
+                    assert_eq!(frequency.initial, expected_initial);
+                    assert_eq!(frequency.counter, expected_counter);
+                    assert_eq!(frequency.frequency, expected_frequency);
                 }
             }
         }
