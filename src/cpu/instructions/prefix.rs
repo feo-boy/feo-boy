@@ -8,7 +8,7 @@ macro_rules! prefix_instructions {
         {
             use $crate::regex::Regex;
 
-            let memory_access_re = Regex::new(r"\(HL\)").unwrap();
+            let memory_access_re = Regex::new(r"BIT .,\(HL\)").unwrap();
 
             let mut prefix_instructions = [
                 $(
@@ -16,6 +16,8 @@ macro_rules! prefix_instructions {
                         // If the instruction accesses memory (through HL), the instruction will
                         // take 16 cycles. Otherwise, it will take 8.
                         let cycles = if memory_access_re.is_match($description) {
+                            12
+                        } else if $description.contains("(HL)") {
                             16
                         } else {
                             8
@@ -755,7 +757,6 @@ lazy_static! {
 mod tests {
     use super::PREFIX_INSTRUCTIONS;
 
-    #[ignore]
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
