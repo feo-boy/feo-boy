@@ -1675,6 +1675,75 @@ mod tests {
     use super::{INSTRUCTIONS, Instruction, InstructionDef};
 
     #[test]
+    fn timings() {
+        // These timings taken from blargg's instruction timing test ROM.
+        let timings: Vec<u8> = vec![
+            1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
+            0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+            2,3,2,2,1,1,2,1,2,2,2,2,1,1,2,1,
+            2,3,2,2,3,3,3,1,2,2,2,2,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            2,3,3,4,3,4,2,4,2,4,3,0,3,6,2,4,
+            2,3,3,0,3,4,2,4,2,4,3,0,3,0,2,4,
+            3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
+            3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
+        ];
+
+        let condition_timings: Vec<u8> = vec![
+            1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
+            0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+            3,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+            3,3,2,2,3,3,3,1,3,2,2,2,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+            5,3,4,4,6,4,2,4,5,4,4,0,6,6,2,4,
+            5,3,4,0,6,4,2,4,5,4,4,0,6,0,2,4,
+            3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
+            3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
+        ];
+
+        for (byte, instruction) in INSTRUCTIONS.iter().enumerate() {
+            let timing = timings[byte as usize];
+
+            // Skip the assertion if the timing isn't tested.
+            if timing == 0 {
+                continue;
+            }
+
+            // The emulator uses clock cycles for its timings, but the above timings are in
+            // M-cycles.
+            let clock_cycles = timing * 4;
+
+            if clock_cycles != instruction.cycles {
+                panic!("wrong timing for {}: has {}, expected {}",
+                       instruction.description, instruction.cycles, clock_cycles);
+            }
+
+            if let Some(condition_cycles) = instruction.condition_cycles {
+                let clock_cycles = condition_timings[byte as usize] * 4;
+
+                if clock_cycles != condition_cycles {
+                    panic!("wrong condition timing for {}: has {}, expected {}",
+                           instruction.description, condition_cycles, clock_cycles);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn instruction_macro() {
         let nop = instruction!(0x00, "NOP", 4);
         assert_eq!(

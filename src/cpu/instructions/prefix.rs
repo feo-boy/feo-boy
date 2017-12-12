@@ -750,3 +750,41 @@ lazy_static! {
         0xff,       "SET 7,A";
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PREFIX_INSTRUCTIONS;
+
+    #[ignore]
+    #[test]
+    fn timings() {
+        // These timings taken from blargg's instruction timing test ROM.
+        let timings: Vec<u8> = vec![
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+            2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+            2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+            2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+            2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+        ];
+
+        for (timing, instruction) in timings.iter().zip(PREFIX_INSTRUCTIONS.iter()) {
+            let clock_cycles = timing * 4;
+
+            if clock_cycles != instruction.cycles {
+                panic!("wrong timing for {:?}: has {}, expected {}",
+                       instruction.description, instruction.cycles, clock_cycles);
+            }
+        }
+    }
+}
