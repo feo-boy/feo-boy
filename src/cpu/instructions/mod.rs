@@ -89,13 +89,7 @@ impl Display for Instruction {
                 "d16" | "a16" => format!("${:#06x}", LittleEndian::read_u16(&self.operands)),
                 "PREFIX CB" => {
                     let opcode = self.operands[0] as usize;
-                    match PREFIX_INSTRUCTIONS[opcode].description {
-                        Some(desc) => desc.to_string(),
-                        None => {
-                            error!("missing description for instruction 0xcb {:#04x}", opcode);
-                            String::from("UNIMPLEMENTED PREFIX INSTRUCTION")
-                        }
-                    }
+                    PREFIX_INSTRUCTIONS[opcode].description.to_owned()
                 }
                 ty => unreachable!("unhandled data type: {}", ty),
             };
