@@ -336,21 +336,12 @@ impl Registers {
     pub fn sbc(&mut self, rhs: u8) {
         let carry_bit = self.f.contains(Flags::CARRY) as u8;
 
-        let (difference, is_half_carry_rhs) = self.a.half_carry_sub(rhs);
-        let (_, is_half_carry_bit) = difference.half_carry_sub(carry_bit);
-
-        let (difference, is_carry_rhs) = self.a.overflowing_sub(rhs);
-        let (difference, is_carry_bit) = difference.overflowing_sub(carry_bit);
-
-        self.a = difference;
-
-        self.f.set(Flags::ZERO, self.a == 0);
         self.f.insert(Flags::SUBTRACT);
-        self.f.set(
-            Flags::HALF_CARRY,
-            is_half_carry_rhs || is_half_carry_bit,
-        );
-        self.f.set(Flags::CARRY, is_carry_rhs || is_carry_bit);
+        self.f.set(Flags::CARRY, u16::from(self.a) < u16::from(rhs) + u16::from(carry_bit));
+        self.f.set(Flags::HALF_CARRY, (self.a & 0xf) < (rhs & 0xf) + carry_bit);
+
+        self.a = self.a.wrapping_sub(rhs).wrapping_sub(carry_bit);
+        self.f.set(Flags::ZERO, self.a == 0);
     }
 
     /// Performs an exclusive OR with the accumulator and sets the zero flag appropriately. Unsets
