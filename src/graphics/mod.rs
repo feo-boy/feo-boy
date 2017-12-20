@@ -393,11 +393,13 @@ impl Ppu {
             let tile_offset = x_position / 8;
 
             // Get the address of the tile in memory.
-            let tile_id_address = if using_window {
-                self.control.window_map_start.address() + &tile_row_offset.into()
-                    + &tile_offset.into()
-            } else {
-                self.control.bg_map_start.address() + &tile_row_offset.into() + &tile_offset.into()
+            let tile_id_address = {
+                let tile_start_address = if using_window {
+                    self.control.window_map_start.address()
+                } else {
+                    self.control.bg_map_start.address()
+                };
+                tile_start_address + tile_row_offset + u16::from(tile_offset)
             };
 
             let tile_id = self.read_byte(tile_id_address);

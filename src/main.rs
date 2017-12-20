@@ -28,7 +28,7 @@ struct Config {
     debug: bool,
 }
 
-fn start_emulator(config: Config) -> Result<()> {
+fn start_emulator(config: &Config) -> Result<()> {
     let mut emulator = if config.debug {
         Emulator::new_with_debug()
     } else {
@@ -158,7 +158,7 @@ fn run() -> Result<()> {
         scaling,
     };
 
-    start_emulator(config)
+    start_emulator(&config)
 }
 
 fn main() {

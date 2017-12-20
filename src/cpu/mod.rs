@@ -107,7 +107,7 @@ impl Cpu {
         match self.state {
             State::Running => {
                 let instruction = self.fetch(bus);
-                self.execute(instruction, bus)
+                self.execute(&instruction, bus)
             }
             State::Halted => self.clock.tick(4), // Tick the duration of a NOP.
             _ => unimplemented!(),

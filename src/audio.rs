@@ -1,6 +1,6 @@
 //! Audio-related functionality.
 //!
-//! Contains an implmentation of the GameBoy sound hardware.
+//! Contains an implementation of the Game Boy sound hardware.
 
 use bytes::ByteExt;
 
@@ -111,7 +111,7 @@ pub struct Frequency {
 impl Frequency {
     /// Modifies the lower 8 bits of the 11-bit frequency according to the written byte.
     pub fn write_lo(&mut self, byte: u8) {
-        self.frequency = (self.frequency & 0xFF00) | (byte as u16);
+        self.frequency = (self.frequency & 0xFF00) | u16::from(byte);
     }
 
     /// Gets the result of reading the high bits of the frequency data.
@@ -126,11 +126,11 @@ impl Frequency {
     pub fn write_hi(&mut self, byte: u8) {
         self.initial = byte.has_bit_set(7);
         self.counter = byte.has_bit_set(6);
-        self.frequency = (((byte & 0x7) as u16) << 8) | (self.frequency & 0xFF);
+        self.frequency = ((u16::from(byte & 0x7)) << 8) | (self.frequency & 0xFF);
     }
 }
 
-/// A single GameBoy sound channel.
+/// A single Game Boy sound channel.
 #[derive(Debug, Default)]
 pub struct Sound {
     /// Whether or not the sound is enabled.
@@ -155,7 +155,7 @@ pub struct Sound {
     pub frequency: Frequency,
 }
 
-/// The controller for the four sound channels output by the GameBoy.
+/// The controller for the four sound channels output by the Game Boy.
 #[derive(Debug, Default)]
 pub struct SoundController {
     /// Sound 1: Rectangle waveform with sweep and envelope functions.
@@ -205,6 +205,7 @@ impl Addressable for SoundController {
             return 0xFF;
         }
 
+        #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         match address {
             // NR10: Sound 1 sweep register
             // Bit 6-4 - Sweep time
@@ -263,7 +264,7 @@ impl Addressable for SoundController {
                     "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
                     address
                 );
-                return 0xFF;
+                0xFF
             }
 
             // NR50: Channel control / ON-OFF / Volume

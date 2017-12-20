@@ -209,7 +209,7 @@ impl Mmu {
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
             0x01 => {
-                self.mbc = Some(Box::new(Mbc1::new(self.cartridge_rom.clone())));
+                self.mbc = Some(Box::new(Mbc1::new(Rc::clone(&self.cartridge_rom))));
                 "MBC1"
             }
             0x02 => "MBC1+RAM",
@@ -226,7 +226,7 @@ impl Mmu {
             0x11 => "MBC3",
             0x12 => "MBC3+RAM",
             0x13 => {
-                self.mbc = Some(Box::new(Mbc3::new(self.cartridge_rom.clone())));
+                self.mbc = Some(Box::new(Mbc3::new(Rc::clone(&self.cartridge_rom))));
                 "MBC3+RAM+BATTERY"
             }
             0x19 => "MBC5",

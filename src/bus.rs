@@ -1,7 +1,5 @@
 //! Inter-component communication.
 
-#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
-
 use std::fmt::{self, Display};
 use std::ops::Range;
 
@@ -65,6 +63,7 @@ impl Bus {
             ..
         } = *self;
 
+        #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         match address {
             // P1/JOYP - Joypad
             0xFF00 => {

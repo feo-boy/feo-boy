@@ -178,7 +178,7 @@ impl super::Cpu {
     ///
     /// All necessary side effects are performed, including updating the program counter, flag
     /// registers, and CPU clock.
-    pub fn execute(&mut self, instruction: Instruction, bus: &mut Bus) {
+    pub fn execute(&mut self, instruction: &Instruction, bus: &mut Bus) {
         debug!("executing {:#06x} {}", self.reg.pc, instruction.to_string());
         trace!("{:?}", instruction);
 
@@ -1885,7 +1885,7 @@ mod tests {
             ..Default::default()
         };
 
-        cpu.execute(nop, &mut bus);
+        cpu.execute(&nop, &mut bus);
         assert_eq!(cpu.clock.diff(), 4);
     }
 
@@ -1901,7 +1901,7 @@ mod tests {
             def: &INSTRUCTIONS[0xff],
             operands: Default::default(),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0x38);
         assert_eq!(cpu.pop(&bus), 0xAB + 1);
@@ -1919,7 +1919,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
         assert_eq!(cpu.clock.diff(), 12);
 
@@ -1928,7 +1928,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
         assert_eq!(cpu.clock.diff(), 12);
 
@@ -1938,7 +1938,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 6);
         assert_eq!(cpu.clock.diff(), 8);
     }
@@ -1970,7 +1970,7 @@ mod tests {
             def: &INSTRUCTIONS[0xe2],
             operands: Default::default(),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xFF42), 0xab);
     }
@@ -1987,7 +1987,7 @@ mod tests {
             def: &INSTRUCTIONS[0xf2],
             ..Default::default()
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xBE);
     }
@@ -2003,7 +2003,7 @@ mod tests {
             def: &INSTRUCTIONS[0xea],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xc000), 0x11);
     }
@@ -2019,7 +2019,7 @@ mod tests {
             def: &INSTRUCTIONS[0xfa],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xaa);
     }
@@ -2035,7 +2035,7 @@ mod tests {
             def: &INSTRUCTIONS[0x08],
             operands: SmallVec::from_slice(&[0x00, 0xC1]),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xC100), 0xF8);
         assert_eq!(bus.read_byte(0xC101), 0xFF);
@@ -2078,7 +2078,7 @@ mod tests {
             def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
-        cpu.execute(instruction_1, &mut bus);
+        cpu.execute(&instruction_1, &mut bus);
 
         assert_eq!(cpu.reg.f, Flags::CARRY);
 
@@ -2090,7 +2090,7 @@ mod tests {
             def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
-        cpu.execute(instruction_2, &mut bus);
+        cpu.execute(&instruction_2, &mut bus);
 
         assert_eq!(cpu.reg.f, Flags::ZERO | Flags::CARRY);
     }
@@ -2107,7 +2107,7 @@ mod tests {
             def: &INSTRUCTIONS[0xe9],
             operands: SmallVec::new(),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0xbeef);
     }
@@ -2124,7 +2124,7 @@ mod tests {
             def: &INSTRUCTIONS[0xf9],
             operands: SmallVec::new(),
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.sp, 0xbeef);
     }
@@ -2140,7 +2140,7 @@ mod tests {
             def: &INSTRUCTIONS[0xF1],
             ..Default::default()
         };
-        cpu.execute(instruction, &mut bus);
+        cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xFF);
         assert_eq!(cpu.reg.f.bits(), 0xF0);

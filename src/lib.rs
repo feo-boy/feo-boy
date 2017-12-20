@@ -194,7 +194,7 @@ impl Emulator {
                     Ok(line) => {
                         self.debug.as_mut().unwrap().editor.add_history_entry(&line);
                         // FIXME: Don't propagate this error.
-                        tui::parse_command(self, &line.trim())?
+                        tui::parse_command(self, line.trim())?
                     }
                     Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => process::exit(0),
                     Err(err) => panic!("{}", err),

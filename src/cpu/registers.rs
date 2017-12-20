@@ -377,7 +377,7 @@ impl Registers {
                 self.a = self.a.wrapping_sub(0x06);
             }
         } else {
-            if c || (self.a & 0xFF) > 0x99 {
+            if c || self.a > 0x99 {
                 self.a = self.a.wrapping_add(0x60);
                 self.f.insert(Flags::CARRY);
             }
