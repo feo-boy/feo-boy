@@ -1,4 +1,4 @@
-use image::{Rgba};
+use image::Rgba;
 
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

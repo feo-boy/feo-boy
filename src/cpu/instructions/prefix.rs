@@ -1,5 +1,5 @@
 use bus::Bus;
-use cpu::{Cpu, arithmetic};
+use cpu::{arithmetic, Cpu};
 use memory::Addressable;
 
 /// Macro to quickly define all prefix instructions.
@@ -475,13 +475,11 @@ impl Cpu {
             0xff => arithmetic::set(&mut self.reg.a, 7),
 
             // error
-            catch => {
-                panic!(
-                    "unimplemented prefix instruction {:#0x} at {:#0x}",
-                    catch,
-                    self.reg.pc + 1
-                )
-            }
+            catch => panic!(
+                "unimplemented prefix instruction {:#0x} at {:#0x}",
+                catch,
+                self.reg.pc + 1
+            ),
         }
     }
 }
@@ -760,6 +758,7 @@ mod tests {
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         let timings: Vec<u8> = vec![
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
@@ -783,8 +782,10 @@ mod tests {
             let clock_cycles = timing * 4;
 
             if clock_cycles != instruction.cycles {
-                panic!("wrong timing for {:?}: has {}, expected {}",
-                       instruction.description, instruction.cycles, clock_cycles);
+                panic!(
+                    "wrong timing for {:?}: has {}, expected {}",
+                    instruction.description, instruction.cycles, clock_cycles
+                );
             }
         }
     }

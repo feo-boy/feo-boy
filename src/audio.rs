@@ -331,12 +331,10 @@ impl Addressable for SoundController {
                 byte
             }
 
-            _ => {
-                panic!(
-                    "read out-of-range address in the sound controller: {:#0x}",
-                    address
-                )
-            }
+            _ => panic!(
+                "read out-of-range address in the sound controller: {:#0x}",
+                address
+            ),
         }
     }
 
@@ -504,12 +502,10 @@ impl Addressable for SoundController {
                 warn!("attempted to modify wave pattern RAM (unimplemented)");
             }
 
-            _ => {
-                panic!(
-                    "write out-of-range address in the sound controller: {:#0x}",
-                    address
-                )
-            }
+            _ => panic!(
+                "write out-of-range address in the sound controller: {:#0x}",
+                address
+            ),
         }
     }
 }
@@ -522,7 +518,7 @@ mod tests {
 
     use memory::Addressable;
 
-    use super::{Sweep, Wave, Envelope, Frequency, SoundController};
+    use super::{Envelope, Frequency, SoundController, Sweep, Wave};
 
     #[test]
     fn sweep_read() {

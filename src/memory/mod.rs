@@ -9,27 +9,28 @@ use std::fmt::{self, Debug, Formatter};
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use byteorder::{BigEndian, LittleEndian, ByteOrder};
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 
 use StdResult;
-use self::mbc::{Mbc1, Mbc3, Mbc};
+use self::mbc::{Mbc, Mbc1, Mbc3};
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
 #[derive(Debug, Fail)]
 pub enum BiosError {
-    #[fail(display = "the BIOS must be exactly 256 bytes")]
-    InvalidSize,
+    #[fail(display = "the BIOS must be exactly 256 bytes")] InvalidSize,
 }
 
 #[derive(Debug, Fail)]
 pub enum CartridgeError {
-    #[fail(display = "the size of the ROM must be at least 32KB")]
-    InvalidSize,
+    #[fail(display = "the size of the ROM must be at least 32KB")] InvalidSize,
 
     #[fail(display = "the header checksum {:#02} is not equal to sum {:#02}", checksum, sum)]
-    BadChecksum { checksum: u8, sum: u8 },
+    BadChecksum {
+        checksum: u8,
+        sum: u8,
+    },
 }
 
 /// Operations for memory-like structs.
@@ -210,7 +211,7 @@ impl Mmu {
             0x01 => {
                 self.mbc = Some(Box::new(Mbc1::new(self.cartridge_rom.clone())));
                 "MBC1"
-            },
+            }
             0x02 => "MBC1+RAM",
             0x03 => "MBC1+RAM+BATTERY",
             0x05 => "MBC2",
@@ -299,8 +300,7 @@ impl Mmu {
         } else {
             info!(
                 "global checksum FAILED: {:#04x} (sum) != {:#04x} (checksum)",
-                global_sum,
-                global_checksum
+                global_sum, global_checksum
             );
         }
 
@@ -337,12 +337,10 @@ impl Mmu {
             }
 
             // ROM Banks
-            0x0000...0x7FFF => {
-                match self.mbc {
-                    Some(ref mbc) => mbc.read_byte(address),
-                    None => self.mem.rom[address as usize],
-                }
-            }
+            0x0000...0x7FFF => match self.mbc {
+                Some(ref mbc) => mbc.read_byte(address),
+                None => self.mem.rom[address as usize],
+            },
 
             // Graphics RAM
             0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
@@ -394,13 +392,10 @@ impl Mmu {
 
                 match self.mbc {
                     Some(ref mut mbc) => mbc.write_byte(address, byte),
-                    None => {
-                        warn!(
-                            "attempted to write {:#04x} to read-only memory at {:#06x}",
-                            byte,
-                            address
-                        )
-                    }
+                    None => warn!(
+                        "attempted to write {:#04x} to read-only memory at {:#06x}",
+                        byte, address
+                    ),
                 }
             }
 

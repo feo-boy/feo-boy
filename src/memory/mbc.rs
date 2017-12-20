@@ -1,4 +1,3 @@
-
 use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
 use super::Addressable;
@@ -20,10 +19,7 @@ pub struct Mbc1 {
 
 impl Mbc1 {
     pub fn new(rom: Rc<Vec<u8>>) -> Mbc1 {
-        Mbc1 {
-            rom,
-            bank_num: 1,
-        }
+        Mbc1 { rom, bank_num: 1 }
     }
 }
 
@@ -35,22 +31,23 @@ impl super::Addressable for Mbc1 {
                 let bank_start = u32::from(self.bank_num) * ROM_BANK_SIZE as u32;
                 let address_offset = u32::from(address) - 0x4000;
                 self.rom[(bank_start + address_offset) as usize]
-            },
-            0xA000...0xBFFF => unimplemented!(),  // TODO: support RAM
+            }
+            0xA000...0xBFFF => unimplemented!(), // TODO: support RAM
             _ => unreachable!(),
         }
     }
 
     fn write_byte(&mut self, address: u16, value: u8) {
         match address {
-            0x0000...0x1FFF => unimplemented!(),  // TODO: support RAM
+            0x0000...0x1FFF => unimplemented!(), // TODO: support RAM
             0x2000...0x3FFF => {
                 self.bank_num = value & 0x1F;
-                if self.bank_num == 0x00
-                    || self.bank_num == 0x20 || self.bank_num == 0x40 || self.bank_num == 0x60 {
+                if self.bank_num == 0x00 || self.bank_num == 0x20 || self.bank_num == 0x40
+                    || self.bank_num == 0x60
+                {
                     self.bank_num += 1;
                 }
-            },
+            }
             _ => unimplemented!(),
         }
     }
@@ -92,28 +89,26 @@ impl super::Addressable for Mbc3 {
 
             // ROM Bank 01-7f (RO)
             0x4000...0x7fff => {
-                let addr: usize = (self.rom_select as usize) * ROM_BANK_SIZE +
-                    (address as usize) - 0x4000;
+                let addr: usize =
+                    (self.rom_select as usize) * ROM_BANK_SIZE + (address as usize) - 0x4000;
                 self.rom[addr]
             }
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
-            0xa000...0xbfff => {
-                match self.ram_rtc_select {
-                    RamRtcSelect::Ram(bank_num) => {
-                        debug_assert!(bank_num <= 3);
-                        let addr: usize = (bank_num as usize) * RAM_BANK_RTC_REG_SIZE +
-                            (address as usize) - 0xa000;
-                        self.ram[addr]
-                    }
-                    RamRtcSelect::Rtc(rtc_num) => {
-                        debug_assert!(rtc_num <= 4);
-                        let addr: usize = (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE +
-                            (address as usize) - 0xa000;
-                        self.rtc[addr]
-                    }
+            0xa000...0xbfff => match self.ram_rtc_select {
+                RamRtcSelect::Ram(bank_num) => {
+                    debug_assert!(bank_num <= 3);
+                    let addr: usize =
+                        (bank_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
+                    self.ram[addr]
                 }
-            }
+                RamRtcSelect::Rtc(rtc_num) => {
+                    debug_assert!(rtc_num <= 4);
+                    let addr: usize =
+                        (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
+                    self.rtc[addr]
+                }
+            },
 
             // Error Read
             _ => unreachable!(),
@@ -150,31 +145,27 @@ impl super::Addressable for Mbc3 {
             }
 
             // Latch Clock Data (WO)
-            0x6000...0x7fff => {
-                match value {
-                    0x00 => unimplemented!(),
-                    0x01 => unimplemented!(),
-                    _ => unimplemented!(),
-                }
-            }
+            0x6000...0x7fff => match value {
+                0x00 => unimplemented!(),
+                0x01 => unimplemented!(),
+                _ => unimplemented!(),
+            },
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
-            0xa000...0xbfff => {
-                match self.ram_rtc_select {
-                    RamRtcSelect::Ram(bank_num) => {
-                        debug_assert!(bank_num <= 3);
-                        let addr: usize = (bank_num as usize) * RAM_BANK_RTC_REG_SIZE +
-                            (address as usize) - 0xa000;
-                        self.ram[addr] = value;
-                    }
-                    RamRtcSelect::Rtc(rtc_num) => {
-                        debug_assert!(rtc_num <= 4);
-                        let addr: usize = (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE +
-                            (address as usize) - 0xa000;
-                        self.rtc[addr] = value;
-                    }
+            0xa000...0xbfff => match self.ram_rtc_select {
+                RamRtcSelect::Ram(bank_num) => {
+                    debug_assert!(bank_num <= 3);
+                    let addr: usize =
+                        (bank_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
+                    self.ram[addr] = value;
                 }
-            }
+                RamRtcSelect::Rtc(rtc_num) => {
+                    debug_assert!(rtc_num <= 4);
+                    let addr: usize =
+                        (rtc_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
+                    self.rtc[addr] = value;
+                }
+            },
 
             _ => unreachable!(),
         }

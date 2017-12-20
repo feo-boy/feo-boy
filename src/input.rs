@@ -35,8 +35,8 @@ pub struct ButtonState {
 
 impl ButtonState {
     pub fn is_pressed(&self, button: Button) -> bool {
-        if (button.is_direction() && self.select.contains(SelectFlags::DIRECTION)) ||
-            (!button.is_direction() && self.select.contains(SelectFlags::BUTTON))
+        if (button.is_direction() && self.select.contains(SelectFlags::DIRECTION))
+            || (!button.is_direction() && self.select.contains(SelectFlags::BUTTON))
         {
             self.pressed[button as usize]
         } else {

@@ -16,7 +16,7 @@ use memory::{Addressable, Mmu};
 
 pub use self::clock::Clock;
 pub use self::instructions::Instruction;
-pub use self::registers::{Registers, Flags};
+pub use self::registers::{Flags, Registers};
 pub use self::timer::Timer;
 
 /// Current state of the CPU.
@@ -109,7 +109,7 @@ impl Cpu {
                 let instruction = self.fetch(bus);
                 self.execute(instruction, bus)
             }
-            State::Halted => self.clock.tick(4),    // Tick the duration of a NOP.
+            State::Halted => self.clock.tick(4), // Tick the duration of a NOP.
             _ => unimplemented!(),
         }
     }

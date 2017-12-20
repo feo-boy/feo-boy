@@ -5,7 +5,7 @@ use std::fmt;
 use std::num::Wrapping;
 use std::ops::{AddAssign, SubAssign};
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 use bytes::{ByteExt, WordExt};
 use cpu::arithmetic;
@@ -289,10 +289,8 @@ impl Registers {
 
         self.f.set(Flags::ZERO, self.a == 0);
         self.f.remove(Flags::SUBTRACT);
-        self.f.set(
-            Flags::HALF_CARRY,
-            is_half_carry_rhs || is_half_carry_bit,
-        );
+        self.f
+            .set(Flags::HALF_CARRY, is_half_carry_rhs || is_half_carry_bit);
         self.f.set(Flags::CARRY, is_carry_rhs || is_carry_bit);
     }
 
@@ -337,8 +335,12 @@ impl Registers {
         let carry_bit = self.f.contains(Flags::CARRY) as u8;
 
         self.f.insert(Flags::SUBTRACT);
-        self.f.set(Flags::CARRY, u16::from(self.a) < u16::from(rhs) + u16::from(carry_bit));
-        self.f.set(Flags::HALF_CARRY, (self.a & 0xf) < (rhs & 0xf) + carry_bit);
+        self.f.set(
+            Flags::CARRY,
+            u16::from(self.a) < u16::from(rhs) + u16::from(carry_bit),
+        );
+        self.f
+            .set(Flags::HALF_CARRY, (self.a & 0xf) < (rhs & 0xf) + carry_bit);
 
         self.a = self.a.wrapping_sub(rhs).wrapping_sub(carry_bit);
         self.f.set(Flags::ZERO, self.a == 0);
@@ -443,14 +445,10 @@ impl Registers {
         let low_byte = self.sp as u8;
 
         self.f = Flags::empty();
-        self.f.set(
-            Flags::HALF_CARRY,
-            low_byte.half_carry_add(rhs as u8).1,
-        );
-        self.f.set(
-            Flags::CARRY,
-            low_byte.checked_add(rhs as u8).is_none(),
-        );
+        self.f
+            .set(Flags::HALF_CARRY, low_byte.half_carry_add(rhs as u8).1);
+        self.f
+            .set(Flags::CARRY, low_byte.checked_add(rhs as u8).is_none());
     }
 }
 
@@ -475,7 +473,7 @@ impl fmt::Display for Registers {
 mod tests {
     use std::ops::SubAssign;
 
-    use super::{Registers, Flags};
+    use super::{Flags, Registers};
 
     #[test]
     fn add() {
@@ -862,7 +860,6 @@ mod tests {
                 assert!(registers.f.contains(Flags::CARRY));
             }
         }
-
 
         // Test with only half-carry flag set
         for i in 0x00..0xff {

@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 use bytes::ByteExt;
 use cpu::{Interrupts, Timer};
-use graphics::{Ppu, TileMapStart, TileDataStart, SpriteSize};
+use graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
 use audio::SoundController;
 use input::{Button, ButtonState, SelectFlags};
 use memory::{Addressable, Mmu};
@@ -72,26 +72,24 @@ impl Bus {
 
                 register.set_bit(
                     0,
-                    !(button_state.is_pressed(Button::Right) ||
-                          button_state.is_pressed(Button::A)),
+                    !(button_state.is_pressed(Button::Right) || button_state.is_pressed(Button::A)),
                 );
 
                 register.set_bit(
                     1,
-                    !(button_state.is_pressed(Button::Left) ||
-                          button_state.is_pressed(Button::B)),
+                    !(button_state.is_pressed(Button::Left) || button_state.is_pressed(Button::B)),
                 );
 
                 register.set_bit(
                     2,
-                    !(button_state.is_pressed(Button::Up) ||
-                          button_state.is_pressed(Button::Select)),
+                    !(button_state.is_pressed(Button::Up)
+                        || button_state.is_pressed(Button::Select)),
                 );
 
                 register.set_bit(
                     3,
-                    !(button_state.is_pressed(Button::Down) ||
-                          button_state.is_pressed(Button::Start)),
+                    !(button_state.is_pressed(Button::Down)
+                        || button_state.is_pressed(Button::Start)),
                 );
 
                 // Sets bits 4 and 5.
@@ -540,9 +538,9 @@ impl<'a> Iterator for MemoryIterator<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.address_iter.next().map(|addr| {
-            self.bus.read_byte(addr as u16)
-        })
+        self.address_iter
+            .next()
+            .map(|addr| self.bus.read_byte(addr as u16))
     }
 }
 
@@ -574,7 +572,7 @@ impl Display for Bus {
 mod tests {
     use super::Bus;
 
-    use std::{u8, u16};
+    use std::{u16, u8};
 
     use quickcheck::{QuickCheck, StdGen, TestResult};
     use rand;

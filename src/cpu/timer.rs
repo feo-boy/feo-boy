@@ -51,10 +51,10 @@ impl Timer {
 
         // The timer will increment at a frequency determined by the control register.
         let threshold: u16 = match self.reg.control & 0x3 {
-            0 => 256,       // 4KHz
-            1 => 4,         // 256KHz
-            2 => 16,        // 64KHz
-            3 => 64,        // 16KHz
+            0 => 256, // 4KHz
+            1 => 4,   // 256KHz
+            2 => 16,  // 64KHz
+            3 => 64,  // 16KHz
             _ => unreachable!(),
         };
 

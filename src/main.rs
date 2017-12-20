@@ -39,7 +39,9 @@ fn start_emulator(config: Config) -> Result<()> {
         emulator.load_bios(bios).context("could not load BIOS")?;
     }
 
-    emulator.load_rom(&config.rom).context("could not load ROM")?;
+    emulator
+        .load_rom(&config.rom)
+        .context("could not load ROM")?;
 
     emulator.reset();
 
@@ -120,12 +122,14 @@ fn run() -> Result<()> {
         .version(crate_version!())
         .author(crate_authors!("\n"))
         .about(crate_description!())
-        .arg(Arg::with_name("rom").required(true).help(
-            "a file containing a ROM to load into the emulator",
-        ))
+        .arg(
+            Arg::with_name("rom")
+                .required(true)
+                .help("a file containing a ROM to load into the emulator"),
+        )
         .arg(Arg::with_name("bios").long("bios").takes_value(true).help(
             "a file containing a binary dump of the Game Boy BIOS. If not supplied, the emulator \
-            will begin executing the ROM as if the BIOS had succeeded",
+             will begin executing the ROM as if the BIOS had succeeded",
         ))
         .arg(
             Arg::with_name("scaling")
@@ -135,9 +139,12 @@ fn run() -> Result<()> {
                 .default_value("1")
                 .help("amount to scale the emulator screen by"),
         )
-        .arg(Arg::with_name("debug").long("debug").short("d").help(
-            "Enable debug mode",
-        ))
+        .arg(
+            Arg::with_name("debug")
+                .long("debug")
+                .short("d")
+                .help("Enable debug mode"),
+        )
         .get_matches();
 
     let bios = matches.value_of("bios").map(PathBuf::from);

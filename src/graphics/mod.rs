@@ -13,7 +13,7 @@ use memory::Addressable;
 
 mod palette;
 
-pub use self::palette::{Shade, BackgroundPalette, SpritePalette};
+pub use self::palette::{BackgroundPalette, Shade, SpritePalette};
 
 /// The width and height of the Game Boy screen.
 pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
@@ -202,7 +202,6 @@ impl Default for Mode {
         Mode::VerticalBlank
     }
 }
-
 
 /// The picture processing unit.
 #[derive(Debug, Default)]
@@ -395,8 +394,8 @@ impl Ppu {
 
             // Get the address of the tile in memory.
             let tile_id_address = if using_window {
-                self.control.window_map_start.address() + &tile_row_offset.into() +
-                    &tile_offset.into()
+                self.control.window_map_start.address() + &tile_row_offset.into()
+                    + &tile_offset.into()
             } else {
                 self.control.bg_map_start.address() + &tile_row_offset.into() + &tile_offset.into()
             };
@@ -490,8 +489,8 @@ impl Ppu {
                 // Get the address of the color information within the sprite tile data. The color
                 // is stored as two bytes corresponding to an 8-pixel line, as with background
                 // tiles.
-                let data_address: u16 = (SPRITE_TILE_DATA_START + (u16::from(tile_location) * 16)) +
-                    current_line as u16;
+                let data_address: u16 = (SPRITE_TILE_DATA_START + (u16::from(tile_location) * 16))
+                    + current_line as u16;
                 let color_row = self.read_word(data_address);
 
                 // Find the shade for each pixel in the line
@@ -522,9 +521,9 @@ impl Ppu {
                     let shade_number = Self::shade_number(color_row, color_bit);
 
                     if let Some(shade) = sprite_palette.get(shade_number) {
-
-                        if !behind_bg ||
-                            self.pixels.0[self.line as usize][pixel as usize] == Shade::White {
+                        if !behind_bg
+                            || self.pixels.0[self.line as usize][pixel as usize] == Shade::White
+                        {
                             self.pixels.0[self.line as usize][pixel as usize] = shade;
                         }
                     }
@@ -611,7 +610,8 @@ mod tests {
     use bytes::ByteExt;
     use memory::Addressable;
 
-    use super::{Ppu, Shade, TileMapStart, TileDataStart, SpriteSize, BackgroundPalette, SpritePalette};
+    use super::{BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart,
+                TileMapStart};
 
     #[test]
     fn chram() {
@@ -781,7 +781,8 @@ mod tests {
             Shade::DarkGray,
             Shade::Black,
         ]);
-        ppu.sprite_palette = [SpritePalette::new([
+        ppu.sprite_palette = [
+            SpritePalette::new([
                 Shade::White,
                 Shade::LightGray,
                 Shade::DarkGray,
@@ -922,7 +923,7 @@ mod tests {
                 Shade::LightGray,
                 Shade::DarkGray,
                 Shade::Black,
-            ])
+            ]),
         ];
 
         // Set the state of the PPU

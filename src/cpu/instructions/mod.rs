@@ -4,12 +4,12 @@ use std::fmt::{self, Display};
 use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, LittleEndian};
-use regex::{Regex, NoExpand};
+use regex::{NoExpand, Regex};
 use smallvec::SmallVec;
 
 use bus::Bus;
 use bytes::WordExt;
-use cpu::{arithmetic, State, Flags};
+use cpu::{arithmetic, Flags, State};
 use memory::Addressable;
 
 mod prefix;
@@ -285,25 +285,19 @@ impl super::Cpu {
             }
 
             // LD BC,d16
-            0x01 => {
-                self.reg.bc_mut().write(LittleEndian::read_u16(
-                    &instruction.operands,
-                ))
-            }
+            0x01 => self.reg
+                .bc_mut()
+                .write(LittleEndian::read_u16(&instruction.operands)),
 
             // LD DE,d16
-            0x11 => {
-                self.reg.de_mut().write(LittleEndian::read_u16(
-                    &instruction.operands,
-                ))
-            }
+            0x11 => self.reg
+                .de_mut()
+                .write(LittleEndian::read_u16(&instruction.operands)),
 
             // LD HL,d16
-            0x21 => {
-                self.reg.hl_mut().write(LittleEndian::read_u16(
-                    &instruction.operands,
-                ))
-            }
+            0x21 => self.reg
+                .hl_mut()
+                .write(LittleEndian::read_u16(&instruction.operands)),
 
             // LD SP,d16
             0x31 => self.reg.sp = LittleEndian::read_u16(&instruction.operands),
@@ -1672,11 +1666,12 @@ mod tests {
     use cpu::{Cpu, Flags};
     use memory::Addressable;
 
-    use super::{INSTRUCTIONS, Instruction, InstructionDef};
+    use super::{Instruction, InstructionDef, INSTRUCTIONS};
 
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         let timings: Vec<u8> = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
@@ -1696,6 +1691,7 @@ mod tests {
             3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
         ];
 
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         let condition_timings: Vec<u8> = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
@@ -1728,16 +1724,20 @@ mod tests {
             let clock_cycles = timing * 4;
 
             if clock_cycles != instruction.cycles {
-                panic!("wrong timing for {}: has {}, expected {}",
-                       instruction.description, instruction.cycles, clock_cycles);
+                panic!(
+                    "wrong timing for {}: has {}, expected {}",
+                    instruction.description, instruction.cycles, clock_cycles
+                );
             }
 
             if let Some(condition_cycles) = instruction.condition_cycles {
                 let clock_cycles = condition_timings[byte as usize] * 4;
 
                 if clock_cycles != condition_cycles {
-                    panic!("wrong condition timing for {}: has {}, expected {}",
-                           instruction.description, condition_cycles, clock_cycles);
+                    panic!(
+                        "wrong condition timing for {}: has {}, expected {}",
+                        instruction.description, condition_cycles, clock_cycles
+                    );
                 }
             }
         }
@@ -2082,9 +2082,9 @@ mod tests {
 
         assert_eq!(cpu.reg.f, Flags::CARRY);
 
-        cpu.reg.f.insert(
-            Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY,
-        );
+        cpu.reg
+            .f
+            .insert(Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
 
         let instruction_2 = Instruction {
             def: &INSTRUCTIONS[0x37],

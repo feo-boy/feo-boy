@@ -12,7 +12,7 @@ pub static COMMANDS: &str = "sblrpdcq?";
 /// Parse and execute a debugger command from a line of input.
 pub fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
     if command.is_empty() {
-        return Ok(())
+        return Ok(());
     }
 
     match &command[..1] {
@@ -71,7 +71,9 @@ fn parse_step(command: &str) -> Result<Option<i32>> {
         _ => bail!("`s` takes a single optional argument"),
     }
 
-    let step = components[1].parse::<i32>().context("could not parse step count")?;
+    let step = components[1]
+        .parse::<i32>()
+        .context("could not parse step count")?;
 
     Ok(Some(step))
 }
@@ -88,9 +90,8 @@ fn parse_breakpoint(command: &str) -> Result<u16> {
         bail!("breakpoint must start with '0x'");
     }
 
-    let breakpoint = u16::from_str_radix(&breakpoint[2..], 16).context(
-        "could not parse hexadecimal number",
-    )?;
+    let breakpoint =
+        u16::from_str_radix(&breakpoint[2..], 16).context("could not parse hexadecimal number")?;
     Ok(breakpoint)
 }
 

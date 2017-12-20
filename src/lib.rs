@@ -8,9 +8,9 @@ extern crate bitflags;
 #[macro_use]
 extern crate failure;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
 
 extern crate byteorder;
 extern crate image;
@@ -196,8 +196,7 @@ impl Emulator {
                         // FIXME: Don't propagate this error.
                         tui::parse_command(self, &line.trim())?
                     }
-                    Err(ReadlineError::Interrupted) |
-                    Err(ReadlineError::Eof) => process::exit(0),
+                    Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => process::exit(0),
                     Err(err) => panic!("{}", err),
                 }
             } else {
@@ -230,9 +229,9 @@ impl Emulator {
 
     /// Return a list of active breakpoints.
     pub fn breakpoints(&self) -> Vec<u16> {
-        self.debug.as_ref().map_or(vec![], |d| {
-            d.breakpoints.iter().cloned().collect()
-        })
+        self.debug
+            .as_ref()
+            .map_or(vec![], |d| d.breakpoints.iter().cloned().collect())
     }
 
     /// Returns the current value of the program counter and the instruction at that memory
@@ -304,10 +303,9 @@ mod tests {
         ];
 
         for (offset, byte) in test_program.into_iter().enumerate() {
-            emulator.bus.write_byte(
-                emulator.cpu.reg.pc + offset as u16,
-                *byte,
-            );
+            emulator
+                .bus
+                .write_byte(emulator.cpu.reg.pc + offset as u16, *byte);
         }
 
         emulator.step();
