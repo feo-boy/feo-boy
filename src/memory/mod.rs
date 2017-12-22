@@ -80,9 +80,6 @@ struct Memory {
     /// Bank 1 memory may be switched to other banks by the cartridge.
     rom: [u8; 0x8000],
 
-    /// Cartridge external RAM.
-    eram: [u8; 0x2000],
-
     /// Working RAM.
     wram: [u8; 0x2000],
 
@@ -97,7 +94,6 @@ impl Default for Memory {
         Memory {
             bios: None,
             rom: [0; 0x8000],
-            eram: [0; 0x2000],
             wram: [0; 0x2000],
             zram: [0; 0x0080],
         }
@@ -108,14 +104,12 @@ impl Debug for Memory {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let bios: Option<&[u8]> = self.bios.as_ref().map(|b| &b[..]);
         let rom: &[u8] = &self.rom;
-        let eram: &[u8] = &self.eram;
         let wram: &[u8] = &self.wram;
         let zram: &[u8] = &self.zram;
 
         f.debug_struct("Memory")
             .field("bios", &bios)
             .field("rom", &rom)
-            .field("eram", &eram)
             .field("wram", &wram)
             .field("zram", &zram)
             .finish()
@@ -346,10 +340,10 @@ impl Mmu {
             0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
-            0xA000...0xBFFF => {
-                let index = address & 0x1FFF;
-                self.mem.eram[index as usize]
-            }
+            0xA000...0xBFFF => match self.mbc {
+                Some(ref mbc) => mbc.read_byte(address),
+                None => 0xFF,
+            },
 
             // Working RAM
             0xC000...0xFDFF => {
@@ -403,10 +397,10 @@ impl Mmu {
             0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
-            0xA000...0xBFFF => {
-                let index = address & 0x1FFF;
-                self.mem.eram[index as usize] = byte;
-            }
+            0xA000...0xBFFF => match self.mbc {
+                Some(ref mut mbc) => mbc.write_byte(address, byte),
+                None => (),
+            },
 
             // Working RAM
             0xC000...0xFDFF => {
@@ -457,17 +451,6 @@ mod tests {
 
         mmu.mem.rom[0x7FFF] = 3;
         assert_eq!(mmu.read_byte(0x7FFF), 3);
-    }
-
-    #[test]
-    fn eram() {
-        let mut mmu = Mmu::default();
-
-        mmu.mem.eram[0] = 1;
-        assert_eq!(mmu.read_byte(0xA000), 1);
-
-        mmu.mem.eram[0x1FFF] = 2;
-        assert_eq!(mmu.read_byte(0xBFFF), 2);
     }
 
     #[test]

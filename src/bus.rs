@@ -584,7 +584,9 @@ mod tests {
     fn read_write() {
         fn read_write(address: u16, value: u8) -> TestResult {
             match address {
-                0x0000...0x7FFF | 0xFEA0...0xFEFF | 0xFF00...0xFFFF => TestResult::discard(),
+                0x0000...0x7FFF | 0xA000...0xBFFF | 0xFEA0...0xFEFF | 0xFF00...0xFFFF => {
+                    TestResult::discard()
+                }
                 address => {
                     let mut bus = Bus::default();
                     bus.write_byte(address, value);
