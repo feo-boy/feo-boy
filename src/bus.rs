@@ -145,7 +145,11 @@ impl Bus {
             0xFF43 => ppu.bg_scroll.x,
 
             // LCDC Y-Coordinate
-            0xFF44 => ppu.line,
+            0xFF44 => if ppu.control.display_enabled {
+                ppu.line
+            } else {
+                0
+            },
 
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
