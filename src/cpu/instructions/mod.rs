@@ -1,4 +1,10 @@
-//! CPU instruction definition.
+//! CPU instruction pipeline implementation.
+//!
+//! The definitions of each instruction are generated at compile time in `build.rs`.
+//!
+//! Information concerning instruction definitions and implementations can be found on [devrs].
+//!
+//! [devrs]: http://www.devrs.com/gb/files/opcodes.html
 
 use std::fmt::{self, Display};
 use std::ops::{AddAssign, SubAssign};
@@ -14,6 +20,10 @@ use memory::Addressable;
 
 mod prefix;
 use cpu::instructions::prefix::PREFIX_INSTRUCTIONS;
+
+/// Game Boy instruction set.
+static INSTRUCTIONS: [InstructionDef; 0x100] =
+    include!(concat!(env!("OUT_DIR"), "/instructions.rs"));
 
 lazy_static! {
     /// Matches instruction descriptions that take operands.
@@ -102,58 +112,6 @@ impl Display for Instruction {
         };
 
         write!(f, "{}", instruction)
-    }
-}
-
-/// Macro to generate the definition of a single instruction.
-macro_rules! instruction {
-    ( $byte:expr, $description:expr, $cycles:expr ) => {
-        instruction!(@inner $byte, $description, $cycles, None)
-    };
-
-    ( $byte:expr, $description:expr, $cycles:expr => $condition_cycles:expr ) => {
-        instruction!(@inner $byte, $description, $cycles, Some($condition_cycles))
-    };
-
-    ( @inner $byte:expr, $description:expr, $cycles:expr, $condition_cycles:expr ) => {
-        {
-            use $crate::cpu::instructions::DATA_RE;
-
-            let condition_cycles: Option<u8> = $condition_cycles;
-
-            if let Some(ref cycles) = condition_cycles {
-                assert!(*cycles > $cycles);
-            }
-
-            let num_operands = DATA_RE.find($description).map(|mat| {
-                match mat.as_str() {
-                    "d8" | "a8" | "r8" | "PREFIX CB" => 1,
-                    "d16" | "a16" => 2,
-                    ty => unreachable!("unhandled data type: {}", ty),
-                }
-            }).unwrap_or_default();
-
-            InstructionDef {
-                byte: $byte,
-                description: $description,
-                cycles: $cycles,
-                condition_cycles: condition_cycles,
-                num_operands: num_operands,
-            }
-        }
-    };
-}
-
-/// Macro to quickly define all CPU instructions for the Game Boy Z80 processor.
-macro_rules! instructions {
-    ( $( $byte:expr, $description:expr, $cycles:expr $( => $condition_cycles:tt )* ; )* ) => {
-        {
-            let mut instructions = [
-                $( instruction!($byte, $description, $cycles $( => $condition_cycles )*) ),*
-            ];
-            instructions.sort_unstable_by_key(|instruction| instruction.byte);
-            instructions
-        }
     }
 }
 
@@ -1391,273 +1349,6 @@ impl super::Cpu {
     }
 }
 
-lazy_static! {
-    /// Game Boy instruction set.
-    ///
-    /// Timings and other information taken from [here].
-    ///
-    /// [here]: http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
-    static ref INSTRUCTIONS: [InstructionDef; 0x100] = instructions! {
-        // byte     description     cycles
-        0x00,       "NOP",          4;
-        0x10,       "STOP",         4;
-        0x20,       "JR NZ,r8",     8 => 12;
-        0x30,       "JR NC,r8",     8 => 12;
-        0x40,       "LD B,B",       4;
-        0x50,       "LD D,B",       4;
-        0x60,       "LD H,B",       4;
-        0x70,       "LD (HL),B",    8;
-        0x80,       "ADD A,B",      4;
-        0x90,       "SUB B",        4;
-        0xa0,       "AND B",        4;
-        0xb0,       "OR B",         4;
-        0xc0,       "RET NZ",       8 => 20;
-        0xd0,       "RET NC",       8 => 20;
-        0xe0,       "LDH (a8),A",   12;     // AKA LD A,($FF00+a8)
-        0xf0,       "LDH A,(a8)",   12;     // AKA LD ($FF00+a8),A
-        0x01,       "LD BC,d16",    12;
-        0x11,       "LD DE,d16",    12;
-        0x21,       "LD HL,d16",    12;
-        0x31,       "LD SP,d16",    12;
-        0x41,       "LD B,C",       4;
-        0x51,       "LD D,C",       4;
-        0x61,       "LD H,C",       4;
-        0x71,       "LD (HL),C",    8;
-        0x81,       "ADD A,C",      4;
-        0x91,       "SUB C",        4;
-        0xa1,       "AND C",        4;
-        0xb1,       "OR C",         4;
-        0xc1,       "POP BC",       12;
-        0xd1,       "POP DC",       12;
-        0xe1,       "POP HL",       12;
-        0xf1,       "POP AF",       12;
-        0x02,       "LD (BC),A",    8;
-        0x12,       "LD (DE),A",    8;
-        0x22,       "LD (HL+),A",   8;      // AKA LD (HLI),A or LDI A,(HL)
-        0x32,       "LD (HL-),A",   8;      // AKA LD (HLD),A or LDD A,(HL)
-        0x42,       "LD B,D",       4;
-        0x52,       "LD D,D",       4;
-        0x62,       "LD H,D",       4;
-        0x72,       "LD (HL),D",    8;
-        0x82,       "ADD A,D",      4;
-        0x92,       "SUB D",        4;
-        0xa2,       "AND D",        4;
-        0xb2,       "OR D",         4;
-        0xc2,       "JP NZ,a16",    12 => 16;
-        0xd2,       "JP NC,a16",    12 => 16;
-        0xe2,       "LD (C),A",     8;      // AKA LD ($FF00+C),A
-        0xf2,       "LD A,(C)",     8;      // AKA LD A,($FF00+C)
-        0x03,       "INC BC",       8;
-        0x13,       "INC DE",       8;
-        0x23,       "INC HL",       8;
-        0x33,       "INC SP",       8;
-        0x43,       "LD B,E",       4;
-        0x53,       "LD D,E",       4;
-        0x63,       "LD H,E",       4;
-        0x73,       "LD (HL),E",    8;
-        0x83,       "ADD A,E",      4;
-        0x93,       "SUB E",        4;
-        0xa3,       "AND E",        4;
-        0xb3,       "OR E",         4;
-        0xc3,       "JP a16",       16;
-        0xd3,       "UNUSED",       0;
-        0xe3,       "UNUSED",       0;
-        0xf3,       "DI",           4;
-        0x04,       "INC B",        4;
-        0x14,       "INC D",        4;
-        0x24,       "INC H",        4;
-        0x34,       "INC (HL)",     12;
-        0x44,       "LD B,H",       4;
-        0x54,       "LD D,H",       4;
-        0x64,       "LD H,H",       4;
-        0x74,       "LD (HL),H",    8;
-        0x84,       "ADD A,H",      4;
-        0x94,       "SUB H",        4;
-        0xa4,       "AND H",        4;
-        0xb4,       "OR H",         4;
-        0xc4,       "CALL NZ,a16",  12 => 24;
-        0xd4,       "CALL NC,a16",  12 => 24;
-        0xe4,       "UNUSED",       0;
-        0xf4,       "UNUSED",       0;
-        0x05,       "DEC B",        4;
-        0x15,       "DEC D",        4;
-        0x25,       "DEC H",        4;
-        0x35,       "DEC (HL)",     12;
-        0x45,       "LD B,L",       4;
-        0x55,       "LD D,L",       4;
-        0x65,       "LD H,L",       4;
-        0x75,       "LD (HL),L",    8;
-        0x85,       "ADD A,L",      4;
-        0x95,       "SUB L",        4;
-        0xa5,       "AND L",        4;
-        0xb5,       "OR L",         4;
-        0xc5,       "PUSH BC",      16;
-        0xd5,       "PUSH DE",      16;
-        0xe5,       "PUSH HL",      16;
-        0xf5,       "PUSH AF",      16;
-        0x06,       "LD B,d8",      8;
-        0x16,       "LD D,d8",      8;
-        0x26,       "LD H,d8",      8;
-        0x36,       "LD (HL),d8",   12;
-        0x46,       "LD B,(HL)",    8;
-        0x56,       "LD D,(HL)",    8;
-        0x66,       "LD H,(HL)",    8;
-        0x76,       "HALT",         4;
-        0x86,       "ADD A,(HL)",   8;
-        0x96,       "SUB (HL)",     8;
-        0xa6,       "AND (HL)",     8;
-        0xb6,       "OR (HL)",      8;
-        0xc6,       "ADD A,d8",     8;
-        0xd6,       "SUB d8",       8;
-        0xe6,       "AND d8",       8;
-        0xf6,       "OR d8",        8;
-        0x07,       "RLCA",         4;
-        0x17,       "RLA",          4;
-        0x27,       "DAA",          4;
-        0x37,       "SCF",          4;
-        0x47,       "LD B,A",       4;
-        0x57,       "LD D,A",       4;
-        0x67,       "LD H,A",       4;
-        0x77,       "LD (HL),A",    8;
-        0x87,       "ADD A,A",      4;
-        0x97,       "SUB A",        4;
-        0xa7,       "AND A",        4;
-        0xb7,       "OR A",         4;
-        0xc7,       "RST 00H",      16;
-        0xd7,       "RST 10H",      16;
-        0xe7,       "RST 20H",      16;
-        0xf7,       "RST 30H",      16;
-        0x08,       "LD (a16),SP",  20;
-        0x18,       "JR r8",        12;
-        0x28,       "JR Z,r8",      8 => 12;
-        0x38,       "JR C,r8",      8 => 12;
-        0x48,       "LD C,B",       4;
-        0x58,       "LD E,B",       4;
-        0x68,       "LD L,B",       4;
-        0x78,       "LD A,B",       4;
-        0x88,       "ADC A,B",      4;
-        0x98,       "SBC A,B",      4;
-        0xa8,       "XOR B",        4;
-        0xb8,       "CP B",         4;
-        0xc8,       "RET Z",        8 => 20;
-        0xd8,       "RET C",        8 => 20;
-        0xe8,       "ADD SP,r8",    16;
-        0xf8,       "LD HL,SP+r8",  12;     // AKA LDHL SP,r8
-        0x09,       "ADD HL,BC",    8;
-        0x19,       "ADD HL,DE",    8;
-        0x29,       "ADD HL,HL",    8;
-        0x39,       "ADD HL,SP",    8;
-        0x49,       "LD C,C",       4;
-        0x59,       "LD E,C",       4;
-        0x69,       "LD L,C",       4;
-        0x79,       "LD A,C",       4;
-        0x89,       "ADC A,C",      4;
-        0x99,       "SBC A,C",      4;
-        0xa9,       "XOR C",        4;
-        0xb9,       "CP C",         4;
-        0xc9,       "RET",          16;
-        0xd9,       "RETI",         16;
-        0xe9,       "JP (HL)",      4;
-        0xf9,       "LD SP,HL",     8;
-        0x0a,       "LD A,(BC)",    8;
-        0x1a,       "LD A,(DE)",    8;
-        0x2a,       "LD A,(HL+)",   8;      // AKA LD A,(HLI) or LDI A,(HL)
-        0x3a,       "LD A,(HL-)",   8;      // AKA LD A,(HLD) or LDD A,(HL)
-        0x4a,       "LD C,D",       4;
-        0x5a,       "LD E,D",       4;
-        0x6a,       "LD L,D",       4;
-        0x7a,       "LD A,D",       4;
-        0x8a,       "ADC A,D",      4;
-        0x9a,       "SBC A,D",      4;
-        0xaa,       "XOR D",        4;
-        0xba,       "CP D",         4;
-        0xca,       "JP Z,a16",     12 => 16;
-        0xda,       "JP C,a16",     12 => 16;
-        0xea,       "LD (a16),A",   16;
-        0xfa,       "LD A,(a16)",   16;
-        0x0b,       "DEC BC",       8;
-        0x1b,       "DEC DE",       8;
-        0x2b,       "DEC HL",       8;
-        0x3b,       "DEC SP",       8;
-        0x4b,       "LD C,E",       4;
-        0x5b,       "LD E,E",       4;
-        0x6b,       "LD L,E",       4;
-        0x7b,       "LD A,E",       4;
-        0x8b,       "ADC A,E",      4;
-        0x9b,       "SBC A,E",      4;
-        0xab,       "XOR E",        4;
-        0xbb,       "CP E",         4;
-        0xcb,       "PREFIX CB",    0;
-        0xdb,       "UNUSED",       0;
-        0xeb,       "UNUSED",       0;
-        0xfb,       "EI",           4;
-        0x0c,       "INC C",        4;
-        0x1c,       "INC E",        4;
-        0x2c,       "INC L",        4;
-        0x3c,       "INC A",        4;
-        0x4c,       "LD C,H",       4;
-        0x5c,       "LD E,H",       4;
-        0x6c,       "LD L,H",       4;
-        0x7c,       "LD A,H",       4;
-        0x8c,       "ADC A,H",      4;
-        0x9c,       "SBC A,H",      4;
-        0xac,       "XOR H",        4;
-        0xbc,       "CP H",         4;
-        0xcc,       "CALL Z,a16",   12 => 24;
-        0xdc,       "CALL C,a16",   12 => 24;
-        0xec,       "UNUSED",       0;
-        0xfc,       "UNUSED",       0;
-        0x0d,       "DEC C",        4;
-        0x1d,       "DEC E",        4;
-        0x2d,       "DEC L",        4;
-        0x3d,       "DEC A",        4;
-        0x4d,       "LD C,L",       4;
-        0x5d,       "LD E,L",       4;
-        0x6d,       "LD L,L",       4;
-        0x7d,       "LD A,L",       4;
-        0x8d,       "ADC A,L",      4;
-        0x9d,       "SBC A,L",      4;
-        0xad,       "XOR L",        4;
-        0xbd,       "CP L",         4;
-        0xcd,       "CALL a16",     24;
-        0xdd,       "UNUSED",       0;
-        0xed,       "UNUSED",       0;
-        0xfd,       "UNUSED",       0;
-        0x0e,       "LD C,d8",      8;
-        0x1e,       "LD E,d8",      8;
-        0x2e,       "LD L,d8",      8;
-        0x3e,       "LD A,d8",      8;
-        0x4e,       "LD C,(HL)",    8;
-        0x5e,       "LD E,(HL)",    8;
-        0x6e,       "LD L,(HL)",    8;
-        0x7e,       "LD A,(HL)",    8;
-        0x8e,       "ADC A,(HL)",   8;
-        0x9e,       "SBC A,(HL)",   8;
-        0xae,       "XOR (HL)",     8;
-        0xbe,       "CP (HL)",      8;
-        0xce,       "ADC A,d8",     8;
-        0xde,       "SBC A,d8",     8;
-        0xee,       "XOR d8",       8;
-        0xfe,       "CP d8",        8;
-        0x0f,       "RRCA",         4;
-        0x1f,       "RRA",          4;
-        0x2f,       "CPL",          4;
-        0x3f,       "CCF",          4;
-        0x4f,       "LD C,A",       4;
-        0x5f,       "LD E,A",       4;
-        0x6f,       "LD L,A",       4;
-        0x7f,       "LD A,A",       4;
-        0x8f,       "ADC A,A",      4;
-        0x9f,       "SBC A,A",      4;
-        0xaf,       "XOR A",        4;
-        0xbf,       "CP A",         4;
-        0xcf,       "RST 08H",      16;
-        0xdf,       "RST 18H",      16;
-        0xef,       "RST 28H",      16;
-        0xff,       "RST 38H",      16;
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use smallvec::SmallVec;
@@ -1744,11 +1435,11 @@ mod tests {
     }
 
     #[test]
-    fn instruction_macro() {
-        let nop = instruction!(0x00, "NOP", 4);
+    fn instructions() {
+        let nop = &INSTRUCTIONS[0x00];
         assert_eq!(
             nop,
-            InstructionDef {
+            &InstructionDef {
                 byte: 0x00,
                 description: "NOP",
                 num_operands: 0,
@@ -1757,10 +1448,10 @@ mod tests {
             }
         );
 
-        let ld = instruction!(0x3e, "LD A,d8", 8);
+        let ld = &INSTRUCTIONS[0x3e];
         assert_eq!(
             ld,
-            InstructionDef {
+            &InstructionDef {
                 byte: 0x3e,
                 description: "LD A,d8",
                 num_operands: 1,
@@ -1769,10 +1460,10 @@ mod tests {
             }
         );
 
-        let jp = instruction!(0xc3, "JP a16", 16);
+        let jp = &INSTRUCTIONS[0xc3];
         assert_eq!(
             jp,
-            InstructionDef {
+            &InstructionDef {
                 byte: 0xc3,
                 description: "JP a16",
                 num_operands: 2,
@@ -1781,10 +1472,10 @@ mod tests {
             }
         );
 
-        let conditional_jp = instruction!(0xc8, "RET Z", 8 => 20);
+        let conditional_jp = &INSTRUCTIONS[0xc8];
         assert_eq!(
             conditional_jp,
-            InstructionDef {
+            &InstructionDef {
                 byte: 0xc8,
                 description: "RET Z",
                 num_operands: 0,
@@ -1793,10 +1484,10 @@ mod tests {
             }
         );
 
-        let prefix_instruction = instruction!(0xcb, "PREFIX CB", 0);
+        let prefix_instruction = &INSTRUCTIONS[0xcb];
         assert_eq!(
             prefix_instruction,
-            InstructionDef {
+            &InstructionDef {
                 byte: 0xcb,
                 description: "PREFIX CB",
                 num_operands: 1,
