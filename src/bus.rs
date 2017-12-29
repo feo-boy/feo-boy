@@ -9,7 +9,7 @@ use bytes::ByteExt;
 use cpu::{Interrupts, Timer};
 use graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
 use audio::SoundController;
-use input::{Button, ButtonState, SelectFlags};
+use input::ButtonState;
 use memory::{Addressable, Mmu};
 
 /// The "wires" of the emulator.
@@ -66,38 +66,7 @@ impl Bus {
         #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         match address {
             // P1/JOYP - Joypad
-            0xFF00 => {
-                let mut register = 0u8;
-
-                register.set_bit(
-                    0,
-                    !(button_state.is_pressed(Button::Right) || button_state.is_pressed(Button::A)),
-                );
-
-                register.set_bit(
-                    1,
-                    !(button_state.is_pressed(Button::Left) || button_state.is_pressed(Button::B)),
-                );
-
-                register.set_bit(
-                    2,
-                    !(button_state.is_pressed(Button::Up)
-                        || button_state.is_pressed(Button::Select)),
-                );
-
-                register.set_bit(
-                    3,
-                    !(button_state.is_pressed(Button::Down)
-                        || button_state.is_pressed(Button::Start)),
-                );
-
-                // Sets bits 4 and 5.
-                register |= button_state.select.bits();
-
-                trace!("read {:#06x}", register);
-
-                register
-            }
+            0xFF00 => button_state.as_byte(),
 
             // DIV - Divider Register
             0xFF04 => timer.reg.divider(),
@@ -372,11 +341,8 @@ impl Bus {
 
     fn write_io_register(&mut self, address: u16, byte: u8) {
         match address {
-            0xFF00 => {
-                trace!("writing {:#06x}", byte);
-                let button_state = &mut self.button_state;
-                button_state.select = SelectFlags::from_bits_truncate(byte);
-            }
+            // P!/JOYP - Joypad
+            0xFF00 => self.button_state.select(byte),
 
             // SB - Serial transfer data
             0xFF01 => {
