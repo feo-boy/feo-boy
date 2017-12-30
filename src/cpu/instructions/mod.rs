@@ -148,11 +148,15 @@ impl super::Cpu {
 
         let mut condition_taken = false;
 
-        // Increment the program counter (PC) *before* executing the instruction.
-        //
-        // This how the actual hardware handles the PC, as relative jumps and other PC-related
-        // instructions assume that PC is pointing at the *next* instruction.
-        self.reg.pc += 1 + instruction.operands.len() as u16;
+        if !self.halt_bug {
+            // Increment the program counter (PC) *before* executing the instruction.
+            //
+            // This how the actual hardware handles the PC, as relative jumps and other PC-related
+            // instructions assume that PC is pointing at the *next* instruction.
+            self.reg.pc += 1 + instruction.operands.len() as u16;
+        } else {
+            self.halt_bug = false;
+        }
 
         // Execute the instruction.
         match instruction.def.byte {
@@ -639,7 +643,19 @@ impl super::Cpu {
             0x66 => self.reg.h = bus.read_byte(self.reg.hl()),
 
             // HALT
-            0x76 => self.state = State::Halted,
+            // This behavior is documented in the giibiiadvance docs.
+            //
+            // See https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf
+            0x76 => if bus.interrupts.enabled {
+                // HALT executed normally.
+                self.state = State::Halted;
+            } else if bus.read_byte(0xFFFF) & bus.read_byte(0xFF0F) & 0x1F == 0 {
+                // HALT mode entered, but interrupts aren't serviced.
+                self.state = State::Halted;
+            } else {
+                // HALT mode is not entered, and HALT bug occurs.
+                self.halt_bug = true;
+            }
 
             // ADD A,(HL)
             0x86 => {

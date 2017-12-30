@@ -90,6 +90,8 @@ pub struct Cpu {
 
     /// The state of execution.
     pub state: State,
+
+    halt_bug: bool,
 }
 
 impl Cpu {
@@ -113,31 +115,6 @@ impl Cpu {
 
     /// Execute any enabled interrupt requests.
     pub fn handle_interrupts(&mut self, bus: &mut Bus) {
-        if !bus.interrupts.enabled {
-            match self.state {
-                State::Running => return,
-                State::Halted => {
-                    let interrupts = [
-                        &bus.interrupts.vblank,
-                        &bus.interrupts.lcd_status,
-                        &bus.interrupts.timer,
-                        &bus.interrupts.serial,
-                        &bus.interrupts.joypad,
-                    ];
-
-                    if interrupts.iter().any(|int| int.requested) {
-                        self.state = State::Running;
-
-                        // Handle "HALT bug"
-                        self.reg.pc += 1;
-                    }
-
-                    return;
-                }
-                _ => unimplemented!(),
-            }
-        }
-
         macro_rules! handle_interrupts {
             ( $bus:expr; $( $interrupt:ident, $vector:expr ; )* ) => {
                 $(
@@ -162,13 +139,33 @@ impl Cpu {
             }
         }
 
-        handle_interrupts! {
-            bus;
-            vblank, 0x0040;
-            lcd_status, 0x0048;
-            timer, 0x0050;
-            serial, 0x0058;
-            joypad, 0x0060;
+        if bus.interrupts.enabled {
+            handle_interrupts! {
+                bus;
+                vblank, 0x0040;
+                lcd_status, 0x0048;
+                timer, 0x0050;
+                serial, 0x0058;
+                joypad, 0x0060;
+            }
+        } else {
+            match self.state {
+                State::Running => (),
+                State::Halted => {
+                    let interrupts = [
+                        &bus.interrupts.vblank,
+                        &bus.interrupts.lcd_status,
+                        &bus.interrupts.timer,
+                        &bus.interrupts.serial,
+                        &bus.interrupts.joypad,
+                    ];
+
+                    if interrupts.iter().any(|int| int.requested) {
+                        self.state = State::Running;
+                    }
+                }
+                _ => unimplemented!(),
+            }
         }
     }
 
