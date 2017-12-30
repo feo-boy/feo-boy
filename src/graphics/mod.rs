@@ -337,12 +337,21 @@ impl Ppu {
         }
     }
 
+    /// Returns the number of the current scanline.
+    pub fn line(&self) -> u8 {
+        if self.control.display_enabled {
+            self.line
+        } else {
+            0
+        }
+    }
+
     /// Returns the number of the current graphics mode.
     pub fn mode(&self) -> u8 {
         if self.control.display_enabled {
             self.mode as u8
         } else {
-            Mode::VerticalBlank as u8
+            Mode::HorizontalBlank as u8
         }
     }
 
@@ -608,11 +617,13 @@ mod tests {
     use std::u8;
 
     use byteorder::{ByteOrder, LittleEndian};
+    use image::RgbaImage;
 
     use bytes::ByteExt;
+    use cpu::Interrupts;
     use memory::Addressable;
 
-    use super::{BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart,
+    use super::{SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart,
                 TileMapStart};
 
     #[test]
@@ -698,9 +709,24 @@ mod tests {
 
     #[test]
     fn lcd_disabled() {
-        let ppu = Ppu::new();
-        assert!(!ppu.control.display_enabled);
-        assert_eq!(ppu.mode(), 1);
+        let mut ppu = Ppu::new();
+        let mut interrupts = Interrupts::default();
+        let mut buffer = RgbaImage::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
+
+        ppu.control.display_enabled = true;
+
+        loop {
+            if ppu.mode() != 0 && ppu.line != 0 {
+                break;
+            }
+
+            ppu.step(1, &mut interrupts, &mut buffer);
+        }
+
+        ppu.control.display_enabled = false;
+
+        assert_eq!(ppu.mode(), 0);
+        assert_eq!(ppu.line(), 0);
     }
 
     #[test]

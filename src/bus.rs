@@ -145,11 +145,7 @@ impl Bus {
             0xFF43 => ppu.bg_scroll.x,
 
             // LCDC Y-Coordinate
-            0xFF44 => if ppu.control.display_enabled {
-                ppu.line
-            } else {
-                0
-            },
+            0xFF44 => ppu.line(),
 
             // LYC - LY Compare
             0xFF45 => ppu.line_compare,
@@ -634,6 +630,7 @@ mod tests {
     #[test]
     fn stat_register() {
         let mut bus = Bus::default();
+        bus.ppu.control.display_enabled = true;
         bus.ppu.line = 40;
         bus.ppu.line_compare = 40;
         bus.ppu.lcd_status_interrupts.vblank = true;
