@@ -90,10 +90,10 @@ fn start_emulator(config: &Config) -> Result<()> {
 
         if event.render_args().is_some() {
             let display_buffer = if config.scaling == 1 {
-                Cow::Borrowed(&emulator.screen_buffer)
+                Cow::Borrowed(emulator.frame_buffer())
             } else {
                 Cow::Owned(imageops::resize(
-                    &emulator.screen_buffer,
+                    emulator.frame_buffer(),
                     window_size.width,
                     window_size.height,
                     FilterType::Nearest,

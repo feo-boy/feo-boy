@@ -71,9 +71,6 @@ pub struct Emulator {
     /// Other components of the emulator.
     pub bus: Bus,
 
-    /// An image buffer to be drawn to the screen.
-    pub screen_buffer: RgbaImage,
-
     debug: Option<Debugger>,
 }
 
@@ -88,12 +85,9 @@ impl Emulator {
             ..Default::default()
         };
 
-        let (width, height) = SCREEN_DIMENSIONS;
-
         Emulator {
             cpu,
             bus,
-            screen_buffer: RgbaImage::new(width, height),
             debug: None,
         }
     }
@@ -143,6 +137,10 @@ impl Emulator {
         Ok(())
     }
 
+    pub fn frame_buffer(&self) -> &RgbaImage {
+        &self.bus.ppu.frame.0
+    }
+
     /// Fetch and execute a single instruction. Returns the number of cycles executed.
     pub fn step(&mut self) -> TCycles {
         self.bus.timer.reset_diff();
@@ -152,7 +150,6 @@ impl Emulator {
         self.bus.ppu.step(
             TCycles::from(self.bus.timer.diff()),
             &mut self.bus.interrupts,
-            &mut self.screen_buffer,
         );
 
         // FIXME: Make sure the timing is correct here

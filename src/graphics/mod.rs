@@ -182,6 +182,15 @@ impl Default for ScreenBuffer {
     }
 }
 
+#[derive(Debug)]
+pub struct FrameBuffer(pub RgbaImage);
+
+impl Default for FrameBuffer {
+    fn default() -> Self {
+        FrameBuffer(RgbaImage::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32))
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 enum Mode {
     /// Horizontal blank.
@@ -243,8 +252,11 @@ pub struct Ppu {
     /// Contains conditions under which the LCDC Status register will fire.
     pub lcd_status_interrupts: LcdcStatusInterrupts,
 
-    /// The pixels to be rendered on the screen.
-    pub pixels: ScreenBuffer,
+    /// The frame to be rendered.
+    pub frame: FrameBuffer,
+
+    /// The pixels to be rendered on a frame.
+    pixels: ScreenBuffer,
 }
 
 impl Ppu {
@@ -256,7 +268,7 @@ impl Ppu {
     }
 
     /// Performs one clock step of the PPU.
-    pub fn step(&mut self, cycles: TCycles, interrupts: &mut Interrupts, buffer: &mut RgbaImage) {
+    pub fn step(&mut self, cycles: TCycles, interrupts: &mut Interrupts) {
         self.modeclock += u32::from(cycles.0);
 
         // Mode changes are a state machine. This match block returns an option indicating whether
@@ -267,8 +279,8 @@ impl Ppu {
                 self.line += 1;
 
                 if self.line > 143 {
-                    // Draw the pixels to the screen.
-                    for (x, y, pixel) in buffer.enumerate_pixels_mut() {
+                    // Push the pixels to a frame.
+                    for (x, y, pixel) in self.frame.0.enumerate_pixels_mut() {
                         *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
                     }
 
@@ -617,14 +629,13 @@ mod tests {
     use std::u8;
 
     use byteorder::{ByteOrder, LittleEndian};
-    use image::RgbaImage;
 
     use bytes::ByteExt;
     use cpu::{Interrupts, TCycles};
     use memory::Addressable;
 
     use super::{BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart,
-                TileMapStart, SCREEN_HEIGHT, SCREEN_WIDTH};
+                TileMapStart};
 
     #[test]
     fn chram() {
@@ -711,7 +722,6 @@ mod tests {
     fn lcd_disabled() {
         let mut ppu = Ppu::new();
         let mut interrupts = Interrupts::default();
-        let mut buffer = RgbaImage::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
 
         ppu.control.display_enabled = true;
 
@@ -720,7 +730,7 @@ mod tests {
                 break;
             }
 
-            ppu.step(TCycles(1), &mut interrupts, &mut buffer);
+            ppu.step(TCycles(1), &mut interrupts);
         }
 
         ppu.control.display_enabled = false;
