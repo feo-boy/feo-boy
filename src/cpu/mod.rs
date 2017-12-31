@@ -107,7 +107,8 @@ impl Cpu {
                 self.execute(&instruction, bus);
             }
             State::Halted => {
-                bus.timer.tick(MCycles(1)); // Tick the duration of a NOP.
+                // Tick the duration of a NOP.
+                bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
             }
             _ => unimplemented!(),
         }
@@ -130,8 +131,7 @@ impl Cpu {
 
                         self.rst($vector, $bus);
 
-                        // FIXME: The timing for interrupts might be more subtle than this.
-                        $bus.timer.tick(MCycles(3));
+                        $bus.timer.tick(MCycles(5), &mut $bus.interrupts.timer.requested);
 
                         return;
                     }
@@ -152,16 +152,22 @@ impl Cpu {
             match self.state {
                 State::Running => (),
                 State::Halted => {
-                    let interrupts = [
-                        &bus.interrupts.vblank,
-                        &bus.interrupts.lcd_status,
-                        &bus.interrupts.timer,
-                        &bus.interrupts.serial,
-                        &bus.interrupts.joypad,
-                    ];
+                    let should_wake = {
+                        let interrupts = [
+                            &bus.interrupts.vblank,
+                            &bus.interrupts.lcd_status,
+                            &bus.interrupts.timer,
+                            &bus.interrupts.serial,
+                            &bus.interrupts.joypad,
+                        ];
 
-                    if interrupts.iter().any(|int| int.requested) {
+                        interrupts.iter().any(|int| int.enabled && int.requested)
+                    };
+
+                    if should_wake {
                         self.state = State::Running;
+                        self.reg.pc += 1;
+                        bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
                     }
                 }
                 _ => unimplemented!(),

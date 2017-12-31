@@ -68,8 +68,8 @@ pub struct Timer {
 impl Timer {
     /// Increment all timer-related registers, based on the M-time of the last instruction.
     ///
-    /// Returns whether the timer interrupt should be triggered.
-    pub fn tick(&mut self, mtime: MCycles) -> bool {
+    /// Requests the timer interrupt if necessary.
+    pub fn tick(&mut self, mtime: MCycles, interrupt_requested: &mut bool) {
         self.diff += mtime.0;
         self.div_counter += mtime.0;
 
@@ -80,7 +80,7 @@ impl Timer {
         }
 
         if !self.is_enabled() {
-            return false;
+            return;
         }
 
         self.timer_counter += mtime.0;
@@ -105,7 +105,6 @@ impl Timer {
         //
         // Notably, getting this wrong will cause blargg's instr_timing test ROM to fail with
         // the cryptic "Failure #255" message.
-        let mut timer_overflow = false;
         while self.timer_counter >= threshold {
             self.timer_counter -= threshold;
 
@@ -115,10 +114,11 @@ impl Timer {
             };
 
             self.reg.counter = counter;
-            timer_overflow |= overflow;
-        }
 
-        timer_overflow
+            if overflow {
+                *interrupt_requested = true;
+            }
+        }
     }
 
     /// Returns the number of M-cycles that have passed since the last call of this method.
@@ -149,16 +149,17 @@ mod tests {
 
     #[test]
     fn div() {
+        let mut interrupt_requested = false;
         let mut timer = Timer::default();
 
         for _ in 0..64 {
-            timer.tick(MCycles(1));
+            timer.tick(MCycles(1), &mut interrupt_requested);
         }
 
         assert_eq!(timer.reg.divider(), 1);
 
         for _ in 0..128 {
-            timer.tick(MCycles(1));
+            timer.tick(MCycles(1), &mut interrupt_requested);
         }
 
         assert_eq!(timer.reg.divider(), 3);
@@ -166,10 +167,11 @@ mod tests {
 
     #[test]
     fn reset_div() {
+        let mut interrupt_requested = false;
         let mut timer = Timer::default();
 
         for _ in 0..63 {
-            timer.tick(MCycles(1));
+            timer.tick(MCycles(1), &mut interrupt_requested);
         }
         assert_eq!(timer.reg.divider(), 0);
 
@@ -177,38 +179,42 @@ mod tests {
         assert_eq!(timer.reg.divider(), 0);
 
         for _ in 0..63 {
-            timer.tick(MCycles(1));
+            timer.tick(MCycles(1), &mut interrupt_requested);
         }
         assert_eq!(timer.reg.divider(), 0);
 
-        timer.tick(MCycles(1));
+        timer.tick(MCycles(1), &mut interrupt_requested);
         assert_eq!(timer.reg.divider(), 1);
     }
 
     #[test]
     fn tima() {
+        let mut interrupt_requested = false;
+
         // Enable timer, increment every 64 M-cycles.
         let mut timer = Timer::default();
         timer.reg.control = 0x07;
 
         for _ in 0..63 {
-            timer.tick(MCycles(1));
+            timer.tick(MCycles(1), &mut interrupt_requested);
         }
         assert_eq!(timer.reg.counter, 0);
 
-        timer.tick(MCycles(1));
+        timer.tick(MCycles(1), &mut interrupt_requested);
         assert_eq!(timer.reg.counter, 1);
 
         // Enable timer, increment every 4 M-cycles.
         let mut timer = Timer::default();
         timer.reg.control = 0x05;
 
-        timer.tick(MCycles(16));
+        timer.tick(MCycles(16), &mut interrupt_requested);
         assert_eq!(timer.reg.counter, 4);
     }
 
     #[test]
     fn tima_overflow() {
+        let mut interrupt_requested = false;
+
         // Enable timer, increment every 4 M-cycles.
         let mut timer = Timer::default();
         timer.reg.control = 0x05;
@@ -217,11 +223,11 @@ mod tests {
         const INCREMENT: MCycles = MCycles(((u8::MAX as u16 * 4) / 8) as u32);
 
         for _ in 0..8 {
-            let interrupt_requested = timer.tick(INCREMENT);
+            timer.tick(INCREMENT, &mut interrupt_requested);
             assert!(!interrupt_requested);
         }
 
-        let interrupt_requested = timer.tick(INCREMENT);
+        timer.tick(INCREMENT, &mut interrupt_requested);
         assert!(interrupt_requested);
     }
 }

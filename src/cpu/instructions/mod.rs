@@ -1332,9 +1332,7 @@ impl super::Cpu {
             _ => instruction.cycles(),
         };
 
-        if bus.timer.tick(MCycles::from(cycles)) {
-            bus.interrupts.timer.requested = true;
-        }
+        bus.timer.tick(MCycles::from(cycles), &mut bus.interrupts.timer.requested);
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
