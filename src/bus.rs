@@ -82,7 +82,7 @@ impl Bus {
 
             // IF - Interrupt Flag
             0xFF0F => {
-                let mut register = 0u8;
+                let mut register = 0xFFu8;
 
                 register.set_bit(0, interrupts.vblank.requested);
                 register.set_bit(1, interrupts.lcd_status.requested);
@@ -320,7 +320,8 @@ impl Bus {
 
             // IE - Interrupt Enable
             0xFFFF => {
-                let mut byte = 0x00;
+                let mut byte = 0xFF;
+
                 byte.set_bit(0, interrupts.vblank.enabled);
                 byte.set_bit(1, interrupts.lcd_status.enabled);
                 byte.set_bit(2, interrupts.timer.enabled);
