@@ -158,6 +158,8 @@ impl super::Cpu {
             self.halt_bug = false;
         }
 
+        let diff = bus.timer.diff();
+
         // Execute the instruction.
         match instruction.def.byte {
             // NOP
@@ -655,7 +657,7 @@ impl super::Cpu {
             } else {
                 // HALT mode is not entered, and HALT bug occurs.
                 self.halt_bug = true;
-            }
+            },
 
             // ADD A,(HL)
             0x86 => {
@@ -1332,7 +1334,20 @@ impl super::Cpu {
             _ => instruction.cycles(),
         };
 
-        bus.timer.tick(MCycles::from(cycles), &mut bus.interrupts.timer.requested);
+        // If we didn't tick the timer manually (like we do for memory accesses), then just tick
+        // the number of cycles that the instruction takes.
+        if bus.timer.diff() - diff == MCycles(0) {
+            bus.timer
+                .tick(MCycles::from(cycles), &mut bus.interrupts.timer.requested);
+        }
+
+        debug_assert_eq!(
+            bus.timer.diff() - diff,
+            MCycles::from(cycles),
+            "incorrect timing for instruction {} ({})",
+            instruction.def.byte,
+            instruction.def.description
+        );
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific

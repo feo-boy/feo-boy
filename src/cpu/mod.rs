@@ -108,7 +108,8 @@ impl Cpu {
             }
             State::Halted => {
                 // Tick the duration of a NOP.
-                bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
+                bus.timer
+                    .tick(MCycles(1), &mut bus.interrupts.timer.requested);
             }
             _ => unimplemented!(),
         }
@@ -124,6 +125,7 @@ impl Cpu {
 
                         if let State::Halted = self.state {
                             self.state = State::Running;
+                            bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
                         }
 
                         $bus.interrupts.enabled = false;
@@ -167,7 +169,8 @@ impl Cpu {
                     if should_wake {
                         self.state = State::Running;
                         self.reg.pc += 1;
-                        bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
+                        bus.timer
+                            .tick(MCycles(1), &mut bus.interrupts.timer.requested);
                     }
                 }
                 _ => unimplemented!(),
