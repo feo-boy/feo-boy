@@ -1,38 +1,7 @@
 //! CPU timer management.
 
-use std::fmt::{self, Display};
-
 use bytes::ByteExt;
-
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
-pub struct MCycles(pub u32);
-
-impl Display for MCycles {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} M-cycles", self.0)
-    }
-}
-
-impl From<TCycles> for MCycles {
-    fn from(t_cycles: TCycles) -> Self {
-        MCycles(t_cycles.0 / 4)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
-pub struct TCycles(pub u32);
-
-impl Display for TCycles {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} T-cycles", self.0)
-    }
-}
-
-impl From<MCycles> for TCycles {
-    fn from(m_cycles: MCycles) -> Self {
-        TCycles(m_cycles.0 * 4)
-    }
-}
+use cpu::MCycles;
 
 #[derive(Debug, Default)]
 pub struct TimerRegisters {
@@ -69,7 +38,7 @@ impl Timer {
     /// Increment all timer-related registers, based on the M-time of the last instruction.
     ///
     /// Requests the timer interrupt if necessary.
-    pub fn tick(&mut self, mtime: MCycles, interrupt_requested: &mut bool) {
+    pub(super) fn tick(&mut self, mtime: MCycles, interrupt_requested: &mut bool) {
         self.diff += mtime.0;
         self.div_counter += mtime.0;
 

@@ -147,11 +147,6 @@ impl Emulator {
 
         self.cpu.step(&mut self.bus);
 
-        self.bus.ppu.step(
-            TCycles::from(self.bus.timer.diff()),
-            &mut self.bus.interrupts,
-        );
-
         // FIXME: Make sure the timing is correct here
         self.cpu.handle_interrupts(&mut self.bus);
 

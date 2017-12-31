@@ -1,16 +1,20 @@
 //! Inter-component communication.
 
+mod timer;
+
 use std::fmt::{self, Display};
 use std::ops::Range;
 
 use itertools::Itertools;
 
-use bytes::ByteExt;
-use cpu::{Interrupts, Timer};
-use graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
 use audio::SoundController;
+use bytes::ByteExt;
+use cpu::{Interrupts, MCycles, TCycles};
+use graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
 use input::ButtonState;
 use memory::{Addressable, Mmu};
+
+use self::timer::Timer;
 
 /// The "wires" of the emulator.
 ///
@@ -45,6 +49,14 @@ impl Addressable for Bus {
 }
 
 impl Bus {
+    /// Tick each component individually.
+    pub fn tick(&mut self, cycles: MCycles) {
+        self.ppu
+            .step(TCycles::from(cycles), &mut self.interrupts /* FIXME */);
+        self.timer
+            .tick(cycles, &mut self.interrupts.timer.requested);
+    }
+
     /// Create an iterator over the entire memory space.
     pub fn iter(&self) -> MemoryIterator {
         MemoryIterator {

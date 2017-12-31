@@ -5,17 +5,45 @@
 pub mod arithmetic;
 mod instructions;
 mod registers;
-mod timer;
 
 use std::default::Default;
-use std::fmt;
+use std::fmt::{self, Display};
 
 use bus::Bus;
 use memory::{Addressable, Mmu};
 
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
-pub use self::timer::{MCycles, TCycles, Timer};
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
+pub struct MCycles(pub u32);
+
+impl Display for MCycles {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} M-cycles", self.0)
+    }
+}
+
+impl From<TCycles> for MCycles {
+    fn from(t_cycles: TCycles) -> Self {
+        MCycles(t_cycles.0 / 4)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
+pub struct TCycles(pub u32);
+
+impl Display for TCycles {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} T-cycles", self.0)
+    }
+}
+
+impl From<MCycles> for TCycles {
+    fn from(m_cycles: MCycles) -> Self {
+        TCycles(m_cycles.0 * 4)
+    }
+}
 
 /// Current state of the CPU.
 #[derive(Debug, PartialEq, Eq)]
@@ -108,8 +136,7 @@ impl Cpu {
             }
             State::Halted => {
                 // Tick the duration of a NOP.
-                bus.timer
-                    .tick(MCycles(1), &mut bus.interrupts.timer.requested);
+                bus.tick(MCycles(1));
             }
             _ => unimplemented!(),
         }
@@ -125,7 +152,7 @@ impl Cpu {
 
                         if let State::Halted = self.state {
                             self.state = State::Running;
-                            bus.timer.tick(MCycles(1), &mut bus.interrupts.timer.requested);
+                            bus.tick(MCycles(1));
                         }
 
                         $bus.interrupts.enabled = false;
@@ -133,7 +160,7 @@ impl Cpu {
 
                         self.rst($vector, $bus);
 
-                        $bus.timer.tick(MCycles(5), &mut $bus.interrupts.timer.requested);
+                        $bus.tick(MCycles(5));
 
                         return;
                     }
@@ -169,8 +196,7 @@ impl Cpu {
                     if should_wake {
                         self.state = State::Running;
                         self.reg.pc += 1;
-                        bus.timer
-                            .tick(MCycles(1), &mut bus.interrupts.timer.requested);
+                        bus.tick(MCycles(1));
                     }
                 }
                 _ => unimplemented!(),

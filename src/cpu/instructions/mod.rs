@@ -1337,8 +1337,7 @@ impl super::Cpu {
         // If we didn't tick the timer manually (like we do for memory accesses), then just tick
         // the number of cycles that the instruction takes.
         if bus.timer.diff() - diff == MCycles(0) {
-            bus.timer
-                .tick(MCycles::from(cycles), &mut bus.interrupts.timer.requested);
+            bus.tick(MCycles::from(cycles));
         }
 
         debug_assert_eq!(
