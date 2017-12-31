@@ -295,7 +295,6 @@ mod tests {
 
         // Load a test program into RAM
         emulator.cpu.reg.pc = 0xC000;
-
         assert!(!emulator.bus.interrupts.enabled);
 
         let test_program = [
@@ -315,13 +314,53 @@ mod tests {
         assert_eq!(emulator.cpu.state, State::Halted);
         assert_eq!(emulator.cpu.reg.pc, 0xC001);
 
+        emulator.step();
+
+        assert_eq!(emulator.cpu.state, State::Halted);
+        assert_eq!(emulator.cpu.reg.pc, 0xC001);
+
         // Request an interrupt
         emulator.bus.interrupts.timer.enabled = true;
         emulator.bus.interrupts.timer.requested = true;
 
-        // The notorious "HALT bug". When an interrupt is requested and the emulator is halted, the
-        // Game Boy skips the next instruction.
         emulator.step();
         assert_eq!(emulator.cpu.reg.pc, 0xC002);
+        assert!(emulator.bus.interrupts.timer.requested);
+    }
+
+    #[test]
+    fn halt_bug() {
+        // The notorious "HALT bug". If interrupts are disabled and there is a pending interrupt
+        // when a HALT instruction is encountered, then the HALT state is skipped, and the PC fails
+        // to increase for the next instruction.
+        let mut emulator = Emulator::new();
+
+        // Load a test program into RAM
+        emulator.cpu.reg.pc = 0xC000;
+
+        let test_program = [
+            0xAF,   // XOR A
+            0x76,   // HALT
+            0x3C,   // INC A    (this instruction will be executed twice)
+            0x22,   // LD (HL+),A
+        ];
+
+        emulator.cpu.reg.hl_mut().write(0xD000);
+        emulator.bus.interrupts.enabled = false;
+        emulator.bus.interrupts.timer.enabled = true;
+        emulator.bus.interrupts.timer.requested = true;
+
+        for (offset, byte) in test_program.into_iter().enumerate() {
+            emulator
+                .bus
+                .write_byte(emulator.cpu.reg.pc + offset as u16, *byte);
+        }
+
+        for _ in 0..5 {
+            emulator.step();
+        }
+
+        assert_eq!(emulator.cpu.reg.a, 2);
+        assert_eq!(emulator.bus.read_byte(0xD000), 2);
     }
 }
