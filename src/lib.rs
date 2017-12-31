@@ -6,6 +6,8 @@
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
+extern crate derive_more;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
@@ -47,7 +49,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use bus::Bus;
-use cpu::{Cpu, Instruction};
+use cpu::{Cpu, Instruction, TCycles};
 use graphics::Ppu;
 use audio::SoundController;
 use memory::Mmu;
@@ -141,20 +143,19 @@ impl Emulator {
         Ok(())
     }
 
-    /// Fetch and execute a single instruction.
-    pub fn step(&mut self) {
+    /// Fetch and execute a single instruction. Returns the number of cycles executed.
+    pub fn step(&mut self) -> TCycles {
+        self.bus.timer.reset_diff();
+
         self.cpu.step(&mut self.bus);
 
         self.bus.ppu.step(
-            self.cpu.clock.diff(),
+            TCycles::from(self.bus.timer.diff()),
             &mut self.bus.interrupts,
             &mut self.screen_buffer,
         );
 
-        if self.bus.timer.tick(self.cpu.clock.diff() as u8 / 4) {
-            self.bus.interrupts.timer.requested = true;
-        }
-
+        // FIXME: Make sure the timing is correct here
         self.cpu.handle_interrupts(&mut self.bus);
 
         if let Some(ref mut debugger) = self.debug {
@@ -163,6 +164,8 @@ impl Emulator {
                 debugger.paused = true;
             }
         }
+
+        TCycles::from(self.bus.timer.diff())
     }
 
     pub fn press(&mut self, button: Button) {
@@ -178,9 +181,9 @@ impl Emulator {
     /// If the debugger is enabled, debug commands will be read from stdin.
     pub fn update(&mut self, dt: f64) -> Result<()> {
         let microseconds = dt * 1_000_000.0;
-        let cycles_to_execute = (microseconds / MICROSECONDS_PER_CYCLE) as u32;
+        let cycles_to_execute = TCycles((microseconds / MICROSECONDS_PER_CYCLE) as u32);
 
-        let mut cycles_executed = 0;
+        let mut cycles_executed = TCycles(0);
 
         while cycles_executed < cycles_to_execute {
             if self.is_paused() {
@@ -200,8 +203,7 @@ impl Emulator {
                     Err(err) => panic!("{}", err),
                 }
             } else {
-                self.step();
-                cycles_executed += self.cpu.clock.diff();
+                cycles_executed += self.step();
             }
         }
 

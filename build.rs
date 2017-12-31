@@ -24,8 +24,8 @@ type Result<T> = std::result::Result<T, Error>;
 struct Instruction {
     #[serde(deserialize_with = "::deserialize_hex_literal")] byte: u8,
     mnemonic: String,
-    cycles: u8,
-    condition_cycles: Option<u8>,
+    cycles: u32,
+    condition_cycles: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,7 +56,7 @@ fn parse_operands(description: &str) -> u8 {
     }
 }
 
-fn parse_prefix_cycles(description: &str) -> u8 {
+fn parse_prefix_cycles(description: &str) -> u32 {
     // If the instruction accesses memory (through HL), the instruction will take 16 cycles.
     // Otherwise, it will take 8.
     if description.contains("(HL)") {
@@ -97,7 +97,7 @@ fn write_instructions<P: AsRef<Path>>(filename: P) -> Result<()> {
             ..
         } = *instruction;
         let condition_cycles = match instruction.condition_cycles {
-            Some(cycles) => quote!{ Some(#cycles) },
+            Some(cycles) => quote!{ Some(TCycles(#cycles)) },
             None => quote!{ None },
         };
         writeln!(
@@ -108,7 +108,7 @@ fn write_instructions<P: AsRef<Path>>(filename: P) -> Result<()> {
                     byte: #byte,
                     description: #mnemonic,
                     num_operands: #operands,
-                    cycles: #cycles,
+                    cycles: TCycles(#cycles),
                     condition_cycles: #condition_cycles,
                 },
             }
@@ -151,7 +151,7 @@ fn write_prefix_instructions<P: AsRef<Path>>(filename: P) -> Result<()> {
                 PrefixInstructionDef {
                     byte: #byte,
                     description: #mnemonic,
-                    cycles: #cycles,
+                    cycles: TCycles(#cycles),
                 },
             }
         )?;

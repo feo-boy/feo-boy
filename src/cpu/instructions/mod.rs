@@ -15,7 +15,7 @@ use smallvec::SmallVec;
 
 use bus::Bus;
 use bytes::WordExt;
-use cpu::{arithmetic, Flags, State};
+use cpu::{arithmetic, Flags, MCycles, State, TCycles};
 use memory::Addressable;
 
 mod prefix;
@@ -47,14 +47,14 @@ struct InstructionDef {
     /// Note that this is measured in clock cycles, not machine cycles. While Nintendo's official
     /// documentation records the timings in machine cycles, most online documentation uses clock
     /// cycles. Four clock cycles is equivalent to a single machine cycle.
-    cycles: u8,
+    cycles: TCycles,
 
     /// The number of clock cycles it takes to execute this instruction if the instruction's
     /// condition is true. Only conditional instructions will have this field set.
     ///
     /// For example, `RET Z` will only return if the zero flag is set. In that case, it will
     /// execute in 20 cycles instead of 8.
-    pub condition_cycles: Option<u8>,
+    pub condition_cycles: Option<TCycles>,
 
     /// The number of operands that this instruction uses.
     pub num_operands: u8,
@@ -71,7 +71,7 @@ pub struct Instruction {
 
 impl Instruction {
     /// The number of clock cycles it takes to execute this instruction.
-    pub fn cycles(&self) -> u8 {
+    pub fn cycles(&self) -> TCycles {
         if self.def.byte == 0xCB {
             PREFIX_INSTRUCTIONS[self.operands[0] as usize].cycles
         } else {
@@ -1312,11 +1312,13 @@ impl super::Cpu {
         }
 
         let cycles = match (condition_taken, instruction.def.condition_cycles) {
-            (true, Some(cycles)) => u32::from(cycles),
-            _ => u32::from(instruction.cycles()),
+            (true, Some(cycles)) => cycles,
+            _ => instruction.cycles(),
         };
 
-        self.clock.tick(cycles);
+        if bus.timer.tick(MCycles::from(cycles)) {
+            bus.interrupts.timer.requested = true;
+        }
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
@@ -1354,7 +1356,7 @@ mod tests {
     use smallvec::SmallVec;
 
     use bus::Bus;
-    use cpu::{Cpu, Flags};
+    use cpu::{Cpu, Flags, MCycles, TCycles};
     use memory::Addressable;
 
     use super::{Instruction, InstructionDef, INSTRUCTIONS};
@@ -1363,7 +1365,7 @@ mod tests {
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        let timings: Vec<u8> = vec![
+        let timings = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
             2,3,2,2,1,1,2,1,2,2,2,2,1,1,2,1,
@@ -1383,7 +1385,7 @@ mod tests {
         ];
 
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        let condition_timings: Vec<u8> = vec![
+        let condition_timings = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
             3,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
@@ -1403,28 +1405,24 @@ mod tests {
         ];
 
         for (byte, instruction) in INSTRUCTIONS.iter().enumerate() {
-            let timing = timings[byte as usize];
+            let timing = MCycles(timings[byte as usize]);
 
             // Skip the assertion if the timing isn't tested.
-            if timing == 0 {
+            if timing.0 == 0 {
                 continue;
             }
 
-            // The emulator uses clock cycles for its timings, but the above timings are in
-            // M-cycles.
-            let clock_cycles = timing * 4;
-
-            if clock_cycles != instruction.cycles {
+            if timing != MCycles::from(instruction.cycles) {
                 panic!(
                     "wrong timing for {}: has {}, expected {}",
-                    instruction.description, instruction.cycles, clock_cycles
+                    instruction.description, instruction.cycles, timing
                 );
             }
 
             if let Some(condition_cycles) = instruction.condition_cycles {
-                let clock_cycles = condition_timings[byte as usize] * 4;
+                let clock_cycles = MCycles(condition_timings[byte as usize]);
 
-                if clock_cycles != condition_cycles {
+                if clock_cycles != MCycles::from(condition_cycles) {
                     panic!(
                         "wrong condition timing for {}: has {}, expected {}",
                         instruction.description, condition_cycles, clock_cycles
@@ -1443,7 +1441,7 @@ mod tests {
                 byte: 0x00,
                 description: "NOP",
                 num_operands: 0,
-                cycles: 4,
+                cycles: TCycles(4),
                 condition_cycles: None,
             }
         );
@@ -1455,7 +1453,7 @@ mod tests {
                 byte: 0x3e,
                 description: "LD A,d8",
                 num_operands: 1,
-                cycles: 8,
+                cycles: TCycles(8),
                 condition_cycles: None,
             }
         );
@@ -1467,7 +1465,7 @@ mod tests {
                 byte: 0xc3,
                 description: "JP a16",
                 num_operands: 2,
-                cycles: 16,
+                cycles: TCycles(16),
                 condition_cycles: None,
             }
         );
@@ -1479,8 +1477,8 @@ mod tests {
                 byte: 0xc8,
                 description: "RET Z",
                 num_operands: 0,
-                cycles: 8,
-                condition_cycles: Some(20),
+                cycles: TCycles(8),
+                condition_cycles: Some(TCycles(20)),
             }
         );
 
@@ -1491,7 +1489,7 @@ mod tests {
                 byte: 0xcb,
                 description: "PREFIX CB",
                 num_operands: 1,
-                cycles: 0,
+                cycles: TCycles(0),
                 condition_cycles: None,
             }
         );
@@ -1504,14 +1502,14 @@ mod tests {
             operands: SmallVec::from_slice(&[0x11]),
         };
 
-        assert_eq!(rl_c.cycles(), 8);
+        assert_eq!(rl_c.cycles(), TCycles(8));
 
         let res_0_hl = Instruction {
             def: &INSTRUCTIONS[0xCB],
             operands: SmallVec::from_slice(&[0x86]),
         };
 
-        assert_eq!(res_0_hl.cycles(), 16);
+        assert_eq!(res_0_hl.cycles(), TCycles(16));
     }
 
     #[test]
@@ -1577,7 +1575,7 @@ mod tests {
         };
 
         cpu.execute(&nop, &mut bus);
-        assert_eq!(cpu.clock.diff(), 4);
+        assert_eq!(bus.timer.diff(), MCycles(1));
     }
 
     #[test]
@@ -1612,18 +1610,20 @@ mod tests {
         };
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
-        assert_eq!(cpu.clock.diff(), 12);
+        assert_eq!(bus.timer.diff(), MCycles(3));
 
         // Move backward 10
+        bus.timer.reset_diff();
         let instruction = Instruction {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
-        assert_eq!(cpu.clock.diff(), 12);
+        assert_eq!(bus.timer.diff(), MCycles(3));
 
         // Do not jump
+        bus.timer.reset_diff();
         cpu.reg.f.insert(Flags::ZERO);
         let instruction = Instruction {
             def: &INSTRUCTIONS[0x20],
@@ -1631,7 +1631,7 @@ mod tests {
         };
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 6);
-        assert_eq!(cpu.clock.diff(), 8);
+        assert_eq!(bus.timer.diff(), MCycles(2));
     }
 
     #[test]

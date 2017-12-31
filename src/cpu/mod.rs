@@ -3,7 +3,6 @@
 //! Contains an implementation of the registers and instruction set.
 
 pub mod arithmetic;
-mod clock;
 mod instructions;
 mod registers;
 mod timer;
@@ -14,10 +13,9 @@ use std::fmt;
 use bus::Bus;
 use memory::{Addressable, Mmu};
 
-pub use self::clock::Clock;
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
-pub use self::timer::Timer;
+pub use self::timer::{MCycles, TCycles, Timer};
 
 /// Current state of the CPU.
 #[derive(Debug, PartialEq, Eq)]
@@ -90,9 +88,6 @@ pub struct Cpu {
     /// Registers
     pub reg: Registers,
 
-    /// The clock corresponding to the last instruction cycle.
-    pub clock: Clock,
-
     /// The state of execution.
     pub state: State,
 }
@@ -107,9 +102,11 @@ impl Cpu {
         match self.state {
             State::Running => {
                 let instruction = self.fetch(bus);
-                self.execute(&instruction, bus)
+                self.execute(&instruction, bus);
             }
-            State::Halted => self.clock.tick(4), // Tick the duration of a NOP.
+            State::Halted => {
+                bus.timer.tick(MCycles(1)); // Tick the duration of a NOP.
+            }
             _ => unimplemented!(),
         }
     }
@@ -157,8 +154,7 @@ impl Cpu {
                         self.rst($vector, $bus);
 
                         // FIXME: The timing for interrupts might be more subtle than this.
-                        self.clock.tick(12);
-                        $bus.timer.tick(3);
+                        $bus.timer.tick(MCycles(3));
 
                         return;
                     }

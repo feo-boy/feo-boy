@@ -1,5 +1,5 @@
 use bus::Bus;
-use cpu::{arithmetic, Cpu};
+use cpu::{arithmetic, Cpu, TCycles};
 use memory::Addressable;
 
 /// Prefix instruction definitions.
@@ -21,7 +21,7 @@ pub struct PrefixInstructionDef {
     /// The number of clock cycles it takes to execute this instruction.
     ///
     /// See the note on `InstructionDef::cycles` for how this field differs from machine cycles.
-    pub cycles: u8,
+    pub cycles: TCycles,
 }
 
 impl Cpu {
@@ -455,13 +455,15 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
+    use cpu::MCycles;
+
     use super::PREFIX_INSTRUCTIONS;
 
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        let timings: Vec<u8> = vec![
+        let timings = vec![
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
@@ -478,15 +480,16 @@ mod tests {
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-        ];
+        ]
+            .into_iter()
+            .map(|timing| MCycles(timing))
+            .collect::<Vec<MCycles>>();
 
-        for (timing, instruction) in timings.iter().zip(PREFIX_INSTRUCTIONS.iter()) {
-            let clock_cycles = timing * 4;
-
-            if clock_cycles != instruction.cycles {
+        for (timing, instruction) in timings.into_iter().zip(PREFIX_INSTRUCTIONS.iter()) {
+            if timing != MCycles::from(instruction.cycles) {
                 panic!(
                     "wrong timing for {:?}: has {}, expected {}",
-                    instruction.description, instruction.cycles, clock_cycles
+                    instruction.description, instruction.cycles, timing,
                 );
             }
         }
