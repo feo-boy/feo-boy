@@ -81,7 +81,7 @@ impl Bus {
             0xFF00 => button_state.as_byte(),
 
             // DIV - Divider Register
-            0xFF04 => timer.reg.divider(),
+            0xFF04 => timer.divider(),
 
             // TIMA - Timer Counter
             0xFF05 => timer.reg.counter,

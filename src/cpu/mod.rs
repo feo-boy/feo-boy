@@ -15,7 +15,8 @@ use memory::{Addressable, Mmu};
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
 
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
+#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub,
+         SubAssign)]
 pub struct MCycles(pub u32);
 
 impl Display for MCycles {
@@ -30,7 +31,8 @@ impl From<TCycles> for MCycles {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign)]
+#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub,
+         SubAssign)]
 pub struct TCycles(pub u32);
 
 impl Display for TCycles {

@@ -1,32 +1,22 @@
 //! CPU timer management.
 
 use bytes::ByteExt;
-use cpu::MCycles;
+use cpu::{MCycles, TCycles};
 
 #[derive(Debug, Default)]
 pub struct TimerRegisters {
     pub counter: u8,
     pub modulo: u8,
     pub control: u8,
-
-    divider: u8,
-}
-
-impl TimerRegisters {
-    /// Returns the value of the divider register.
-    pub fn divider(&self) -> u8 {
-        self.divider
-    }
 }
 
 #[derive(Debug, Default)]
 pub struct Timer {
-    /// Divider internal counter. Increments the divider register once it reaches `64` M-cycles.
-    div_counter: u32,
+    /// Divider internal counter. The upper 8 bits are the DIV register.
+    div_counter: TCycles,
 
-    // TODO: We might be able to just use `div_counter` for this.
     /// Timer internal counter.
-    timer_counter: u32,
+    timer_counter: MCycles,
 
     /// The amount of time ticked since the last call to `reset_diff`.
     diff: u32,
@@ -35,31 +25,31 @@ pub struct Timer {
 }
 
 impl Timer {
+    pub fn divider(&self) -> u8 {
+        (self.div_counter.0 >> 8) as u8
+    }
+
     /// Increment all timer-related registers, based on the M-time of the last instruction.
     ///
     /// Requests the timer interrupt if necessary.
     pub(super) fn tick(&mut self, mtime: MCycles, interrupt_requested: &mut bool) {
         self.diff += mtime.0;
-        self.div_counter += mtime.0;
 
         // The divider is always counting, regardless of whether the timer is enabled.
-        while self.div_counter >= 64 {
-            self.div_counter -= 64;
-            self.reg.divider = self.reg.divider.wrapping_add(1);
-        }
+        self.div_counter += TCycles::from(mtime);
 
         if !self.is_enabled() {
             return;
         }
 
-        self.timer_counter += mtime.0;
+        self.timer_counter += mtime;
 
         // The timer will increment at a frequency determined by the control register.
         let threshold = match self.reg.control & 0x3 {
-            0 => 256, // 4KHz
-            1 => 4,   // 256KHz
-            2 => 16,  // 64KHz
-            3 => 64,  // 16KHz
+            0 => MCycles(256), // 4KHz
+            1 => MCycles(4),   // 256KHz
+            2 => MCycles(16),  // 64KHz
+            3 => MCycles(64),  // 16KHz
             _ => unreachable!(),
         };
 
@@ -100,9 +90,8 @@ impl Timer {
     }
 
     pub fn reset_divider(&mut self) {
-        self.reg.divider = 0;
-        self.div_counter = 0;
-        self.timer_counter = 0;
+        self.div_counter = TCycles(0);
+        self.timer_counter = MCycles(0);
     }
 
     pub fn is_enabled(&self) -> bool {
@@ -125,13 +114,13 @@ mod tests {
             timer.tick(MCycles(1), &mut interrupt_requested);
         }
 
-        assert_eq!(timer.reg.divider(), 1);
+        assert_eq!(timer.divider(), 1);
 
         for _ in 0..128 {
             timer.tick(MCycles(1), &mut interrupt_requested);
         }
 
-        assert_eq!(timer.reg.divider(), 3);
+        assert_eq!(timer.divider(), 3);
     }
 
     #[test]
@@ -142,18 +131,18 @@ mod tests {
         for _ in 0..63 {
             timer.tick(MCycles(1), &mut interrupt_requested);
         }
-        assert_eq!(timer.reg.divider(), 0);
+        assert_eq!(timer.divider(), 0);
 
         timer.reset_divider();
-        assert_eq!(timer.reg.divider(), 0);
+        assert_eq!(timer.divider(), 0);
 
         for _ in 0..63 {
             timer.tick(MCycles(1), &mut interrupt_requested);
         }
-        assert_eq!(timer.reg.divider(), 0);
+        assert_eq!(timer.divider(), 0);
 
         timer.tick(MCycles(1), &mut interrupt_requested);
-        assert_eq!(timer.reg.divider(), 1);
+        assert_eq!(timer.divider(), 1);
     }
 
     #[test]

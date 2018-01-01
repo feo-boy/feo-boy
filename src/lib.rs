@@ -270,14 +270,14 @@ mod tests {
         let mut emulator = Emulator::new();
         emulator.cpu.state = State::Halted;
 
-        assert_eq!(emulator.bus.timer.reg.divider(), 0);
+        assert_eq!(emulator.bus.timer.divider(), 0);
 
         // Step at least enough times for the divider to increase.
         for _ in 0..64 {
             emulator.step();
         }
 
-        assert!(emulator.bus.timer.reg.divider() > 0);
+        assert!(emulator.bus.timer.divider() > 0);
     }
 
     #[test]
