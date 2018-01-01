@@ -49,7 +49,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use bus::Bus;
-use cpu::{Cpu, Instruction, TCycles};
+use cpu::{Cpu, Instruction, MCycles, TCycles};
 use graphics::Ppu;
 use audio::SoundController;
 use memory::Mmu;
@@ -145,9 +145,17 @@ impl Emulator {
     pub fn step(&mut self) -> TCycles {
         self.bus.timer.reset_diff();
 
+        let mut cycles = MCycles(0);
+
         self.cpu.handle_interrupts(&mut self.bus);
+        cycles += self.bus.timer.diff();
+
+        // FIXME: Hack: the cycle timing debug assert at the end of Cpu::execute is dependent on
+        // this state, but it shouldn't be.
+        self.bus.timer.reset_diff();
 
         self.cpu.step(&mut self.bus);
+        cycles += self.bus.timer.diff();
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;
@@ -156,7 +164,7 @@ impl Emulator {
             }
         }
 
-        TCycles::from(self.bus.timer.diff())
+        TCycles::from(cycles)
     }
 
     pub fn press(&mut self, button: Button) {
@@ -230,7 +238,7 @@ impl Emulator {
     /// Returns the current value of the program counter and the instruction at that memory
     /// address.
     pub fn current_instruction(&self) -> (u16, Instruction) {
-        (self.cpu.reg.pc, self.cpu.fetch(&self.bus))
+        (self.cpu.reg.pc, self.cpu.current_instruction(&self.bus))
     }
 }
 
@@ -261,7 +269,6 @@ impl Debugger {
 mod tests {
     use super::Emulator;
     use super::cpu::State;
-    use super::memory::Addressable;
 
     #[test]
     fn tick_while_halted() {
@@ -297,7 +304,7 @@ mod tests {
         for (offset, byte) in test_program.into_iter().enumerate() {
             emulator
                 .bus
-                .write_byte(emulator.cpu.reg.pc + offset as u16, *byte);
+                .write_byte_no_tick(emulator.cpu.reg.pc + offset as u16, *byte);
         }
 
         emulator.step();

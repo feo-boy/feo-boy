@@ -1,6 +1,5 @@
 use bus::Bus;
 use cpu::{arithmetic, Cpu, TCycles};
-use memory::Addressable;
 
 /// Prefix instruction definitions.
 pub(super) static PREFIX_INSTRUCTIONS: [PrefixInstructionDef; 0x100] =

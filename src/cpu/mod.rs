@@ -10,7 +10,7 @@ use std::default::Default;
 use std::fmt::{self, Display};
 
 use bus::Bus;
-use memory::{Addressable, Mmu};
+use memory::Mmu;
 
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
@@ -112,6 +112,20 @@ pub struct Interrupts {
     pub joypad: InterruptState,
 }
 
+impl Interrupts {
+    /// Returns true if there is a requested and enabled interrupt.
+    pub fn pending(&self) -> bool {
+        [
+            &self.vblank,
+            &self.lcd_status,
+            &self.timer,
+            &self.serial,
+            &self.joypad,
+        ].iter()
+            .any(|int| int.requested && int.enabled)
+    }
+}
+
 /// The CPU.
 #[derive(Debug, Default)]
 pub struct Cpu {
@@ -160,9 +174,10 @@ impl Cpu {
                         $bus.interrupts.enabled = false;
                         $bus.interrupts.$interrupt.requested = false;
 
-                        self.rst($vector, $bus);
+                        // Internal delay
+                        $bus.tick(MCycles(3));
 
-                        $bus.tick(MCycles(5));
+                        self.rst($vector, $bus);
 
                         return;
                     }
@@ -209,7 +224,7 @@ impl Cpu {
     /// Push a value onto the stack.
     ///
     /// Uses the current value of `SP`, and decrements it.
-    pub fn push<B: Addressable>(&mut self, value: u16, bus: &mut B) {
+    pub fn push(&mut self, value: u16, bus: &mut Bus) {
         self.reg.sp = self.reg.sp.wrapping_sub(2);
         bus.write_word(self.reg.sp, value);
     }
@@ -217,7 +232,7 @@ impl Cpu {
     /// Pop a value off the stack.
     ///
     /// Uses the current value of `SP`, and increments it.
-    pub fn pop<B: Addressable>(&mut self, bus: &B) -> u16 {
+    pub fn pop(&mut self, bus: &mut Bus) -> u16 {
         let value = bus.read_word(self.reg.sp);
         self.reg.sp = self.reg.sp.wrapping_add(2);
         value
@@ -269,16 +284,16 @@ mod tests {
 
     #[test]
     fn push_pop() {
-        let mut bus = [0u8; 0x10000];
+        let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
-        cpu.reg.sp = 0xFFF0;
+        cpu.reg.sp = 0xE000;
 
         cpu.push(0xcafe, &mut bus);
-        assert_eq!(cpu.pop(&bus), 0xcafe);
+        assert_eq!(cpu.pop(&mut bus), 0xcafe);
 
-        cpu.reg.sp = 0;
+        cpu.reg.sp = 0xD000;
         cpu.push(0xbeef, &mut bus);
-        assert_eq!(cpu.pop(&bus), 0xbeef);
+        assert_eq!(cpu.pop(&mut bus), 0xbeef);
     }
 }

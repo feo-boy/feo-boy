@@ -16,7 +16,6 @@ use smallvec::SmallVec;
 use bus::Bus;
 use bytes::WordExt;
 use cpu::{arithmetic, Flags, MCycles, State, TCycles};
-use memory::Addressable;
 
 mod prefix;
 use cpu::instructions::prefix::PREFIX_INSTRUCTIONS;
@@ -116,8 +115,24 @@ impl Display for Instruction {
 }
 
 impl super::Cpu {
+    /// Retrieves the current instruction. Does not consume any cycles.
+    pub fn current_instruction(&self, bus: &Bus) -> Instruction {
+        let byte = bus.read_byte_no_tick(self.reg.pc);
+
+        let def = &INSTRUCTIONS[byte as usize];
+
+        let operands = (0..def.num_operands)
+            .map(|i| bus.read_byte_no_tick(self.reg.pc + 1 + u16::from(i)))
+            .collect();
+
+        Instruction {
+            def: def,
+            operands: operands,
+        }
+    }
+
     /// Decodes the next instruction.
-    pub fn fetch<B: Addressable>(&self, bus: &B) -> Instruction {
+    pub fn fetch(&self, bus: &mut Bus) -> Instruction {
         let byte = bus.read_byte(self.reg.pc);
 
         let def = &INSTRUCTIONS[byte as usize];
@@ -158,8 +173,6 @@ impl super::Cpu {
             self.halt_bug = false;
         }
 
-        let diff = bus.timer.diff();
-
         // Execute the instruction.
         match instruction.def.byte {
             // NOP
@@ -173,6 +186,9 @@ impl super::Cpu {
                 if !self.reg.f.contains(Flags::ZERO) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -181,6 +197,9 @@ impl super::Cpu {
                 if !self.reg.f.contains(Flags::CARRY) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -222,17 +241,29 @@ impl super::Cpu {
 
             // RET NZ
             0xc0 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 if !self.reg.f.contains(Flags::ZERO) {
                     self.ret(bus);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
             // RET NC
             0xd0 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 if !self.reg.f.contains(Flags::CARRY) {
                     self.ret(bus);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -386,6 +417,9 @@ impl super::Cpu {
                 if !self.reg.f.contains(Flags::ZERO) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -394,6 +428,9 @@ impl super::Cpu {
                 if !self.reg.f.contains(Flags::CARRY) {
                     self.reg.pc = LittleEndian::read_u16(&instruction.operands);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -412,16 +449,36 @@ impl super::Cpu {
             }
 
             // INC BC
-            0x03 => self.reg.bc_mut().add_assign(1),
+            0x03 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.bc_mut().add_assign(1);
+            }
 
             // INC DE
-            0x13 => self.reg.de_mut().add_assign(1),
+            0x13 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.de_mut().add_assign(1);
+            }
 
             // INC HL
-            0x23 => self.reg.hl_mut().add_assign(1),
+            0x23 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.hl_mut().add_assign(1);
+            }
 
             // INC SP
-            0x33 => self.reg.sp = self.reg.sp.wrapping_add(1),
+            0x33 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.sp = self.reg.sp.wrapping_add(1);
+            }
 
             // LD B,E
             0x43 => self.reg.b = self.reg.e,
@@ -460,7 +517,12 @@ impl super::Cpu {
             }
 
             // JP a16
-            0xc3 => self.reg.pc = LittleEndian::read_u16(&instruction.operands),
+            0xc3 => {
+                self.reg.pc = LittleEndian::read_u16(&instruction.operands);
+
+                // Internal delay
+                bus.tick(MCycles(1));
+            }
 
             // UNUSED
             // 0xd3
@@ -527,6 +589,10 @@ impl super::Cpu {
             0xc4 => {
                 if !self.reg.f.contains(Flags::ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
+
                     self.call(address, bus);
                     condition_taken = true;
                 }
@@ -536,6 +602,10 @@ impl super::Cpu {
             0xd4 => {
                 if !self.reg.f.contains(Flags::CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
+
                     self.call(address, bus);
                     condition_taken = true;
                 }
@@ -601,24 +671,36 @@ impl super::Cpu {
 
             // PUSH BC
             0xc5 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 let bc = self.reg.bc();
                 self.push(bc, bus);
             }
 
             // PUSH DE
             0xd5 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 let de = self.reg.de();
                 self.push(de, bus);
             }
 
             // PUSH HL
             0xe5 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 let hl = self.reg.hl();
                 self.push(hl, bus);
             }
 
             // PUSH AF
             0xf5 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 let af = self.reg.af();
                 self.push(af, bus);
             }
@@ -651,7 +733,7 @@ impl super::Cpu {
             0x76 => if bus.interrupts.enabled {
                 // HALT executed normally.
                 self.state = State::Halted;
-            } else if bus.read_byte(0xFFFF) & bus.read_byte(0xFF0F) & 0x1F == 0 {
+            } else if !bus.interrupts.pending() {
                 // HALT mode entered, but interrupts aren't serviced.
                 self.state = State::Halted;
             } else {
@@ -747,16 +829,36 @@ impl super::Cpu {
             }
 
             // RST 00H
-            0xc7 => self.rst(0x0000, bus),
+            0xc7 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0000, bus);
+            }
 
             // RST 10H
-            0xd7 => self.rst(0x0010, bus),
+            0xd7 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0010, bus);
+            }
 
             // RST 20H
-            0xe7 => self.rst(0x0020, bus),
+            0xe7 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0020, bus);
+            }
 
             // RST 30H
-            0xf7 => self.rst(0x0030, bus),
+            0xf7 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0030, bus);
+            }
 
             // LD (a16),SP
             0x08 => {
@@ -765,13 +867,21 @@ impl super::Cpu {
             }
 
             // JR r8
-            0x18 => self.jr(instruction.operands[0] as i8),
+            0x18 => {
+                self.jr(instruction.operands[0] as i8);
+
+                // Internal delay
+                bus.tick(MCycles(1));
+            }
 
             // JR Z,r8
             0x28 => {
                 if self.reg.f.contains(Flags::ZERO) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -780,6 +890,9 @@ impl super::Cpu {
                 if self.reg.f.contains(Flags::CARRY) {
                     self.jr(instruction.operands[0] as i8);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -821,47 +934,81 @@ impl super::Cpu {
 
             // RET Z
             0xc8 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 if self.reg.f.contains(Flags::ZERO) {
                     self.ret(bus);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
             // RET C
             0xd8 => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 if self.reg.f.contains(Flags::CARRY) {
                     self.ret(bus);
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
             // ADD SP,r8
-            0xe8 => self.reg.add_sp(instruction.operands[0] as i8),
+            0xe8 => {
+                self.reg.add_sp(instruction.operands[0] as i8);
+
+                // Internal delay
+                bus.tick(MCycles(2));
+            }
 
             // LD HL,SP+r8
             // LDHL SP,r8
-            0xf8 => self.reg.ld_hl_sp_r8(instruction.operands[0] as i8),
+            0xf8 => {
+                self.reg.ld_hl_sp_r8(instruction.operands[0] as i8);
+
+                // Internal delay
+                bus.tick(MCycles(1));
+            }
 
             // ADD HL,BC
             0x09 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
                 let bc = self.reg.bc();
                 self.reg.add_hl(bc);
             }
 
             // ADD HL,DE
             0x19 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
                 let de = self.reg.de();
                 self.reg.add_hl(de);
             }
 
             // ADD HL,HL
             0x29 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
                 let hl = self.reg.hl();
                 self.reg.add_hl(hl);
             }
 
             // ADD HL,SP
             0x39 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
                 let sp = self.reg.sp;
                 self.reg.add_hl(sp);
             }
@@ -905,19 +1052,30 @@ impl super::Cpu {
             // RET
             0xc9 => {
                 self.ret(bus);
+
+                // Internal delay
+                bus.tick(MCycles(1));
             }
 
             // RETI
             0xD9 => {
                 self.ret(bus);
                 bus.interrupts.enabled = true;
+
+                // Internal delay
+                bus.tick(MCycles(1));
             }
 
             // JP (HL)
             0xe9 => self.reg.pc = self.reg.hl(),
 
             // LD SP,HL
-            0xf9 => self.reg.sp = self.reg.hl(),
+            0xf9 => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.sp = self.reg.hl();
+            }
 
             // LD A,(BC)
             0x0a => self.reg.a = bus.read_byte(self.reg.bc()),
@@ -979,6 +1137,9 @@ impl super::Cpu {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -988,6 +1149,9 @@ impl super::Cpu {
                     let address = LittleEndian::read_u16(&instruction.operands);
                     self.reg.pc = address;
                     condition_taken = true;
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
                 }
             }
 
@@ -1004,16 +1168,36 @@ impl super::Cpu {
             }
 
             // DEC BC
-            0x0b => self.reg.bc_mut().sub_assign(1),
+            0x0b => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.bc_mut().sub_assign(1);
+            }
 
             // DEC DE
-            0x1b => self.reg.de_mut().sub_assign(1),
+            0x1b => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.de_mut().sub_assign(1);
+            }
 
             // DEC HL
-            0x2b => self.reg.hl_mut().sub_assign(1),
+            0x2b => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.hl_mut().sub_assign(1);
+            }
 
             // DEC SP
-            0x3b => self.reg.sp = self.reg.sp.wrapping_sub(1),
+            0x3b => {
+                // Internal delay (not observable)
+                bus.tick(MCycles(1));
+
+                self.reg.sp = self.reg.sp.wrapping_sub(1);
+            }
 
             // LD C,E
             0x4b => self.reg.c = self.reg.e,
@@ -1117,6 +1301,10 @@ impl super::Cpu {
             0xcc => {
                 if self.reg.f.contains(Flags::ZERO) {
                     let address = LittleEndian::read_u16(&instruction.operands);
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
+
                     self.call(address, bus);
                     condition_taken = true;
                 }
@@ -1126,6 +1314,10 @@ impl super::Cpu {
             0xdc => {
                 if self.reg.f.contains(Flags::CARRY) {
                     let address = LittleEndian::read_u16(&instruction.operands);
+
+                    // Internal delay
+                    bus.tick(MCycles(1));
+
                     self.call(address, bus);
                     condition_taken = true;
                 }
@@ -1188,6 +1380,10 @@ impl super::Cpu {
             // CALL a16
             0xcd => {
                 let address = LittleEndian::read_u16(&instruction.operands);
+
+                // Internal delay
+                bus.tick(MCycles(1));
+
                 self.call(address, bus);
             }
 
@@ -1310,16 +1506,36 @@ impl super::Cpu {
             }
 
             // RST 08H
-            0xcf => self.rst(0x0008, bus),
+            0xcf => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0008, bus);
+            }
 
             // RST 18H
-            0xdf => self.rst(0x0018, bus),
+            0xdf => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0018, bus);
+            }
 
             // RST 28H
-            0xef => self.rst(0x0028, bus),
+            0xef => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0028, bus);
+            }
 
             // RST 38H
-            0xff => self.rst(0x0038, bus),
+            0xff => {
+                // Internal delay
+                bus.tick(MCycles(1));
+
+                self.rst(0x0038, bus);
+            }
 
             // Unused instructions
             0xe3 | 0xd3 | 0xf4 | 0xe4 | 0xeb | 0xdb | 0xfc | 0xec | 0xdd | 0xed | 0xfd => {
@@ -1329,24 +1545,20 @@ impl super::Cpu {
             _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
-        let cycles = match (condition_taken, instruction.def.condition_cycles) {
-            (true, Some(cycles)) => cycles,
-            _ => instruction.cycles(),
-        };
+        if cfg!(debug_assertions) {
+            let cycles = match (condition_taken, instruction.def.condition_cycles) {
+                (true, Some(cycles)) => cycles,
+                _ => instruction.cycles(),
+            };
 
-        // If we didn't tick the timer manually (like we do for memory accesses), then just tick
-        // the number of cycles that the instruction takes.
-        if bus.timer.diff() - diff == MCycles(0) {
-            bus.tick(MCycles::from(cycles));
+            debug_assert_eq!(
+                bus.timer.diff(),
+                MCycles::from(cycles),
+                "incorrect timing for instruction {:#04x} ({})",
+                instruction.def.byte,
+                instruction.def.description
+            );
         }
-
-        debug_assert_eq!(
-            bus.timer.diff() - diff,
-            MCycles::from(cycles),
-            "incorrect timing for instruction {} ({})",
-            instruction.def.byte,
-            instruction.def.description
-        );
     }
 
     /// Pushes the current value of the program counter onto the stack, then jumps to a specific
@@ -1354,21 +1566,21 @@ impl super::Cpu {
     ///
     /// The current value of the program counter is assumed to be the address of the next
     /// instruction.
-    pub fn rst<B: Addressable>(&mut self, addr: u16, bus: &mut B) {
+    pub fn rst(&mut self, addr: u16, bus: &mut Bus) {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = addr;
     }
 
     /// Performs a CALL operation. Does not modify any flags.
-    fn call<B: Addressable>(&mut self, address: u16, bus: &mut B) {
+    fn call(&mut self, address: u16, bus: &mut Bus) {
         let pc = self.reg.pc;
         self.push(pc, bus);
         self.reg.pc = address;
     }
 
     /// Performs a RET operation. Does not modify any flags.
-    fn ret<B: Addressable>(&mut self, bus: &B) {
+    fn ret(&mut self, bus: &mut Bus) {
         self.reg.pc = self.pop(bus);
     }
 
@@ -1385,7 +1597,6 @@ mod tests {
 
     use bus::Bus;
     use cpu::{Cpu, Flags, MCycles, TCycles};
-    use memory::Addressable;
 
     use super::{Instruction, InstructionDef, INSTRUCTIONS};
 
@@ -1573,20 +1784,21 @@ mod tests {
 
     #[test]
     fn fetch() {
-        let mut bus = [0; 0x10000];
-        let cpu = Cpu::new();
-
-        bus[0x00] = 0x00;
-        let nop = cpu.fetch(&bus);
+        let mut bus = Bus::default();
+        let mut cpu = Cpu::new();
+        bus.write_byte_no_tick(0xC000, 0x00);
+        cpu.reg.pc = 0xC000;
+        let nop = cpu.fetch(&mut bus);
         assert_eq!(nop.def.byte, 0x00);
         assert_eq!(nop.def.num_operands, 0);
         assert_eq!(nop.operands.len(), 0);
 
-        let mut bus = [0; 0x10000];
-        let cpu = Cpu::new();
-        bus[0x0000] = 0xcb;
-        bus[0x0001] = 0x7c;
-        let prefix_instruction = cpu.fetch(&bus);
+        let mut bus = Bus::default();
+        let mut cpu = Cpu::new();
+        bus.write_byte_no_tick(0xC000, 0xcb);
+        bus.write_byte_no_tick(0xC001, 0x7c);
+        cpu.reg.pc = 0xC000;
+        let prefix_instruction = cpu.fetch(&mut bus);
         assert_eq!(prefix_instruction.def.byte, 0xcb);
         assert_eq!(prefix_instruction.def.num_operands, 1);
         assert_eq!(prefix_instruction.operands.into_vec().as_slice(), &[0x7c]);
@@ -1601,6 +1813,7 @@ mod tests {
             def: &INSTRUCTIONS[0x00],
             ..Default::default()
         };
+        bus.tick(MCycles(1));
 
         cpu.execute(&nop, &mut bus);
         assert_eq!(bus.timer.diff(), MCycles(1));
@@ -1618,10 +1831,11 @@ mod tests {
             def: &INSTRUCTIONS[0xff],
             operands: Default::default(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0x38);
-        assert_eq!(cpu.pop(&bus), 0xAB + 1);
+        assert_eq!(cpu.pop(&mut bus), 0xAB + 1);
     }
 
     #[test]
@@ -1636,6 +1850,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
+        bus.tick(MCycles(2));
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 12);
         assert_eq!(bus.timer.diff(), MCycles(3));
@@ -1646,6 +1861,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[!0x0a + 1]),
         };
+        bus.tick(MCycles(2));
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 4);
         assert_eq!(bus.timer.diff(), MCycles(3));
@@ -1657,6 +1873,7 @@ mod tests {
             def: &INSTRUCTIONS[0x20],
             operands: SmallVec::from_slice(&[0x0a]),
         };
+        bus.tick(MCycles(2));
         cpu.execute(&instruction, &mut bus);
         assert_eq!(cpu.reg.pc, 6);
         assert_eq!(bus.timer.diff(), MCycles(2));
@@ -1689,6 +1906,7 @@ mod tests {
             def: &INSTRUCTIONS[0xe2],
             operands: Default::default(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xFF42), 0xab);
@@ -1722,6 +1940,7 @@ mod tests {
             def: &INSTRUCTIONS[0xea],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
+        bus.tick(MCycles(3));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xc000), 0x11);
@@ -1732,12 +1951,13 @@ mod tests {
         let mut bus = Bus::default();
         let mut cpu = Cpu::new();
 
-        bus.write_byte(0xc000, 0xaa);
+        bus.write_byte_no_tick(0xc000, 0xaa);
 
         let instruction = Instruction {
             def: &INSTRUCTIONS[0xfa],
             operands: SmallVec::from_slice(&[0x00, 0xc0]),
         };
+        bus.tick(MCycles(3));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xaa);
@@ -1754,6 +1974,7 @@ mod tests {
             def: &INSTRUCTIONS[0x08],
             operands: SmallVec::from_slice(&[0x00, 0xC1]),
         };
+        bus.tick(MCycles(3));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(bus.read_byte(0xC100), 0xF8);
@@ -1770,7 +1991,7 @@ mod tests {
         cpu.call(4, &mut bus);
 
         assert_eq!(cpu.reg.pc, 4);
-        assert_eq!(cpu.pop(&bus), 1);
+        assert_eq!(cpu.pop(&mut bus), 1);
     }
 
     #[test]
@@ -1780,7 +2001,7 @@ mod tests {
 
         cpu.reg.sp = 0xffff;
         cpu.push(5, &mut bus);
-        cpu.ret(&bus);
+        cpu.ret(&mut bus);
 
         assert_eq!(cpu.reg.sp, 0xffff);
         assert_eq!(cpu.reg.pc, 5);
@@ -1797,6 +2018,7 @@ mod tests {
             def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction_1, &mut bus);
 
         assert_eq!(cpu.reg.f, Flags::CARRY);
@@ -1805,10 +2027,12 @@ mod tests {
             .f
             .insert(Flags::ZERO | Flags::SUBTRACT | Flags::HALF_CARRY | Flags::CARRY);
 
+        bus.timer.reset_diff();
         let instruction_2 = Instruction {
             def: &INSTRUCTIONS[0x37],
             operands: SmallVec::new(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction_2, &mut bus);
 
         assert_eq!(cpu.reg.f, Flags::ZERO | Flags::CARRY);
@@ -1826,6 +2050,7 @@ mod tests {
             def: &INSTRUCTIONS[0xe9],
             operands: SmallVec::new(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.pc, 0xbeef);
@@ -1843,6 +2068,7 @@ mod tests {
             def: &INSTRUCTIONS[0xf9],
             operands: SmallVec::new(),
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.sp, 0xbeef);
@@ -1853,12 +2079,14 @@ mod tests {
         let mut bus = Bus::default();
         let mut cpu = Cpu::new();
         cpu.reg.sp = 0xFFFD;
-        bus.write_word(cpu.reg.sp, 0xFFFF);
+        bus.write_byte_no_tick(cpu.reg.sp, 0xFF);
+        bus.write_byte_no_tick(cpu.reg.sp + 1, 0xFF);
 
         let instruction = Instruction {
             def: &INSTRUCTIONS[0xF1],
             ..Default::default()
         };
+        bus.tick(MCycles(1));
         cpu.execute(&instruction, &mut bus);
 
         assert_eq!(cpu.reg.a, 0xFF);

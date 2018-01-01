@@ -5,6 +5,7 @@ mod timer;
 use std::fmt::{self, Display};
 use std::ops::Range;
 
+use byteorder::{ByteOrder, LittleEndian};
 use itertools::Itertools;
 
 use audio::SoundController;
@@ -30,8 +31,40 @@ pub struct Bus {
     pub button_state: ButtonState,
 }
 
-impl Addressable for Bus {
-    fn read_byte(&self, address: u16) -> u8 {
+impl Bus {
+    /// Returns the word at a given memory address, read in little-endian order. Each component is
+    /// ticked two cycles.
+    pub fn read_word(&mut self, address: u16) -> u16 {
+        LittleEndian::read_u16(&[self.read_byte(address), self.read_byte(address + 1)])
+    }
+
+    /// Writes a word to a given memory address in little-endian order. Each component is ticked
+    /// two cycles.
+    pub fn write_word(&mut self, address: u16, word: u16) {
+        let mut bytes = [0u8; 2];
+
+        LittleEndian::write_u16(&mut bytes, word);
+
+        self.write_byte(address, bytes[0]);
+        self.write_byte(address + 1, bytes[1]);
+    }
+
+    /// Reads a single byte from memory. Ticks each component a cycle.
+    pub fn read_byte(&mut self, address: u16) -> u8 {
+        let byte = self.read_byte_no_tick(address);
+        self.tick(MCycles(1));
+        byte
+    }
+
+    /// Writes a single byte to memory. Ticks each component a cycle.
+    pub fn write_byte(&mut self, address: u16, byte: u8) {
+        self.write_byte_no_tick(address, byte);
+        self.tick(MCycles(1));
+    }
+
+    /// Reads a single byte from memory. This read happens instantaneously: no components are
+    /// ticked.
+    pub fn read_byte_no_tick(&self, address: u16) -> u8 {
         match address {
             0x8000...0x9FFF | 0xFE00...0xFE9F => self.ppu.read_byte(address),
             0xFF00...0xFF7F | 0xFFFF => self.read_io_register(address),
@@ -39,20 +72,19 @@ impl Addressable for Bus {
         }
     }
 
-    fn write_byte(&mut self, address: u16, byte: u8) {
+    /// Writes a single byte to memory. This read happens instantaneously: no components are
+    /// ticked.
+    pub fn write_byte_no_tick(&mut self, address: u16, byte: u8) {
         match address {
             0x8000...0x9FFF | 0xFE00...0xFE9F => self.ppu.write_byte(address, byte),
             0xFF00...0xFF7F | 0xFFFF => self.write_io_register(address, byte),
             _ => self.mmu.write_byte(address, byte),
         }
     }
-}
 
-impl Bus {
     /// Tick each component individually.
     pub fn tick(&mut self, cycles: MCycles) {
-        self.ppu
-            .step(TCycles::from(cycles), &mut self.interrupts /* FIXME */);
+        self.ppu.step(TCycles::from(cycles), &mut self.interrupts);
         self.timer
             .tick(cycles, &mut self.interrupts.timer.requested);
     }
@@ -451,9 +483,10 @@ impl Bus {
                 // fills the XX in 0xXXNN, where 00 <= NN < A0
                 let transfer_address = u16::from(byte) << 8;
 
+                // FIXME: The timing is more subtle than this.
                 for i in 0..0xA0 {
-                    let transfer_byte = self.read_byte(transfer_address + (i as u16));
-                    self.write_byte(0xFE00 + (i as u16), transfer_byte);
+                    let transfer_byte = self.read_byte_no_tick(transfer_address + (i as u16));
+                    self.write_byte_no_tick(0xFE00 + (i as u16), transfer_byte);
                 }
             }
 
@@ -518,7 +551,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.address_iter
             .next()
-            .map(|addr| self.bus.read_byte(addr as u16))
+            .map(|addr| self.bus.read_byte_no_tick(addr as u16))
     }
 }
 
@@ -557,7 +590,7 @@ mod tests {
 
     use graphics::{BackgroundPalette, Shade};
     use input::Button;
-    use memory::{Addressable, BIOS_SIZE};
+    use memory::BIOS_SIZE;
 
     #[test]
     fn read_write() {
