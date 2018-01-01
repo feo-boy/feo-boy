@@ -145,10 +145,9 @@ impl Emulator {
     pub fn step(&mut self) -> TCycles {
         self.bus.timer.reset_diff();
 
-        self.cpu.step(&mut self.bus);
-
-        // FIXME: Make sure the timing is correct here
         self.cpu.handle_interrupts(&mut self.bus);
+
+        self.cpu.step(&mut self.bus);
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;
@@ -316,7 +315,7 @@ mod tests {
         emulator.bus.interrupts.timer.requested = true;
 
         emulator.step();
-        assert_eq!(emulator.cpu.reg.pc, 0xC002);
+        assert_eq!(emulator.cpu.reg.pc, 0xC003);
         assert!(emulator.bus.interrupts.timer.requested);
     }
 
