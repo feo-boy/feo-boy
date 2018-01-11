@@ -130,6 +130,126 @@ impl Frequency {
     }
 }
 
+/// The sound length for channel 3.
+#[derive(Debug, Default)]
+pub struct BigLength {
+    /// Sound length (0-255)
+    pub length: u8,
+}
+
+// TODO test
+impl BigLength {
+    /// Gets the result of reading the BigLength register for the current register state.
+    pub fn read(&self) -> u8 {
+        self.length
+    }
+
+    /// Modifies the BigLength state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.length = byte;
+    }
+}
+
+/// The output level.
+#[derive(Debug, Default)]
+pub struct OutputLevel {
+    /// The output level (0-3).
+    pub output_level: u8,
+}
+
+// TODO test
+impl OutputLevel {
+    /// Gets the result of reading the output level for the current register state.
+    pub fn read(&self) -> u8 {
+        self.output_level
+    }
+
+    /// Modifies the output level state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.output_level = (byte >> 5) & 0x3;
+    }
+}
+
+/// The sound length for channel 4.
+#[derive(Debug, Default)]
+pub struct Length {
+    /// Sound length (0-63).
+    pub length: u8,
+}
+
+// TODO test
+impl Length {
+    /// Gets the result of reading the length register for the current register state.
+    pub fn read(&self) -> u8 {
+        self.length
+    }
+
+    /// Modifies the length state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.length = byte & 0x3F;
+    }
+}
+
+/// The polynomial counter for channel 4.
+#[derive(Debug, Default)]
+pub struct PolynomialCounter {
+    /// The shift clock frequency.
+    pub shift_clock_frequency: u8,
+
+    /// Counter step/width (false=15 bits, true=7 bits).
+    pub counter_step: bool,
+
+    /// Dividing ratio of frequencies.
+    pub divide_ratio: u8,
+}
+
+// TODO test
+impl PolynomialCounter {
+    /// Gets the result of reading the PolynomialCounter state for the current register state.
+    pub fn read(&self) -> u8 {
+        let mut byte = self.shift_clock_frequency << 4;
+        byte |= self.divide_ratio;
+        byte.set_bit(3, self.counter_step);
+
+        byte
+    }
+
+    /// Modifies the PolynomialCounter state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.shift_clock_frequency = byte >> 4;
+        self.counter_step = byte.has_bit_set(3);
+        self.divide_ratio = byte & 0x7;
+    }
+}
+
+/// The counter/consecutive selection and initial flag.
+#[derive(Debug, Default)]
+pub struct InitialCounterConsecutive {
+    /// Initial flag (true = restart sound) - write only.
+    pub initial: bool,
+
+    /// Counter/consecutive selection (true = stop output when length in NR41 expires).
+    pub counter: bool,
+}
+
+// TODO test
+impl InitialCounterConsecutive {
+    /// Gets the result of reading the InitialCounterConsecutive state for the current register
+    /// state.
+    pub fn read(&self) -> u8 {
+        let mut byte = 0;
+        byte.set_bit(6, self.counter);
+
+        byte
+    }
+
+    /// Modifies the InitialCounterConsecutive state according to the written byte.
+    pub fn write(&mut self, byte: u8) {
+        self.initial = byte.has_bit_set(7);
+        self.counter = byte.has_bit_set(6);
+    }
+}
+
 /// A single Game Boy sound channel.
 #[derive(Debug, Default)]
 pub struct Sound {
@@ -155,6 +275,31 @@ pub struct Sound {
     pub frequency: Frequency,
 }
 
+/// Sound channel 4.
+#[derive(Debug, Default)]
+pub struct Sound4 {
+    /// Whether or not the sound is enabled.
+    pub is_on: bool,
+
+    /// Whether to output this sound to the SO1 terminal.
+    pub so1_enabled: bool,
+
+    /// Whether to output this sound to the SO2 terminal.
+    pub so2_enabled: bool,
+
+    /// The sound length.
+    pub length: Length,
+
+    /// The volumne envelope data.
+    pub envelope: Envelope,
+
+    /// The polynomial counter.
+    pub polynomial_counter: PolynomialCounter,
+
+    /// The initial flag and counter/consecutive selection.
+    pub initial_counter_consecutive: InitialCounterConsecutive,
+}
+
 /// The controller for the four sound channels output by the Game Boy.
 #[derive(Debug, Default)]
 pub struct SoundController {
@@ -168,7 +313,7 @@ pub struct SoundController {
     pub sound_3: Sound,
 
     /// Sound 4: White noise with an envelope function.
-    pub sound_4: Sound,
+    pub sound_4: Sound4,
 
     /// Toggle whether or not sound is enabled.
     pub sound_enabled: bool,
