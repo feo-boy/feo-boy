@@ -522,14 +522,16 @@ impl Addressable for SoundController {
             }
 
             // NR52: Sound on/off
-            //
-            // Bit 7 - All sound on/off
-            // Bit 3 - Sound 4 on flag
-            // Bit 2 - Sound 3 on flag
-            // Bit 1 - Sound 2 on flag
-            // Bit 0 - sound 1 on flag
+            // Bit 7 - All sound on/off  (0: stop all sound circuits) (Read/Write)
+            //         Note that disabling sound destroys all the contents of the sound registers,
+            //         and it is not possible to access any other sound registers while sound is
+            //         disabled.
+            // Bit 3 - Sound 4 ON flag (Read Only)
+            // Bit 2 - Sound 3 ON flag (Read Only)
+            // Bit 1 - Sound 2 ON flag (Read Only)
+            // Bit 0 - Sound 1 ON flag (Read Only)
             0xFF26 => {
-                let mut byte: u8 = 0;
+                let mut byte: u8 = 0xFF;
 
                 byte.set_bit(0, self.sound_1.is_on);
                 byte.set_bit(1, self.sound_2.is_on);
@@ -708,14 +710,23 @@ impl Addressable for SoundController {
             }
 
             // NR52: Sound on/off
-            // Writing to bit 7 of this address enables or disables all sound. The other bits of
-            // this address are not writable.
+            // Bit 7 - All sound on/off  (0: stop all sound circuits) (Read/Write)
+            //         Note that disabling sound destroys all the contents of the sound registers,
+            //         and it is not possible to access any other sound registers while sound is
+            //         disabled.
+            // Bit 3 - Sound 4 ON flag (Read Only)
+            // Bit 2 - Sound 3 ON flag (Read Only)
+            // Bit 1 - Sound 2 ON flag (Read Only)
+            // Bit 0 - Sound 1 ON flag (Read Only)
             0xFF26 => {
-                let enable_sound = byte.has_bit_set(7);
-                self.sound_enabled = enable_sound;
+                self.sound_enabled = byte.has_bit_set(7);
 
-                // TODO: Disabling sound allegedly destroys all the contents of the sound
-                // registers.
+                if !self.sound_enabled {
+                    self.sound_1 = Sound::default();
+                    self.sound_2 = Sound::default();
+                    self.sound_3 = Sound3::default();
+                    self.sound_4 = Sound4::default();
+                }
             }
 
             // Channel 3 Wave pattern memory
@@ -1090,7 +1101,7 @@ mod tests {
         let mut sc = SoundController::new();
 
         for i in 0u8..32 {
-            let mut expected: u8 = i & 0x0F;
+            let mut expected: u8 = i | 0xF0;
             expected.set_bit(7, i.has_bit_set(4));
 
             sc.sound_1.is_on = i.has_bit_set(0);
@@ -1105,6 +1116,7 @@ mod tests {
 
     #[test]
     fn ff26_write() {
+        // TODO: need to test that sound registers are cleared
         let mut sc = SoundController::new();
 
         for i_large in 0usize..256 {
