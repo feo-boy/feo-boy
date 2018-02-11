@@ -275,6 +275,31 @@ pub struct Sound {
     pub frequency: Frequency,
 }
 
+/// Sound channel 3.
+#[derive(Debug, Default)]
+pub struct Sound3 {
+    /// Whether or not the sound is enabled.
+    pub is_on: bool,
+
+    /// Whether to output this sound to SO1 terminal.
+    pub so1_enabled: bool,
+
+    /// Whether to output this sound to SO2 terminal.
+    pub so2_enabled: bool,
+
+    /// The volume level of this sound.
+    pub output_level: OutputLevel,
+
+    /// The sound length.
+    pub length: BigLength,
+
+    /// The frequency data.
+    pub frequency: Frequency,
+
+    /// The wave pattern memory for storing arbitrary sound data. Holds 32 4-bit samples.
+    pub wave_pattern: [u8; 16],
+}
+
 /// Sound channel 4.
 #[derive(Debug, Default)]
 pub struct Sound4 {
@@ -310,7 +335,7 @@ pub struct SoundController {
     pub sound_2: Sound,
 
     /// Sound 3: A waveform specificed by the waveform RAM.
-    pub sound_3: Sound,
+    pub sound_3: Sound3,
 
     /// Sound 4: White noise with an envelope function.
     pub sound_4: Sound4,
@@ -346,7 +371,6 @@ impl Addressable for SoundController {
     fn read_byte(&self, address: u16) -> u8 {
         // Access to sound registers, aside from 0xFF26, is disabled unless the sound is on.
         if !self.sound_enabled && address != 0xFF26 {
-            // TODO: Currently assumes that unreadable addresses will be read as 0xFF
             return 0xFF;
         }
 
@@ -404,13 +428,53 @@ impl Addressable for SoundController {
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF19 => self.sound_2.frequency.read_hi(),
 
-            0xFF1A...0xFF23 => {
-                warn!(
-                    "Attempted to read unimplemented sound register {:#0x}. Returning dummy value.",
-                    address
-                );
-                0xFF
-            }
+            // NR30: Channel 3 sound on/off
+            // Bit 7 - Sound channel 3 off (0=Stop, 1=Playback)
+            0xFF1A => if self.sound_3.is_on { 1 } else { 0 },
+
+            // NR31: Channel 3 sound length
+            // Bit 7-0 - Sound length (0-255)
+            0xFF1B => self.sound_3.length.read(),
+
+            // NR32: Channel 3 select output level
+            // Bit 6-5 - Select output level:
+            //           0 - mute
+            //           1 - 100% volume
+            //           2 - 50% volume
+            //           3 - 25% volume
+            0xFF1C => self.sound_3.output_level.read(),
+
+            // NR33: Channel 3 frequency low
+            // Unreadable.
+            0xFF1D => 0xFF,
+
+            // NR34: Channel 3 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF1E => self.sound_3.frequency.read_hi(),
+
+            // NR41: Channel 4 sound length
+            // Bit 5-0 - Sound length data (0-63)
+            0xFF20 => self.sound_4.length.read(),
+
+            // NR42: Channel 4 volume envelope
+            // Bit 7-4 - Initial volume of envelope (0=No sound)
+            // Bit 3   - Envelope direction (0=Decrease, 1=Increase)
+            // Bit 2-0 - Number of envelope sweep (If zero, stop envelope operation)
+            0xFF21 => self.sound_4.envelope.read(),
+
+            // NR43: Channel 4 polynomial counter
+            // Bit 7-4 - Shift clock frequency
+            // Bit 3   - Counter step/width (0=15 bits, 1=7 bits)
+            // Bit 2-0 - Dividing ratio of frequencies
+            0xFF22 => self.sound_4.polynomial_counter.read(),
+
+            // NR44: Channel 4 counter/consecutive; initial
+            // Bit 7 - Initial (1=restart sound) (write only)
+            // Bit 6 - Counter/consecutive selection (1=Stop output when length in NR41 expires)
+            0xFF23 => self.sound_4.initial_counter_consecutive.read(),
 
             // NR50: Channel control / ON-OFF / Volume
             // Specifies the master volume for Left/Right sound output.
@@ -477,6 +541,14 @@ impl Addressable for SoundController {
                 byte
             }
 
+            // Channel 3 Wave pattern memory
+            // Waveform storage for arbitrary sound data. Holds 32 4-bit samples, which are played
+            // back upper 4 bits first.
+            0xFF30...0xFF3F => {
+                let index = address - 0xFF30;
+                self.sound_3.wave_pattern[index as usize]
+            }
+
             _ => panic!(
                 "read out-of-range address in the sound controller: {:#0x}",
                 address
@@ -538,7 +610,7 @@ impl Addressable for SoundController {
             0xFF17 => self.sound_2.envelope.write(byte),
 
             // NR23: Channel 2 frequency low
-            // Unreadable.
+            // Lower 8 bits of the 11-bit frequency
             0xFF18 => self.sound_2.frequency.write_lo(byte),
 
             // NR24: Channel 2 frequency high
@@ -548,50 +620,53 @@ impl Addressable for SoundController {
             // Bit 2-0 - Frequency's higher 3 bits (write only)
             0xFF19 => self.sound_2.frequency.write_hi(byte),
 
-            // NR30 - Channel 3 Sound on/off
-            0xFF1A => {
-                warn!("attempted to modify channel 3 on/off state (unimplemented)");
-            }
+            // NR30: Channel 3 sound on/off
+            // Bit 7 - Sound channel 3 off (0=Stop, 1=Playback)
+            0xFF1A => self.sound_3.is_on = byte.has_bit_set(7),
 
-            // NR31 - Channel 3 Sound Length
-            0xFF1B => {
-                warn!("attempted to modify channel 3 sound length (unimplemented)");
-            }
+            // NR31: Channel 3 sound length
+            // Bit 7-0 - Sound length (0-255)
+            0xFF1B => self.sound_3.length.write(byte),
 
-            // NR32 - Channel 3 Select output level
-            0xFF1C => {
-                warn!("attempted to modify channel 3 output level (unimplemented)");
-            }
+            // NR32: Channel 3 select output level
+            // Bit 6-5 - Select output level:
+            //           0 - mute
+            //           1 - 100% volume
+            //           2 - 50% volume
+            //           3 - 25% volume
+            0xFF1C => self.sound_3.output_level.write(byte),
 
-            // NR33 - Channel 3 Frequency lo data
-            0xFF1D => {
-                warn!("attempted to modify channel 3 frequency lo data (unimplemented)");
-            }
+            // NR33: Channel 3 frequency low
+            // Lower 8 bits of the 11-bit frequency
+            0xFF1D => self.sound_3.frequency.write_lo(byte),
 
-            // NR34 - Channel 3 Frequency hi data
-            0xFF1E => {
-                warn!("attempted to modify channel 3 frequency hi data (unimplemented)");
-            }
+            // NR34: Channel 3 frequency high
+            // Bit 7   - Initial (1 = restart sound) (write only)
+            // Bit 6   - Counter/consecutive selection (1 = stop output when length in NR11
+            //           expires)
+            // Bit 2-0 - Frequency's higher 3 bits (write only)
+            0xFF1E => self.sound_3.frequency.write_hi(byte),
 
-            // NR41 - Channel 4 Sound Length
-            0xFF20 => {
-                warn!("attempted to modify channel 4 sound length (unimplemented)");
-            }
+            // NR41: Channel 4 sound length
+            // Bit 5-0 - Sound length data (0-63)
+            0xFF20 => self.sound_4.length.write(byte),
 
-            // NR42 - Channel 4 Volume Envelope
-            0xFF21 => {
-                warn!("attempted to modify channel 4 volume envelope (unimplemented)");
-            }
+            // NR42: Channel 4 volume envelope
+            // Bit 7-4 - Initial volume of envelope (0=No sound)
+            // Bit 3   - Envelope direction (0=Decrease, 1=Increase)
+            // Bit 2-0 - Number of envelope sweep (If zero, stop envelope operation)
+            0xFF21 => self.sound_4.envelope.write(byte),
 
-            // NR43 - Channel 4 Polynomial Counter
-            0xFF22 => {
-                warn!("attempted to modify channel 4 polynomial counter (unimplemented)");
-            }
+            // NR43: Channel 4 polynomial counter
+            // Bit 7-4 - Shift clock frequency
+            // Bit 3   - Counter step/width (0=15 bits, 1=7 bits)
+            // Bit 2-0 - Dividing ratio of frequencies
+            0xFF22 => self.sound_4.polynomial_counter.write(byte),
 
-            // NR44 - Channel 4 Counter/consecutive; Initial
-            0xFF23 => {
-                warn!("attempted to modify channel 4 consecutive/initial state (unimplemented)");
-            }
+            // NR44: Channel 4 counter/consecutive; initial
+            // Bit 7 - Initial (1=restart sound) (write only)
+            // Bit 6 - Counter/consecutive selection (1=Stop output when length in NR41 expires)
+            0xFF23 => self.sound_4.initial_counter_consecutive.write(byte),
 
             // NR50: Channel control / ON-OFF / Volume
             // Specifies the master volume for Left/Right sound output.
@@ -643,9 +718,12 @@ impl Addressable for SoundController {
                 // registers.
             }
 
-            // Wave Pattern RAM
+            // Channel 3 Wave pattern memory
+            // Waveform storage for arbitrary sound data. Holds 32 4-bit samples, which are played
+            // back upper 4 bits first.
             0xFF30...0xFF3F => {
-                warn!("attempted to modify wave pattern RAM (unimplemented)");
+                let index = address - 0xFF30;
+                self.sound_3.wave_pattern[index as usize] = byte;
             }
 
             _ => panic!(
