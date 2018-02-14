@@ -11,15 +11,34 @@ pub trait Mbc: Addressable + Debug {}
 
 impl<M: Addressable + Debug> Mbc for M {}
 
-#[derive(Debug)]
 pub struct Mbc1 {
     rom: Rc<Vec<u8>>,
-    bank_num: u8,
+    rom_num: u8,
+    ram: [u8; RAM_SIZE],
+    ram_num: u8,
+    ram_enabled: bool,
+    rom_ram_select: bool, // TODO rename?
 }
 
 impl Mbc1 {
     pub fn new(rom: Rc<Vec<u8>>) -> Mbc1 {
-        Mbc1 { rom, bank_num: 1 }
+        Mbc1 { rom, rom_num: 1, ram: [0; RAM_SIZE], ram_num: 0, ram_enabled: false,
+               rom_ram_select: false }
+    }
+}
+
+impl Debug for Mbc1 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let ram: &[u8] = &self.ram;
+
+        f.debug_struct("Mbc1")
+            .field("rom", &self.rom)
+            .field("rom_num", &self.rom_num)
+            .field("ram", &ram)
+            .field("ram_num", &self.ram_num)
+            .field("ram_enabled", &self.ram_enabled)
+            .field("rom_ram_select", &self.rom_ram_select)
+            .finish()
     }
 }
 
@@ -28,27 +47,67 @@ impl super::Addressable for Mbc1 {
         match address {
             0x0000...0x3FFF => self.rom[address as usize],
             0x4000...0x7FFF => {
-                let bank_start = u32::from(self.bank_num) * ROM_BANK_SIZE as u32;
+                let bank_start = u32::from(self.rom_num) * ROM_BANK_SIZE as u32;
                 let address_offset = u32::from(address) - 0x4000;
                 self.rom[(bank_start + address_offset) as usize]
             }
-            0xA000...0xBFFF => unimplemented!(), // TODO: support RAM
+            0xA000...0xBFFF => {
+               let bank_start = u32::from(self.ram_num) * RAM_BANK_RTC_REG_SIZE as u32;
+               let address_offset = u32::from(address) - 0xA000;
+               self.ram[(bank_start + address_offset) as usize]
+            }
             _ => unreachable!(),
         }
     }
 
     fn write_byte(&mut self, address: u16, value: u8) {
         match address {
-            0x0000...0x1FFF => unimplemented!(), // TODO: support RAM
-            0x2000...0x3FFF => {
-                self.bank_num = value & 0x1F;
-                if self.bank_num == 0x00 || self.bank_num == 0x20 || self.bank_num == 0x40
-                    || self.bank_num == 0x60
-                {
-                    self.bank_num += 1;
+            // RAM Enabled
+            0x0000...0x1FFF => {
+                match value {
+                    0x00 => self.ram_enabled = false,
+                    0x0A => self.ram_enabled = true,
+                    _ => ()//unreachable!(),
                 }
             }
-            _ => unimplemented!(),
+
+            // ROM Bank Num (Lower)
+            0x2000...0x3FFF => {
+                let lower = value & 0x1F; // TODO should I enforce this?
+                let upper = self.rom_num & 0x60;
+                self.rom_num = lower | upper;
+                if self.rom_num % 0x20 == 0 { // cannot select 0x00, 0x20, 0x40, 0x60
+                    self.rom_num += 1
+                }
+            }
+            // TODO question about how upper bits are preserved between switches
+
+            // RAM Bank Num or ROM Bank # (Upper)
+            0x4000...0x5FFF => {
+                if self.rom_ram_select {
+                    // rom selected
+                    let lower = self.rom_num & 0x1F;
+                    let upper = value & 0x03; // TODO should I enforce this?
+                    self.rom_num = lower | upper;
+                    if self.rom_num % 0x20 == 0 { // cannot select 0x00, 0x20, 0x40, 0x60
+                        self.rom_num += 1
+                    }
+                } else {
+                    // ram select
+                    self.ram_num = value & 0x03; // TODO should I enforce this?
+                }
+            }
+
+            // ROM/RAM Mode Select
+            0x6000...0x7FFF => {
+                match value {
+                    0x00 => self.rom_ram_select = false,
+                    0x01 => self.rom_ram_select = true,
+                    _ => unreachable!(),
+                }
+            }
+
+            _ => () //unimplemented!(),
         }
     }
 }
@@ -96,10 +155,10 @@ impl super::Addressable for Mbc3 {
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
             0xa000...0xbfff => match self.ram_rtc_select {
-                RamRtcSelect::Ram(bank_num) => {
-                    debug_assert!(bank_num <= 3);
+                RamRtcSelect::Ram(rom_num) => {
+                    debug_assert!(rom_num <= 3);
                     let addr: usize =
-                        (bank_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
+                        (rom_num as usize) * RAM_BANK_RTC_REG_SIZE + (address as usize) - 0xa000;
                     self.ram[addr]
                 }
                 RamRtcSelect::Rtc(rtc_num) => {
@@ -146,9 +205,9 @@ impl super::Addressable for Mbc3 {
 
             // Latch Clock Data (WO)
             0x6000...0x7fff => match value {
-                0x00 => unimplemented!(),
+                0x00 => unimplemented!(), // TODO fix?
                 0x01 => unimplemented!(),
-                _ => unimplemented!(),
+                _ =>  unimplemented!(),
             },
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
@@ -178,8 +237,8 @@ impl Debug for Mbc3 {
         let rtc: &[u8] = &self.rtc;
 
         f.debug_struct("Mbc3")
-            .field("bios", &self.rom)
-            .field("rom", &ram)
+            .field("rom", &self.rom)
+            .field("ram", &ram)
             .field("rtc", &rtc)
             .field("ram_timer_enabled", &self.ram_timer_enabled)
             .field("rom_select", &self.rom_select)
