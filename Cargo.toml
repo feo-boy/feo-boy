@@ -26,6 +26,7 @@ piston_window = "0.73"
 pretty_env_logger = "0.1"
 regex = "0.2"
 rustyline = "1"
+sdl2 = "0.31"
 smallvec = "0.5"
 
 [build-dependencies]

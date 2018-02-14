@@ -19,6 +19,7 @@ extern crate image;
 extern crate itertools;
 extern crate regex;
 extern crate rustyline;
+extern crate sdl2;
 extern crate smallvec;
 
 #[cfg(test)]
