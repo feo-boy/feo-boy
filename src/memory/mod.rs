@@ -11,26 +11,28 @@ use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 
-use StdResult;
 use self::mbc::{Mbc, Mbc1, Mbc3};
+use StdResult;
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
 #[derive(Debug, Fail)]
 pub enum BiosError {
-    #[fail(display = "the BIOS must be exactly 256 bytes")] InvalidSize,
+    #[fail(display = "the BIOS must be exactly 256 bytes")]
+    InvalidSize,
 }
 
 #[derive(Debug, Fail)]
 pub enum CartridgeError {
-    #[fail(display = "the size of the ROM must be at least 32KB")] InvalidSize,
+    #[fail(display = "the size of the ROM must be at least 32KB")]
+    InvalidSize,
 
-    #[fail(display = "the header checksum {:#02} is not equal to sum {:#02}", checksum, sum)]
-    BadChecksum {
-        checksum: u8,
-        sum: u8,
-    },
+    #[fail(
+        display = "the header checksum {:#02} is not equal to sum {:#02}",
+        checksum, sum
+    )]
+    BadChecksum { checksum: u8, sum: u8 },
 }
 
 /// Operations for memory-like structs.
@@ -281,7 +283,8 @@ impl Mmu {
         };
         info!("region: {}", region);
 
-        let global_sum: Wrapping<u16> = rom.iter()
+        let global_sum: Wrapping<u16> = rom
+            .iter()
             .enumerate()
             .flat_map(|(i, byte)| match i {
                 0x14E | 0x14F => None,

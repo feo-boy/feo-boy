@@ -430,7 +430,13 @@ impl Addressable for SoundController {
 
             // NR30: Channel 3 sound on/off
             // Bit 7 - Sound channel 3 off (0=Stop, 1=Playback)
-            0xFF1A => if self.sound_3.is_on { 1 } else { 0 },
+            0xFF1A => {
+                if self.sound_3.is_on {
+                    1
+                } else {
+                    0
+                }
+            }
 
             // NR31: Channel 3 sound length
             // Bit 7-0 - Sound length (0-255)

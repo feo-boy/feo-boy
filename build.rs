@@ -22,7 +22,8 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Instruction {
-    #[serde(deserialize_with = "::deserialize_hex_literal")] byte: u8,
+    #[serde(deserialize_with = "::deserialize_hex_literal")]
+    byte: u8,
     mnemonic: String,
     cycles: u32,
     condition_cycles: Option<u32>,
@@ -31,7 +32,8 @@ struct Instruction {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PrefixInstruction {
-    #[serde(deserialize_with = "::deserialize_hex_literal")] byte: u8,
+    #[serde(deserialize_with = "::deserialize_hex_literal")]
+    byte: u8,
     mnemonic: String,
 }
 
@@ -45,7 +47,9 @@ where
 }
 
 fn parse_operands(description: &str) -> u8 {
-    if description.contains("d8") || description.contains("a8") || description.contains("r8")
+    if description.contains("d8")
+        || description.contains("a8")
+        || description.contains("r8")
         || description.contains("PREFIX CB")
     {
         1
@@ -97,8 +101,8 @@ fn write_instructions<P: AsRef<Path>>(filename: P) -> Result<()> {
             ..
         } = *instruction;
         let condition_cycles = match instruction.condition_cycles {
-            Some(cycles) => quote!{ Some(TCycles(#cycles)) },
-            None => quote!{ None },
+            Some(cycles) => quote! { Some(TCycles(#cycles)) },
+            None => quote! { None },
         };
         writeln!(
             instructions_out,

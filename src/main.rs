@@ -14,8 +14,8 @@ use std::process;
 
 use clap::{App, AppSettings, Arg};
 use failure::ResultExt;
-use image::{FilterType, RgbaImage};
 use image::imageops;
+use image::{FilterType, RgbaImage};
 use piston_window::*;
 
 use feo_boy::{Emulator, Result, SCREEN_DIMENSIONS};
@@ -59,7 +59,8 @@ fn start_emulator(config: &Config) -> Result<()> {
         &mut window.factory,
         &RgbaImage::new(window_size.width, window_size.height),
         &TextureSettings::new(),
-    ).unwrap();
+    )
+    .unwrap();
 
     while let Some(event) = window.next() {
         if let Some(args) = event.button_args() {

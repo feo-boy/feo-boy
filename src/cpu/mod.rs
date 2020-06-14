@@ -15,8 +15,9 @@ use memory::Mmu;
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
 
-#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub,
-         SubAssign)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign,
+)]
 pub struct MCycles(pub u32);
 
 impl Display for MCycles {
@@ -31,8 +32,9 @@ impl From<TCycles> for MCycles {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub,
-         SubAssign)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign,
+)]
 pub struct TCycles(pub u32);
 
 impl Display for TCycles {
@@ -121,8 +123,9 @@ impl Interrupts {
             &self.timer,
             &self.serial,
             &self.joypad,
-        ].iter()
-            .any(|int| int.requested && int.enabled)
+        ]
+        .iter()
+        .any(|int| int.requested && int.enabled)
     }
 }
 

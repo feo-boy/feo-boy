@@ -280,17 +280,20 @@ impl super::Cpu {
             }
 
             // LD BC,d16
-            0x01 => self.reg
+            0x01 => self
+                .reg
                 .bc_mut()
                 .write(LittleEndian::read_u16(&instruction.operands)),
 
             // LD DE,d16
-            0x11 => self.reg
+            0x11 => self
+                .reg
                 .de_mut()
                 .write(LittleEndian::read_u16(&instruction.operands)),
 
             // LD HL,d16
-            0x21 => self.reg
+            0x21 => self
+                .reg
                 .hl_mut()
                 .write(LittleEndian::read_u16(&instruction.operands)),
 
@@ -730,16 +733,18 @@ impl super::Cpu {
             // This behavior is documented in the giibiiadvance docs.
             //
             // See https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf
-            0x76 => if bus.interrupts.enabled {
-                // HALT executed normally.
-                self.state = State::Halted;
-            } else if !bus.interrupts.pending() {
-                // HALT mode entered, but interrupts aren't serviced.
-                self.state = State::Halted;
-            } else {
-                // HALT mode is not entered, and HALT bug occurs.
-                self.halt_bug = true;
-            },
+            0x76 => {
+                if bus.interrupts.enabled {
+                    // HALT executed normally.
+                    self.state = State::Halted;
+                } else if !bus.interrupts.pending() {
+                    // HALT mode entered, but interrupts aren't serviced.
+                    self.state = State::Halted;
+                } else {
+                    // HALT mode is not entered, and HALT bug occurs.
+                    self.halt_bug = true;
+                }
+            }
 
             // ADD A,(HL)
             0x86 => {

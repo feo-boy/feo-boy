@@ -634,8 +634,9 @@ mod tests {
     use cpu::{Interrupts, TCycles};
     use memory::Addressable;
 
-    use super::{BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart,
-                TileMapStart};
+    use super::{
+        BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart, TileMapStart,
+    };
 
     #[test]
     fn chram() {

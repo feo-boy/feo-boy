@@ -1,6 +1,6 @@
+use super::Addressable;
 use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
-use super::Addressable;
 
 const RAM_SIZE: usize = 0x2000 * 4;
 const RTC_SIZE: usize = 0x2000 * 5;
@@ -22,8 +22,14 @@ pub struct Mbc1 {
 
 impl Mbc1 {
     pub fn new(rom: Rc<Vec<u8>>) -> Mbc1 {
-        Mbc1 { rom, rom_num: 1, ram: [0; RAM_SIZE], ram_num: 0, ram_enabled: false,
-               rom_ram_select: false }
+        Mbc1 {
+            rom,
+            rom_num: 1,
+            ram: [0; RAM_SIZE],
+            ram_num: 0,
+            ram_enabled: false,
+            rom_ram_select: false,
+        }
     }
 }
 
@@ -52,9 +58,9 @@ impl super::Addressable for Mbc1 {
                 self.rom[(bank_start + address_offset) as usize]
             }
             0xA000...0xBFFF => {
-               let bank_start = u32::from(self.ram_num) * RAM_BANK_RTC_REG_SIZE as u32;
-               let address_offset = u32::from(address) - 0xA000;
-               self.ram[(bank_start + address_offset) as usize]
+                let bank_start = u32::from(self.ram_num) * RAM_BANK_RTC_REG_SIZE as u32;
+                let address_offset = u32::from(address) - 0xA000;
+                self.ram[(bank_start + address_offset) as usize]
             }
             _ => unreachable!(),
         }
@@ -67,7 +73,7 @@ impl super::Addressable for Mbc1 {
                 match value {
                     0x00 => self.ram_enabled = false,
                     0x0A => self.ram_enabled = true,
-                    _ => ()//unreachable!(),
+                    _ => (), //unreachable!(),
                 }
             }
 
@@ -76,7 +82,8 @@ impl super::Addressable for Mbc1 {
                 let lower = value & 0x1F; // TODO should I enforce this?
                 let upper = self.rom_num & 0x60;
                 self.rom_num = lower | upper;
-                if self.rom_num % 0x20 == 0 { // cannot select 0x00, 0x20, 0x40, 0x60
+                if self.rom_num % 0x20 == 0 {
+                    // cannot select 0x00, 0x20, 0x40, 0x60
                     self.rom_num += 1
                 }
             }
@@ -89,7 +96,8 @@ impl super::Addressable for Mbc1 {
                     let lower = self.rom_num & 0x1F;
                     let upper = value & 0x03; // TODO should I enforce this?
                     self.rom_num = lower | upper;
-                    if self.rom_num % 0x20 == 0 { // cannot select 0x00, 0x20, 0x40, 0x60
+                    if self.rom_num % 0x20 == 0 {
+                        // cannot select 0x00, 0x20, 0x40, 0x60
                         self.rom_num += 1
                     }
                 } else {
@@ -99,15 +107,13 @@ impl super::Addressable for Mbc1 {
             }
 
             // ROM/RAM Mode Select
-            0x6000...0x7FFF => {
-                match value {
-                    0x00 => self.rom_ram_select = false,
-                    0x01 => self.rom_ram_select = true,
-                    _ => unreachable!(),
-                }
-            }
+            0x6000...0x7FFF => match value {
+                0x00 => self.rom_ram_select = false,
+                0x01 => self.rom_ram_select = true,
+                _ => unreachable!(),
+            },
 
-            _ => () //unimplemented!(),
+            _ => (), //unimplemented!(),
         }
     }
 }
@@ -207,7 +213,7 @@ impl super::Addressable for Mbc3 {
             0x6000...0x7fff => match value {
                 0x00 => unimplemented!(), // TODO fix?
                 0x01 => unimplemented!(),
-                _ =>  unimplemented!(),
+                _ => unimplemented!(),
             },
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)

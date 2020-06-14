@@ -29,11 +29,11 @@ extern crate quickcheck;
 #[cfg(test)]
 extern crate rand;
 
+pub mod audio;
 pub mod bus;
 pub mod bytes;
 pub mod cpu;
 pub mod graphics;
-pub mod audio;
 pub mod input;
 pub mod memory;
 pub mod tui;
@@ -49,10 +49,10 @@ use image::RgbaImage;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
+use audio::SoundController;
 use bus::Bus;
 use cpu::{Cpu, Instruction, MCycles, TCycles};
 use graphics::Ppu;
-use audio::SoundController;
 use memory::Mmu;
 
 pub use graphics::SCREEN_DIMENSIONS;
@@ -268,8 +268,8 @@ impl Debugger {
 
 #[cfg(test)]
 mod tests {
-    use super::Emulator;
     use super::cpu::State;
+    use super::Emulator;
 
     #[test]
     fn tick_while_halted() {
@@ -297,9 +297,9 @@ mod tests {
         assert!(!emulator.bus.interrupts.enabled);
 
         let test_program = [
-            0x76,   // HALT
-            0x00,   // NOP
-            0x00,   // NOP
+            0x76, // HALT
+            0x00, // NOP
+            0x00, // NOP
         ];
 
         for (offset, byte) in test_program.into_iter().enumerate() {
@@ -338,10 +338,10 @@ mod tests {
         emulator.cpu.reg.pc = 0xC000;
 
         let test_program = [
-            0xAF,   // XOR A
-            0x76,   // HALT
-            0x3C,   // INC A    (this instruction will be executed twice)
-            0x22,   // LD (HL+),A
+            0xAF, // XOR A
+            0x76, // HALT
+            0x3C, // INC A    (this instruction will be executed twice)
+            0x22, // LD (HL+),A
         ];
 
         emulator.cpu.reg.hl_mut().write(0xD000);
