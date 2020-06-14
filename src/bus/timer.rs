@@ -1,7 +1,7 @@
 //! CPU timer management.
 
-use bytes::ByteExt;
-use cpu::{MCycles, TCycles};
+use crate::bytes::ByteExt;
+use crate::cpu::{MCycles, TCycles};
 
 #[derive(Debug, Default)]
 pub struct TimerRegisters {

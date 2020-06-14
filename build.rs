@@ -22,7 +22,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Instruction {
-    #[serde(deserialize_with = "::deserialize_hex_literal")]
+    #[serde(deserialize_with = "deserialize_hex_literal")]
     byte: u8,
     mnemonic: String,
     cycles: u32,
@@ -32,7 +32,7 @@ struct Instruction {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PrefixInstruction {
-    #[serde(deserialize_with = "::deserialize_hex_literal")]
+    #[serde(deserialize_with = "deserialize_hex_literal")]
     byte: u8,
     mnemonic: String,
 }
@@ -42,7 +42,7 @@ where
     D: Deserializer<'de>,
 {
     let string = String::deserialize(deserializer)?;
-    let string = string.trim_left_matches("0x");
+    let string = string.trim_start_matches("0x");
     u8::from_str_radix(string, 16).map_err(serde::de::Error::custom)
 }
 
@@ -177,7 +177,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
-        for cause in e.causes() {
+        for cause in e.iter_causes() {
             println!("{}", cause);
         }
 

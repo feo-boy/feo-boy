@@ -10,15 +10,17 @@ use std::fmt::{self, Display};
 use std::ops::{AddAssign, SubAssign};
 
 use byteorder::{ByteOrder, LittleEndian};
+use lazy_static::lazy_static;
+use log::*;
 use regex::{NoExpand, Regex};
 use smallvec::SmallVec;
 
-use bus::Bus;
-use bytes::WordExt;
-use cpu::{arithmetic, Flags, MCycles, State, TCycles};
+use crate::bus::Bus;
+use crate::bytes::WordExt;
+use crate::cpu::{arithmetic, Flags, MCycles, State, TCycles};
 
 mod prefix;
-use cpu::instructions::prefix::PREFIX_INSTRUCTIONS;
+use crate::cpu::instructions::prefix::PREFIX_INSTRUCTIONS;
 
 /// Game Boy instruction set.
 static INSTRUCTIONS: [InstructionDef; 0x100] =
@@ -91,7 +93,7 @@ impl Default for Instruction {
 
 impl Display for Instruction {
     /// Prints the instruction in assembly syntax, including the operands.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let instruction = if let Some(mat) = DATA_RE.find(self.def.description) {
             let replacement = match mat.as_str() {
                 "d8" | "a8" | "r8" => format!("${:#04x}", &self.operands[0]),
@@ -1546,8 +1548,6 @@ impl super::Cpu {
             0xe3 | 0xd3 | 0xf4 | 0xe4 | 0xeb | 0xdb | 0xfc | 0xec | 0xdd | 0xed | 0xfd => {
                 self.state = State::Locked;
             }
-
-            _ => panic!("unimplemented instruction: {:?}", instruction),
         }
 
         if cfg!(debug_assertions) {
@@ -1600,8 +1600,8 @@ impl super::Cpu {
 mod tests {
     use smallvec::SmallVec;
 
-    use bus::Bus;
-    use cpu::{Cpu, Flags, MCycles, TCycles};
+    use crate::bus::Bus;
+    use crate::cpu::{Cpu, Flags, MCycles, TCycles};
 
     use super::{Instruction, InstructionDef, INSTRUCTIONS};
 

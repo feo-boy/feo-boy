@@ -1,4 +1,6 @@
-use bytes::ByteExt;
+use bitflags::bitflags;
+
+use crate::bytes::ByteExt;
 
 bitflags! {
     #[derive(Default)]

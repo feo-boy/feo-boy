@@ -10,9 +10,11 @@ use std::num::Wrapping;
 use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use failure::Fail;
+use log::*;
 
 use self::mbc::{Mbc, Mbc1, Mbc3};
-use StdResult;
+use crate::StdResult;
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
@@ -103,7 +105,7 @@ impl Default for Memory {
 }
 
 impl Debug for Memory {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let bios: Option<&[u8]> = self.bios.as_ref().map(|b| &b[..]);
         let rom: &[u8] = &self.rom;
         let wram: &[u8] = &self.wram;
@@ -130,7 +132,7 @@ pub struct Mmu {
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Rc<Vec<u8>>,
 
-    mbc: Option<Box<Mbc>>,
+    mbc: Option<Box<dyn Mbc>>,
 }
 
 impl Mmu {
@@ -246,7 +248,7 @@ impl Mmu {
 
         let num_banks = match rom[0x148] {
             0x00 => Some(0),
-            0x01...0x08 => Some(2 << rom[0x148]),
+            0x01..=0x08 => Some(2 << rom[0x148]),
             0x52 => Some(72),
             0x53 => Some(80),
             0x54 => Some(96),
@@ -329,27 +331,27 @@ impl Mmu {
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             // BIOS
-            0x0000...0x00FF if self.bios_mapped && self.has_bios() => {
+            0x0000..=0x00FF if self.bios_mapped && self.has_bios() => {
                 self.mem.bios.unwrap()[address as usize]
             }
 
             // ROM Banks
-            0x0000...0x7FFF => match self.mbc {
+            0x0000..=0x7FFF => match self.mbc {
                 Some(ref mbc) => mbc.read_byte(address),
                 None => self.mem.rom[address as usize],
             },
 
             // Graphics RAM
-            0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
+            0x8000..=0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
-            0xA000...0xBFFF => match self.mbc {
+            0xA000..=0xBFFF => match self.mbc {
                 Some(ref mbc) => mbc.read_byte(address),
                 None => 0xFF,
             },
 
             // Working RAM
-            0xC000...0xFDFF => {
+            0xC000..=0xFDFF => {
                 // Addresses E000-FDFF are known as "shadow RAM." They contain an exact copy of
                 // addresses C000-DFFF, until the last 512 bytes of the map.
                 let index = address & 0x1FFF;
@@ -357,21 +359,19 @@ impl Mmu {
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => panic!("sprite RAM is present on the PPU"),
+            0xFE00..=0xFE9F => panic!("sprite RAM is present on the PPU"),
 
             // Reserved, unused
-            0xFEA0...0xFEFF => 0x00,
+            0xFEA0..=0xFEFF => 0x00,
 
             // I/O Registers
-            0xFF00...0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
+            0xFF00..=0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
 
             // Zero-Page RAM
-            0xFF80...0xFFFE => {
+            0xFF80..=0xFFFE => {
                 let index = address & 0x7F;
                 self.mem.zram[index as usize]
             }
-
-            _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
 
@@ -383,7 +383,7 @@ impl Mmu {
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             // BIOS and ROM Banks
-            0x0000...0x7FFF => {
+            0x0000..=0x7FFF => {
                 // While BIOS and ROM are read-only, if the cartridge has a memory bank controller,
                 // writes to this region will trigger a bank switch.
 
@@ -397,36 +397,34 @@ impl Mmu {
             }
 
             // Graphics RAM
-            0x8000...0x9FFF => panic!("graphics RAM is present on the PPU"),
+            0x8000..=0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
-            0xA000...0xBFFF => match self.mbc {
+            0xA000..=0xBFFF => match self.mbc {
                 Some(ref mut mbc) => mbc.write_byte(address, byte),
                 None => (),
             },
 
             // Working RAM
-            0xC000...0xFDFF => {
+            0xC000..=0xFDFF => {
                 let index = address & 0x1FFF;
                 self.mem.wram[index as usize] = byte;
             }
 
             // Graphics Sprite Information
-            0xFE00...0xFE9F => panic!("sprite RAM is present on the PPU"),
+            0xFE00..=0xFE9F => panic!("sprite RAM is present on the PPU"),
 
             // Reserved, unused
-            0xFEA0...0xFEFF => (),
+            0xFEA0..=0xFEFF => (),
 
             // I/O Registers
-            0xFF00...0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
+            0xFF00..=0xFF7F | 0xFFFF => panic!("I/O registers are not stored in memory"),
 
             // Zero-Page RAM
-            0xFF80...0xFFFE => {
+            0xFF80..=0xFFFE => {
                 let index = address & 0x7F;
                 self.mem.zram[index as usize] = byte;
             }
-
-            _ => unreachable!("exhaustive match was not exhaustive: {}", address),
         }
     }
 }

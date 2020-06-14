@@ -2,9 +2,9 @@
 //!
 //! Contains an implementation of the Game Boy sound hardware.
 
-use bytes::ByteExt;
+use crate::bytes::ByteExt;
 
-use memory::Addressable;
+use crate::memory::Addressable;
 
 /// The sweep register data for a channel.
 #[derive(Debug, Default)]
@@ -552,7 +552,7 @@ impl Addressable for SoundController {
             // Channel 3 Wave pattern memory
             // Waveform storage for arbitrary sound data. Holds 32 4-bit samples, which are played
             // back upper 4 bits first.
-            0xFF30...0xFF3F => {
+            0xFF30..=0xFF3F => {
                 let index = address - 0xFF30;
                 self.sound_3.wave_pattern[index as usize]
             }
@@ -738,7 +738,7 @@ impl Addressable for SoundController {
             // Channel 3 Wave pattern memory
             // Waveform storage for arbitrary sound data. Holds 32 4-bit samples, which are played
             // back upper 4 bits first.
-            0xFF30...0xFF3F => {
+            0xFF30..=0xFF3F => {
                 let index = address - 0xFF30;
                 self.sound_3.wave_pattern[index as usize] = byte;
             }
@@ -755,9 +755,9 @@ impl Addressable for SoundController {
 mod tests {
     use std::u8;
 
-    use bytes::ByteExt;
+    use crate::bytes::ByteExt;
 
-    use memory::Addressable;
+    use crate::memory::Addressable;
 
     use super::{Envelope, Frequency, SoundController, Sweep, Wave};
 

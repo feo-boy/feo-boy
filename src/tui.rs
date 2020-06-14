@@ -2,9 +2,9 @@
 
 use std::process;
 
-use failure::ResultExt;
+use failure::{bail, ResultExt};
 
-use {Emulator, Result};
+use crate::{Emulator, Result};
 
 /// The commands that are available to the debugger.
 pub static COMMANDS: &str = "sblrpdcq?";

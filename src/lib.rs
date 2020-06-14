@@ -1,33 +1,7 @@
 //! A Game Boy emulator written in Rust.
 
-#![cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
-#![cfg_attr(feature = "cargo-clippy", allow(unreadable_literal))]
-
-#[macro_use]
-extern crate bitflags;
-#[macro_use]
-extern crate derive_more;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-
-extern crate byteorder;
-extern crate image;
-extern crate itertools;
-extern crate regex;
-extern crate rustyline;
-extern crate sdl2;
-extern crate smallvec;
-
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
-
-#[cfg(test)]
-extern crate rand;
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::unreadable_literal)]
 
 pub mod audio;
 pub mod bus;
@@ -46,17 +20,18 @@ use std::process;
 
 use failure::{Error, ResultExt};
 use image::RgbaImage;
+use log::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use audio::SoundController;
-use bus::Bus;
-use cpu::{Cpu, Instruction, MCycles, TCycles};
-use graphics::Ppu;
-use memory::Mmu;
+use crate::audio::SoundController;
+use crate::bus::Bus;
+use crate::cpu::{Cpu, Instruction, MCycles, TCycles};
+use crate::graphics::Ppu;
+use crate::memory::Mmu;
 
-pub use graphics::SCREEN_DIMENSIONS;
-pub use input::Button;
+pub use crate::graphics::SCREEN_DIMENSIONS;
+pub use crate::input::Button;
 
 const MICROSECONDS_PER_CYCLE: f64 = 0.2384;
 
@@ -302,7 +277,7 @@ mod tests {
             0x00, // NOP
         ];
 
-        for (offset, byte) in test_program.into_iter().enumerate() {
+        for (offset, byte) in test_program.iter().enumerate() {
             emulator
                 .bus
                 .write_byte_no_tick(emulator.cpu.reg.pc + offset as u16, *byte);
@@ -349,7 +324,7 @@ mod tests {
         emulator.bus.interrupts.timer.enabled = true;
         emulator.bus.interrupts.timer.requested = true;
 
-        for (offset, byte) in test_program.into_iter().enumerate() {
+        for (offset, byte) in test_program.iter().enumerate() {
             emulator
                 .bus
                 .write_byte(emulator.cpu.reg.pc + offset as u16, *byte);

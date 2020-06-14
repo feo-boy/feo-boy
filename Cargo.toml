@@ -6,6 +6,7 @@ authors = [
     "Andrew Fishberg <fishberg.github@gmail.com>",
     "Max Comstock <maxibillion6@gmail.com>",
 ]
+edition = "2018"
 
 [[bin]]
 name = "feo-boy"
@@ -20,7 +21,7 @@ derive_more = "0.7"
 failure = "0.1"
 image = "0.17"
 itertools = "0.7"
-lazy_static = "0.2"
+lazy_static = "1.4.0"
 log = "0.3"
 piston_window = "0.73"
 pretty_env_logger = "0.1"

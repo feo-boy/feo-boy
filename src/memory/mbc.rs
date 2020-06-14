@@ -34,7 +34,7 @@ impl Mbc1 {
 }
 
 impl Debug for Mbc1 {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let ram: &[u8] = &self.ram;
 
         f.debug_struct("Mbc1")
@@ -51,13 +51,13 @@ impl Debug for Mbc1 {
 impl super::Addressable for Mbc1 {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x0000...0x3FFF => self.rom[address as usize],
-            0x4000...0x7FFF => {
+            0x0000..=0x3FFF => self.rom[address as usize],
+            0x4000..=0x7FFF => {
                 let bank_start = u32::from(self.rom_num) * ROM_BANK_SIZE as u32;
                 let address_offset = u32::from(address) - 0x4000;
                 self.rom[(bank_start + address_offset) as usize]
             }
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 let bank_start = u32::from(self.ram_num) * RAM_BANK_RTC_REG_SIZE as u32;
                 let address_offset = u32::from(address) - 0xA000;
                 self.ram[(bank_start + address_offset) as usize]
@@ -69,7 +69,7 @@ impl super::Addressable for Mbc1 {
     fn write_byte(&mut self, address: u16, value: u8) {
         match address {
             // RAM Enabled
-            0x0000...0x1FFF => {
+            0x0000..=0x1FFF => {
                 match value {
                     0x00 => self.ram_enabled = false,
                     0x0A => self.ram_enabled = true,
@@ -78,7 +78,7 @@ impl super::Addressable for Mbc1 {
             }
 
             // ROM Bank Num (Lower)
-            0x2000...0x3FFF => {
+            0x2000..=0x3FFF => {
                 let lower = value & 0x1F; // TODO should I enforce this?
                 let upper = self.rom_num & 0x60;
                 self.rom_num = lower | upper;
@@ -90,7 +90,7 @@ impl super::Addressable for Mbc1 {
             // TODO question about how upper bits are preserved between switches
 
             // RAM Bank Num or ROM Bank # (Upper)
-            0x4000...0x5FFF => {
+            0x4000..=0x5FFF => {
                 if self.rom_ram_select {
                     // rom selected
                     let lower = self.rom_num & 0x1F;
@@ -107,7 +107,7 @@ impl super::Addressable for Mbc1 {
             }
 
             // ROM/RAM Mode Select
-            0x6000...0x7FFF => match value {
+            0x6000..=0x7FFF => match value {
                 0x00 => self.rom_ram_select = false,
                 0x01 => self.rom_ram_select = true,
                 _ => unreachable!(),
@@ -150,17 +150,17 @@ impl super::Addressable for Mbc3 {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             // ROM Bank 00 (RO)
-            0x0000...0x3fff => self.rom[address as usize],
+            0x0000..=0x3fff => self.rom[address as usize],
 
             // ROM Bank 01-7f (RO)
-            0x4000...0x7fff => {
+            0x4000..=0x7fff => {
                 let addr: usize =
                     (self.rom_select as usize) * ROM_BANK_SIZE + (address as usize) - 0x4000;
                 self.rom[addr]
             }
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
-            0xa000...0xbfff => match self.ram_rtc_select {
+            0xa000..=0xbfff => match self.ram_rtc_select {
                 RamRtcSelect::Ram(rom_num) => {
                     debug_assert!(rom_num <= 3);
                     let addr: usize =
@@ -183,7 +183,7 @@ impl super::Addressable for Mbc3 {
     fn write_byte(&mut self, address: u16, value: u8) {
         match address {
             // RAM and Time Enable (WO)
-            0x0000...0x1fff => {
+            0x0000..=0x1fff => {
                 self.ram_timer_enabled = match value {
                     0x00 => false,
                     0x0a => true,
@@ -192,7 +192,7 @@ impl super::Addressable for Mbc3 {
             }
 
             // ROM Bank Number (WO)
-            0x2000...0x3fff => {
+            0x2000..=0x3fff => {
                 // only cares about lower 7-bits
                 self.rom_select = value & !0x80;
                 if self.rom_select == 0x00 {
@@ -201,23 +201,23 @@ impl super::Addressable for Mbc3 {
             }
 
             // RAM Bank Number || RTC Register Select (WO)
-            0x4000...0x5fff => {
+            0x4000..=0x5fff => {
                 self.ram_rtc_select = match value {
-                    0x00...0x03 => RamRtcSelect::Ram(value),
-                    0x08...0x0c => RamRtcSelect::Rtc(value - 0x08),
+                    0x00..=0x03 => RamRtcSelect::Ram(value),
+                    0x08..=0x0c => RamRtcSelect::Rtc(value - 0x08),
                     _ => self.ram_rtc_select,
                 }
             }
 
             // Latch Clock Data (WO)
-            0x6000...0x7fff => match value {
+            0x6000..=0x7fff => match value {
                 0x00 => unimplemented!(), // TODO fix?
                 0x01 => unimplemented!(),
                 _ => unimplemented!(),
             },
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
-            0xa000...0xbfff => match self.ram_rtc_select {
+            0xa000..=0xbfff => match self.ram_rtc_select {
                 RamRtcSelect::Ram(bank_num) => {
                     debug_assert!(bank_num <= 3);
                     let addr: usize =
@@ -238,7 +238,7 @@ impl super::Addressable for Mbc3 {
 }
 
 impl Debug for Mbc3 {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let ram: &[u8] = &self.ram;
         let rtc: &[u8] = &self.rtc;
 

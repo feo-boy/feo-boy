@@ -9,8 +9,10 @@ mod registers;
 use std::default::Default;
 use std::fmt::{self, Display};
 
-use bus::Bus;
-use memory::Mmu;
+use crate::bus::Bus;
+use crate::memory::Mmu;
+use derive_more::{Add, AddAssign, Sub, SubAssign};
+use log::*;
 
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
@@ -21,7 +23,7 @@ pub use self::registers::{Flags, Registers};
 pub struct MCycles(pub u32);
 
 impl Display for MCycles {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} M-cycles", self.0)
     }
 }
@@ -38,7 +40,7 @@ impl From<TCycles> for MCycles {
 pub struct TCycles(pub u32);
 
 impl Display for TCycles {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} T-cycles", self.0)
     }
 }
@@ -256,14 +258,14 @@ impl Cpu {
 }
 
 impl fmt::Display for Cpu {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.reg.to_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bus::Bus;
+    use crate::bus::Bus;
 
     use super::Cpu;
 

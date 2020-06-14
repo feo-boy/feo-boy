@@ -5,10 +5,11 @@ use std::fmt;
 use std::num::Wrapping;
 use std::ops::{AddAssign, SubAssign};
 
+use bitflags::bitflags;
 use byteorder::{BigEndian, ByteOrder};
 
-use bytes::{ByteExt, WordExt};
-use cpu::arithmetic;
+use crate::bytes::{ByteExt, WordExt};
+use crate::cpu::arithmetic;
 
 bitflags! {
     /// CPU status flags.
@@ -217,7 +218,7 @@ impl Registers {
     }
 
     /// Returns a mutable reference to register pair `BC`.
-    pub fn bc_mut(&mut self) -> RegisterPairMut {
+    pub fn bc_mut(&mut self) -> RegisterPairMut<'_> {
         RegisterPairMut {
             hi: &mut self.b,
             lo: &mut self.c,
@@ -230,7 +231,7 @@ impl Registers {
     }
 
     /// Returns a mutable reference to register pair `DE`.
-    pub fn de_mut(&mut self) -> RegisterPairMut {
+    pub fn de_mut(&mut self) -> RegisterPairMut<'_> {
         RegisterPairMut {
             hi: &mut self.d,
             lo: &mut self.e,
@@ -243,7 +244,7 @@ impl Registers {
     }
 
     /// Returns a mutable reference to register pair `HL`.
-    pub fn hl_mut(&mut self) -> RegisterPairMut {
+    pub fn hl_mut(&mut self) -> RegisterPairMut<'_> {
         RegisterPairMut {
             hi: &mut self.h,
             lo: &mut self.l,
@@ -453,7 +454,7 @@ impl Registers {
 }
 
 impl fmt::Display for Registers {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "A {:#04x}", self.a)?;
         writeln!(f, "B {:#04x}  {:#04x} C", self.b, self.c)?;
         writeln!(f, "D {:#04x}  {:#04x} E", self.d, self.e)?;
@@ -472,6 +473,8 @@ impl fmt::Display for Registers {
 #[cfg(test)]
 mod tests {
     use std::ops::SubAssign;
+
+    use quickcheck::quickcheck;
 
     use super::{Flags, Registers};
 

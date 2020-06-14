@@ -1,5 +1,5 @@
-use bus::Bus;
-use cpu::{arithmetic, Cpu, TCycles};
+use crate::bus::Bus;
+use crate::cpu::{arithmetic, Cpu, TCycles};
 
 /// Prefix instruction definitions.
 pub(super) static PREFIX_INSTRUCTIONS: [PrefixInstructionDef; 0x100] =
@@ -441,20 +441,13 @@ impl Cpu {
                 bus.write_byte(self.reg.hl(), byte);
             }
             0xff => arithmetic::set(&mut self.reg.a, 7),
-
-            // error
-            catch => panic!(
-                "unimplemented prefix instruction {:#0x} at {:#0x}",
-                catch,
-                self.reg.pc + 1
-            ),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use cpu::MCycles;
+    use crate::cpu::MCycles;
 
     use super::PREFIX_INSTRUCTIONS;
 

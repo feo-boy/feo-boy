@@ -7,13 +7,14 @@ use std::ops::Range;
 
 use byteorder::{ByteOrder, LittleEndian};
 use itertools::Itertools;
+use log::*;
 
-use audio::SoundController;
-use bytes::ByteExt;
-use cpu::{Interrupts, MCycles, TCycles};
-use graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
-use input::ButtonState;
-use memory::{Addressable, Mmu};
+use crate::audio::SoundController;
+use crate::bytes::ByteExt;
+use crate::cpu::{Interrupts, MCycles, TCycles};
+use crate::graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
+use crate::input::ButtonState;
+use crate::memory::{Addressable, Mmu};
 
 use self::timer::Timer;
 
@@ -66,8 +67,8 @@ impl Bus {
     /// ticked.
     pub fn read_byte_no_tick(&self, address: u16) -> u8 {
         match address {
-            0x8000...0x9FFF | 0xFE00...0xFE9F => self.ppu.read_byte(address),
-            0xFF00...0xFF7F | 0xFFFF => self.read_io_register(address),
+            0x8000..=0x9FFF | 0xFE00..=0xFE9F => self.ppu.read_byte(address),
+            0xFF00..=0xFF7F | 0xFFFF => self.read_io_register(address),
             _ => self.mmu.read_byte(address),
         }
     }
@@ -76,8 +77,8 @@ impl Bus {
     /// ticked.
     pub fn write_byte_no_tick(&mut self, address: u16, byte: u8) {
         match address {
-            0x8000...0x9FFF | 0xFE00...0xFE9F => self.ppu.write_byte(address, byte),
-            0xFF00...0xFF7F | 0xFFFF => self.write_io_register(address, byte),
+            0x8000..=0x9FFF | 0xFE00..=0xFE9F => self.ppu.write_byte(address, byte),
+            0xFF00..=0xFF7F | 0xFFFF => self.write_io_register(address, byte),
             _ => self.mmu.write_byte(address, byte),
         }
     }
@@ -90,7 +91,7 @@ impl Bus {
     }
 
     /// Create an iterator over the entire memory space.
-    pub fn iter(&self) -> MemoryIterator {
+    pub fn iter(&self) -> MemoryIterator<'_> {
         MemoryIterator {
             address_iter: 0x00..0x10000,
             bus: self,
@@ -140,7 +141,7 @@ impl Bus {
             }
 
             // Sound memory
-            0xFF10...0xFF3F => audio.read_byte(address),
+            0xFF10..=0xFF3F => audio.read_byte(address),
 
             // LCDC - LCD Control
             0xFF40 => {
@@ -423,7 +424,7 @@ impl Bus {
             }
 
             // Sound control registers
-            0xFF10...0xFF30 => self.audio.write_byte(address, byte),
+            0xFF10..=0xFF30 => self.audio.write_byte(address, byte),
 
             // LCDC - LCD Control
             0xFF40 => {
@@ -556,7 +557,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
 }
 
 impl Display for Bus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         const LINE_LENGTH: usize = 32;
 
         let mut address = 0;
@@ -588,15 +589,15 @@ mod tests {
     use quickcheck::{QuickCheck, StdGen, TestResult};
     use rand;
 
-    use graphics::{BackgroundPalette, Shade};
-    use input::Button;
-    use memory::BIOS_SIZE;
+    use crate::graphics::{BackgroundPalette, Shade};
+    use crate::input::Button;
+    use crate::memory::BIOS_SIZE;
 
     #[test]
     fn read_write() {
         fn read_write(address: u16, value: u8) -> TestResult {
             match address {
-                0x0000...0x7FFF | 0xA000...0xBFFF | 0xFEA0...0xFEFF | 0xFF00...0xFFFF => {
+                0x0000..=0x7FFF | 0xA000..=0xBFFF | 0xFEA0..=0xFEFF | 0xFF00..=0xFFFF => {
                     TestResult::discard()
                 }
                 address => {
@@ -619,7 +620,7 @@ mod tests {
             let address = 0xFF00u16 + &offset.into();
 
             match address {
-                0xFF00...0xFF39 | 0xFF41...0xFF4A | 0xFF4C...0xFF7F => TestResult::discard(),
+                0xFF00..=0xFF39 | 0xFF41..=0xFF4A | 0xFF4C..=0xFF7F => TestResult::discard(),
                 address => {
                     let mut bus = Bus::default();
                     bus.write_byte(address, value);

@@ -1,21 +1,13 @@
-extern crate feo_boy;
-
-#[macro_use]
-extern crate clap;
-
-extern crate failure;
-extern crate image;
-extern crate piston_window;
-extern crate pretty_env_logger;
-
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::process;
 
-use clap::{App, AppSettings, Arg};
+use ::image::imageops;
+use ::image::{FilterType, RgbaImage};
+use clap::{
+    crate_authors, crate_description, crate_name, crate_version, value_t, App, AppSettings, Arg,
+};
 use failure::ResultExt;
-use image::imageops;
-use image::{FilterType, RgbaImage};
 use piston_window::*;
 
 use feo_boy::{Emulator, Result, SCREEN_DIMENSIONS};
@@ -166,7 +158,7 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("fatal error");
 
-        for cause in e.causes() {
+        for cause in e.iter_chain() {
             eprintln!("cause: {}", cause);
         }
 

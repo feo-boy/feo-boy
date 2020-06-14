@@ -2,8 +2,8 @@
 //!
 //! This module should contain free functions that operate on bytes and flags.
 
-use bytes::ByteExt;
-use cpu::Flags;
+use crate::bytes::ByteExt;
+use crate::cpu::Flags;
 
 /// Increments by 1 (with overflow).
 ///
@@ -237,7 +237,7 @@ pub fn set(byte: &mut u8, n: u8) {
 
 #[cfg(test)]
 mod tests {
-    use cpu::Flags;
+    use crate::cpu::Flags;
 
     #[test]
     fn inc() {

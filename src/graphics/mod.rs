@@ -6,10 +6,11 @@ use std::fmt::{self, Debug, Formatter};
 
 use byteorder::{ByteOrder, LittleEndian};
 use image::RgbaImage;
+use log::*;
 
-use bytes::ByteExt;
-use cpu::{Interrupts, TCycles};
-use memory::Addressable;
+use crate::bytes::ByteExt;
+use crate::cpu::{Interrupts, TCycles};
+use crate::memory::Addressable;
 
 mod palette;
 
@@ -171,7 +172,7 @@ pub struct Position {
 pub struct ScreenBuffer(pub [[Shade; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 
 impl Debug for ScreenBuffer {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FrameBuffer").finish()
     }
 }
@@ -564,17 +565,17 @@ impl Addressable for Ppu {
     /// Panics if reading memory that is not managed by the PPU.
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x8000...0x97FF => {
+            0x8000..=0x97FF => {
                 let index = address - 0x8000;
                 self.mem.chram[index as usize]
             }
 
-            0x9800...0x9FFF => {
+            0x9800..=0x9FFF => {
                 let index = address - 0x9800;
                 self.mem.bg_map[index as usize]
             }
 
-            0xFE00...0xFE9F => {
+            0xFE00..=0xFE9F => {
                 let index = address - 0xFE00;
                 self.mem.oam[index as usize]
             }
@@ -590,17 +591,17 @@ impl Addressable for Ppu {
     /// Panics if writing memory that is not managed by the PPU.
     fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
-            0x8000...0x97FF => {
+            0x8000..=0x97FF => {
                 let index = address - 0x8000;
                 self.mem.chram[index as usize] = byte;
             }
 
-            0x9800...0x9FFF => {
+            0x9800..=0x9FFF => {
                 let index = address - 0x9800;
                 self.mem.bg_map[index as usize] = byte;
             }
 
-            0xFE00...0xFE9F => {
+            0xFE00..=0xFE9F => {
                 let index = address & 0xFF;
                 self.mem.oam[index as usize] = byte;
             }
@@ -611,7 +612,7 @@ impl Addressable for Ppu {
 }
 
 impl fmt::Debug for Memory {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let chram: &[u8] = &self.chram;
         let bg_map: &[u8] = &self.bg_map;
         let oam: &[u8] = &self.oam;
@@ -630,9 +631,9 @@ mod tests {
 
     use byteorder::{ByteOrder, LittleEndian};
 
-    use bytes::ByteExt;
-    use cpu::{Interrupts, TCycles};
-    use memory::Addressable;
+    use crate::bytes::ByteExt;
+    use crate::cpu::{Interrupts, TCycles};
+    use crate::memory::Addressable;
 
     use super::{
         BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart, TileMapStart,
