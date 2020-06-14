@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
 
-use failure::ResultExt;
+use anyhow::{Context, Result};
 use log::*;
 use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
 use structopt::clap::AppSettings::*;
@@ -13,7 +13,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use feo_boy::{Button, Emulator, Result, SCREEN_DIMENSIONS};
+use feo_boy::{Button, Emulator, SCREEN_DIMENSIONS};
 
 #[derive(Debug, StructOpt)]
 #[structopt(setting(ColorAuto), setting(ColoredHelp))]
@@ -146,11 +146,7 @@ fn main() {
     let opt = Opt::from_args();
 
     if let Err(e) = run(opt) {
-        eprintln!("fatal error");
-
-        for cause in e.iter_chain() {
-            eprintln!("cause: {}", cause);
-        }
+        eprintln!("fatal error: {}", e);
 
         if let Some(pixels::Error::AdapterNotFound) = e.downcast_ref() {
             eprintln!("help: ensure your graphics adapter supports Vulkan");

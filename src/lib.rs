@@ -19,7 +19,7 @@ use std::path::Path;
 use std::process;
 use std::time::Duration;
 
-use failure::{Error, ResultExt};
+use anyhow::{Context, Result};
 use log::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -37,9 +37,6 @@ pub use crate::input::Button;
 ///
 /// Sourced from this [timing document](http://gameboy.mongenel.com/dmg/gbc_cpu_timing.txt).
 const CYCLE_DURATION: Duration = Duration::from_nanos(234);
-
-pub type Result<T> = std::result::Result<T, Error>;
-pub(crate) type StdResult<T, E> = std::result::Result<T, E>;
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug)]

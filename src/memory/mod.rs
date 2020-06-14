@@ -10,30 +10,26 @@ use std::num::Wrapping;
 use std::rc::Rc;
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use failure::Fail;
 use log::*;
+use thiserror::Error;
 
 use self::mbc::{Mbc, Mbc1, Mbc3};
-use crate::StdResult;
 
 /// The size (in bytes) of the DMG BIOS.
 pub const BIOS_SIZE: usize = 0x0100;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum BiosError {
-    #[fail(display = "the BIOS must be exactly 256 bytes")]
+    #[error("the BIOS must be exactly 256 bytes")]
     InvalidSize,
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CartridgeError {
-    #[fail(display = "the size of the ROM must be at least 32KB")]
+    #[error("the size of the ROM must be at least 32KB")]
     InvalidSize,
 
-    #[fail(
-        display = "the header checksum {:#02} is not equal to sum {:#02}",
-        checksum, sum
-    )]
+    #[error("the header checksum {checksum:#02} is not equal to sum {sum:#02}")]
     BadChecksum { checksum: u8, sum: u8 },
 }
 
@@ -151,7 +147,7 @@ impl Mmu {
     /// Loads a byte slice containing the BIOS into memory.
     ///
     /// Returns an error if the slice is not the correct length.
-    pub fn load_bios(&mut self, bios: &[u8]) -> StdResult<(), BiosError> {
+    pub fn load_bios(&mut self, bios: &[u8]) -> Result<(), BiosError> {
         if bios.len() != BIOS_SIZE {
             return Err(BiosError::InvalidSize);
         }
@@ -171,7 +167,7 @@ impl Mmu {
     /// Returns an error if the header checksum is invalid.
     ///
     /// [cartridge header]: http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
-    pub fn load_rom(&mut self, rom: &[u8]) -> StdResult<(), CartridgeError> {
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<(), CartridgeError> {
         if rom.len() < self.mem.rom.len() {
             return Err(CartridgeError::InvalidSize);
         }

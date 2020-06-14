@@ -15,10 +15,10 @@ doc = false
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.31"
 bitflags = "1"
 byteorder = "1"
 derive_more = "0.7"
-failure = "0.1"
 itertools = "0.7"
 lazy_static = "1.4.0"
 log = "0.3"
@@ -29,12 +29,13 @@ rustyline = "1"
 sdl2 = "0.31"
 smallvec = "0.5"
 structopt = "0.3.14"
+thiserror = "1.0.19"
 winit = "0.22.2"
 winit_input_helper = "0.7.0"
 
 [build-dependencies]
+anyhow = "1.0.31"
 csv = "1.0.0-beta.5"
-failure = "0.1"
 quote = "0.3"
 serde = "1"
 serde_derive = "1"

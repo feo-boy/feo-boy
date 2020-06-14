@@ -6,7 +6,6 @@ extern crate quote;
 extern crate serde_derive;
 
 extern crate csv;
-extern crate failure;
 extern crate serde;
 
 use std::env;
@@ -14,10 +13,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use failure::Error;
+use anyhow::Result;
 use serde::{Deserialize, Deserializer};
-
-type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -166,21 +163,11 @@ fn write_prefix_instructions<P: AsRef<Path>>(filename: P) -> Result<()> {
     Ok(())
 }
 
-fn run() -> Result<()> {
+fn main() -> Result<()> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
     write_instructions(out_dir.join("instructions.rs"))?;
     write_prefix_instructions(out_dir.join("prefix_instructions.rs"))?;
 
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = run() {
-        for cause in e.iter_causes() {
-            println!("{}", cause);
-        }
-
-        panic!("build failed");
-    }
 }
