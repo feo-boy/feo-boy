@@ -1,19 +1,12 @@
 //! Generates instruction definitions from the data in the `definitions` subdirectory.
 
-#[macro_use]
-extern crate quote;
-#[macro_use]
-extern crate serde_derive;
-
-extern crate csv;
-extern crate serde;
-
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use quote::quote;
 use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Deserialize)]

@@ -142,7 +142,7 @@ fn handle_keys(input: &WinitInputHelper, emulator: &mut Emulator) {
 }
 
 fn main() {
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
     let opt = Opt::from_args();
 
     if let Err(e) = run(opt) {

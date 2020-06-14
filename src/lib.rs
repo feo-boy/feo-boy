@@ -224,7 +224,7 @@ impl Default for Emulator {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Debugger {
     editor: Editor<()>,
     breakpoints: HashSet<u16>,
@@ -238,6 +238,12 @@ impl Debugger {
             paused: true,
             editor: Editor::<()>::new(),
         }
+    }
+}
+
+impl Default for Debugger {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
