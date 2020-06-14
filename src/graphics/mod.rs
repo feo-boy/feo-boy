@@ -5,7 +5,6 @@
 use std::fmt::{self, Debug, Formatter};
 
 use byteorder::{ByteOrder, LittleEndian};
-use image::RgbaImage;
 use log::*;
 
 use crate::bytes::ByteExt;
@@ -169,26 +168,18 @@ pub struct Position {
     pub y: u8,
 }
 
+#[derive(Clone)]
 pub struct ScreenBuffer(pub [[Shade; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 
 impl Debug for ScreenBuffer {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FrameBuffer").finish()
+        f.debug_struct("ScreenBuffer").finish()
     }
 }
 
 impl Default for ScreenBuffer {
     fn default() -> ScreenBuffer {
         ScreenBuffer([[Shade::default(); SCREEN_WIDTH]; SCREEN_HEIGHT])
-    }
-}
-
-#[derive(Debug)]
-pub struct FrameBuffer(pub RgbaImage);
-
-impl Default for FrameBuffer {
-    fn default() -> Self {
-        FrameBuffer(RgbaImage::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32))
     }
 }
 
@@ -254,7 +245,7 @@ pub struct Ppu {
     pub lcd_status_interrupts: LcdcStatusInterrupts,
 
     /// The frame to be rendered.
-    pub frame: FrameBuffer,
+    frame: ScreenBuffer,
 
     /// The pixels to be rendered on a frame.
     pixels: ScreenBuffer,
@@ -266,6 +257,19 @@ impl Ppu {
     /// The initial contents of the memory are unspecified.
     pub fn new() -> Ppu {
         Ppu::default()
+    }
+
+    /// Render the current frame into a frame buffer.
+    ///
+    /// Assumes the default texture format of [`wgpu::TextureFormat::Rgba8UnormSrgb`].
+    pub fn render(&self, frame: &mut [u8]) {
+        for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+            let x = i % SCREEN_WIDTH;
+            let y = i / SCREEN_WIDTH;
+
+            let shade = self.frame.0[y][x];
+            pixel.copy_from_slice(shade.as_rgba());
+        }
     }
 
     /// Performs one clock step of the PPU.
@@ -281,10 +285,7 @@ impl Ppu {
 
                 if self.line > 143 {
                     // Push the pixels to a frame.
-                    for (x, y, pixel) in self.frame.0.enumerate_pixels_mut() {
-                        *pixel = self.pixels.0[y as usize][x as usize].to_rgba();
-                    }
-
+                    self.frame = self.pixels.clone();
                     Some(Mode::VerticalBlank)
                 } else {
                     Some(Mode::ScanlineOam)

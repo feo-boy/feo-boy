@@ -1,5 +1,3 @@
-use image::Rgba;
-
 /// The colors that can be displayed by the DMG.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Shade {
@@ -10,17 +8,17 @@ pub enum Shade {
 }
 
 impl Shade {
-    /// Returns a pixel that represents the color of a `Shade`.
-    pub fn to_rgba(&self) -> Rgba<u8> {
+    /// Returns an RGBA slice that represents the color of a `Shade`.
+    pub fn as_rgba(&self) -> &[u8] {
         use self::Shade::*;
 
         // This uses the GameBoy Pocket palette.
         // TODO: Support more palettes.
         match *self {
-            White => Rgba([0xFF, 0xFF, 0xFF, 0xFF]),
-            LightGray => Rgba([0xA9, 0xA9, 0xA9, 0xFF]),
-            DarkGray => Rgba([0x54, 0x54, 0x54, 0xFF]),
-            Black => Rgba([0x00, 0x00, 0x00, 0xFF]),
+            White => &[0xFF, 0xFF, 0xFF, 0xFF],
+            LightGray => &[0xA9, 0xA9, 0xA9, 0xFF],
+            DarkGray => &[0x54, 0x54, 0x54, 0xFF],
+            Black => &[0x00, 0x00, 0x00, 0xFF],
         }
     }
 }

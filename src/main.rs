@@ -1,16 +1,19 @@
-use std::borrow::Cow;
 use std::path::PathBuf;
 use std::process;
-use std::time::Duration;
+use std::time::Instant;
 
-use ::image::imageops;
-use ::image::{FilterType, RgbaImage};
 use failure::ResultExt;
-use piston_window::*;
+use log::*;
+use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
 use structopt::clap::AppSettings::*;
 use structopt::StructOpt;
+use winit::dpi::LogicalSize;
+use winit::event::{Event, VirtualKeyCode};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+use winit_input_helper::WinitInputHelper;
 
-use feo_boy::{Emulator, Result, SCREEN_DIMENSIONS};
+use feo_boy::{Button, Emulator, Result, SCREEN_DIMENSIONS};
 
 #[derive(Debug, StructOpt)]
 #[structopt(setting(ColorAuto), setting(ColoredHelp))]
@@ -51,74 +54,91 @@ fn run(opt: Opt) -> Result<()> {
 
     emulator.reset();
 
-    let scaled_dimensions = [
-        SCREEN_DIMENSIONS.0 * u32::from(opt.scaling),
-        SCREEN_DIMENSIONS.1 * u32::from(opt.scaling),
-    ];
-    let mut window: PistonWindow = WindowSettings::new("FeO Boy", scaled_dimensions)
-        .build()
-        .unwrap();
+    let event_loop = EventLoop::new();
+    let mut input = WinitInputHelper::new();
+    let window = {
+        let size = LogicalSize::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1);
+        WindowBuilder::new()
+            .with_title("FeO Boy")
+            .with_inner_size(size)
+            .with_min_inner_size(size)
+            .build(&event_loop)
+            .unwrap()
+    };
+    let mut hidpi_factor = window.scale_factor();
 
-    let window_size = window.size();
+    let mut pixels = {
+        let surface = Surface::create(&window);
+        let surface_texture =
+            SurfaceTexture::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface);
+        Pixels::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface_texture)?
+    };
 
-    let mut texture = Texture::from_image(
-        &mut window.factory,
-        &RgbaImage::new(window_size.width, window_size.height),
-        &TextureSettings::new(),
-    )
-    .unwrap();
+    let mut last_update = Instant::now();
 
-    while let Some(event) = window.next() {
-        if let Some(args) = event.button_args() {
-            // TODO: Make this configurable
-            let button = match args.button {
-                Button::Keyboard(Key::Up) => Some(feo_boy::Button::Up),
-                Button::Keyboard(Key::Down) => Some(feo_boy::Button::Down),
-                Button::Keyboard(Key::Left) => Some(feo_boy::Button::Left),
-                Button::Keyboard(Key::Right) => Some(feo_boy::Button::Right),
-                Button::Keyboard(Key::X) => Some(feo_boy::Button::B),
-                Button::Keyboard(Key::Z) => Some(feo_boy::Button::A),
-                Button::Keyboard(Key::Return) => Some(feo_boy::Button::Start),
-                Button::Keyboard(Key::Backspace) => Some(feo_boy::Button::Select),
-                _ => None,
-            };
+    event_loop.run(move |event, _, control_flow| {
+        if let Event::RedrawRequested(_) = event {
+            emulator.render(pixels.get_frame());
 
-            if let Some(button) = button {
-                match args.state {
-                    ButtonState::Press => emulator.press(button),
-                    ButtonState::Release => emulator.release(button),
-                }
+            if let Err(e) = pixels.render() {
+                *control_flow = ControlFlow::Exit;
+                error!("unable to render: {}", e);
+                return;
             }
         }
 
-        if let Some(args) = event.update_args() {
-            emulator.update(Duration::from_secs_f64(args.dt))?;
+        if input.update(&event) {
+            if input.quit() {
+                *control_flow = ControlFlow::Exit;
+                return;
+            }
+
+            handle_keys(&input, &mut emulator);
+
+            if let Some(factor) = input.scale_factor_changed() {
+                hidpi_factor = factor;
+            }
+
+            if let Some(size) = input.window_resized() {
+                // FIXME: User-specified scaling is currently ignored: parasyte/pixels/issues/89
+                pixels.resize(size.width, size.height);
+            }
+
+            let current_time = Instant::now();
+            if let Err(e) = emulator.update(current_time - last_update) {
+                error!("unable to update emulator state: {}", e);
+                *control_flow = ControlFlow::Exit;
+            }
+            last_update = current_time;
+            window.request_redraw();
         }
+    });
+}
 
-        if event.render_args().is_some() {
-            let display_buffer = if opt.scaling == 1 {
-                Cow::Borrowed(emulator.frame_buffer())
-            } else {
-                Cow::Owned(imageops::resize(
-                    emulator.frame_buffer(),
-                    window_size.width,
-                    window_size.height,
-                    FilterType::Nearest,
-                ))
-            };
-
-            texture
-                .update(&mut window.encoder, &display_buffer)
-                .unwrap();
-
-            window.draw_2d(&event, |context, graphics| {
-                clear([1.0; 4], graphics);
-                image(&texture, context.transform, graphics);
-            });
-        }
+fn handle_keys(input: &WinitInputHelper, emulator: &mut Emulator) {
+    macro_rules! button_mapping {
+        ( $( $winit_key:expr => $feo_boy_key:expr),+ $(,)? ) => {{
+            $(
+                if input.key_pressed($winit_key) {
+                    emulator.press($feo_boy_key)
+                }
+                if input.key_released($winit_key) {
+                    emulator.release($feo_boy_key)
+                }
+            )*
+        }}
     }
 
-    Ok(())
+    button_mapping! {
+        VirtualKeyCode::Up => Button::Up,
+        VirtualKeyCode::Down => Button::Down,
+        VirtualKeyCode::Left => Button::Left,
+        VirtualKeyCode::Right => Button::Right,
+        VirtualKeyCode::X => Button::B,
+        VirtualKeyCode::Z => Button::A,
+        VirtualKeyCode::Return => Button::Start,
+        VirtualKeyCode::Back => Button::Select,
+    }
 }
 
 fn main() {
@@ -130,6 +150,10 @@ fn main() {
 
         for cause in e.iter_chain() {
             eprintln!("cause: {}", cause);
+        }
+
+        if let Some(pixels::Error::AdapterNotFound) = e.downcast_ref() {
+            eprintln!("help: ensure your graphics adapter supports Vulkan");
         }
 
         process::exit(1);

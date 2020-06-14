@@ -20,7 +20,6 @@ use std::process;
 use std::time::Duration;
 
 use failure::{Error, ResultExt};
-use image::RgbaImage;
 use log::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -117,8 +116,9 @@ impl Emulator {
         Ok(())
     }
 
-    pub fn frame_buffer(&self) -> &RgbaImage {
-        &self.bus.ppu.frame.0
+    /// Render the current frame into a frame buffer.
+    pub fn render(&self, frame: &mut [u8]) {
+        self.bus.ppu.render(frame);
     }
 
     /// Fetch and execute a single instruction. Returns the number of cycles executed.
