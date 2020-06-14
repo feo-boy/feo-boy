@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::process;
+use std::time::Duration;
 
 use ::image::imageops;
 use ::image::{FilterType, RgbaImage};
@@ -78,7 +79,7 @@ fn start_emulator(config: &Config) -> Result<()> {
         }
 
         if let Some(args) = event.update_args() {
-            emulator.update(args.dt)?;
+            emulator.update(Duration::from_secs_f64(args.dt))?;
         }
 
         if event.render_args().is_some() {

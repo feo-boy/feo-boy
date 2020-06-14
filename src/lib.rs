@@ -17,6 +17,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::process;
+use std::time::Duration;
 
 use failure::{Error, ResultExt};
 use image::RgbaImage;
@@ -33,7 +34,10 @@ use crate::memory::Mmu;
 pub use crate::graphics::SCREEN_DIMENSIONS;
 pub use crate::input::Button;
 
-const MICROSECONDS_PER_CYCLE: f64 = 0.2384;
+/// The amount of time it takes for a physical Game Boy to complete a single cycle.
+///
+/// Sourced from this [timing document](http://gameboy.mongenel.com/dmg/gbc_cpu_timing.txt).
+const CYCLE_DURATION: Duration = Duration::from_nanos(234);
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub(crate) type StdResult<T, E> = std::result::Result<T, E>;
@@ -154,9 +158,8 @@ impl Emulator {
     /// Step the emulation state for the given time in seconds.
     ///
     /// If the debugger is enabled, debug commands will be read from stdin.
-    pub fn update(&mut self, dt: f64) -> Result<()> {
-        let microseconds = dt * 1_000_000.0;
-        let cycles_to_execute = TCycles((microseconds / MICROSECONDS_PER_CYCLE) as u32);
+    pub fn update(&mut self, dt: Duration) -> Result<()> {
+        let cycles_to_execute = TCycles((dt.as_nanos() / CYCLE_DURATION.as_nanos()) as u32);
 
         let mut cycles_executed = TCycles(0);
 
