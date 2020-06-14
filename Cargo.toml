@@ -6,6 +6,7 @@ authors = [
     "Andrew Fishberg <fishberg.github@gmail.com>",
     "Max Comstock <maxibillion6@gmail.com>",
 ]
+description = "Emulator for the Nintendo Game Boy"
 edition = "2018"
 
 [[bin]]
@@ -16,7 +17,6 @@ path = "src/main.rs"
 [dependencies]
 bitflags = "1"
 byteorder = "1"
-clap = "2"
 derive_more = "0.7"
 failure = "0.1"
 image = "0.17"
@@ -29,6 +29,7 @@ regex = "0.2"
 rustyline = "1"
 sdl2 = "0.31"
 smallvec = "0.5"
+structopt = "0.3.14"
 
 [build-dependencies]
 csv = "1.0.0-beta.5"

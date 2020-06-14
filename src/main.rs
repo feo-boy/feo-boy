@@ -5,42 +5,55 @@ use std::time::Duration;
 
 use ::image::imageops;
 use ::image::{FilterType, RgbaImage};
-use clap::{
-    crate_authors, crate_description, crate_name, crate_version, value_t, App, AppSettings, Arg,
-};
 use failure::ResultExt;
 use piston_window::*;
+use structopt::clap::AppSettings::*;
+use structopt::StructOpt;
 
 use feo_boy::{Emulator, Result, SCREEN_DIMENSIONS};
 
-#[derive(Debug, Clone)]
-struct Config {
+#[derive(Debug, StructOpt)]
+#[structopt(setting(ColorAuto), setting(ColoredHelp))]
+#[structopt(author, about)]
+struct Opt {
+    /// A file containing a ROM to load into the emulator.
     rom: PathBuf,
+
+    /// A file containing a binary dump of the Game Boy BIOS.
+    ///
+    /// If not supplied, the emulator will begin executing the ROM as if the BIOS had succeeded.
+    #[structopt(long)]
     bios: Option<PathBuf>,
+
+    /// Pixel scaling factor.
+    ///
+    /// Each pixel on the emulator screen is scaled by this amount to map to the host screen.
+    #[structopt(long, default_value = "1")]
     scaling: u8,
+
+    /// Enable debug mode.
+    #[structopt(short, long)]
     debug: bool,
 }
 
-fn start_emulator(config: &Config) -> Result<()> {
-    let mut emulator = if config.debug {
+fn run(opt: Opt) -> Result<()> {
+    let mut emulator = if opt.debug {
         Emulator::new_with_debug()
     } else {
         Emulator::new()
     };
 
-    if let Some(ref bios) = config.bios {
+    if let Some(ref bios) = opt.bios {
         emulator.load_bios(bios).context("could not load BIOS")?;
     }
 
-    emulator
-        .load_rom(&config.rom)
-        .context("could not load ROM")?;
+    emulator.load_rom(&opt.rom).context("could not load ROM")?;
 
     emulator.reset();
 
     let scaled_dimensions = [
-        SCREEN_DIMENSIONS.0 * u32::from(config.scaling),
-        SCREEN_DIMENSIONS.1 * u32::from(config.scaling),
+        SCREEN_DIMENSIONS.0 * u32::from(opt.scaling),
+        SCREEN_DIMENSIONS.1 * u32::from(opt.scaling),
     ];
     let mut window: PistonWindow = WindowSettings::new("FeO Boy", scaled_dimensions)
         .build()
@@ -83,7 +96,7 @@ fn start_emulator(config: &Config) -> Result<()> {
         }
 
         if event.render_args().is_some() {
-            let display_buffer = if config.scaling == 1 {
+            let display_buffer = if opt.scaling == 1 {
                 Cow::Borrowed(emulator.frame_buffer())
             } else {
                 Cow::Owned(imageops::resize(
@@ -108,55 +121,11 @@ fn start_emulator(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn run() -> Result<()> {
-    pretty_env_logger::init().unwrap();
-
-    let matches = App::new(crate_name!())
-        .setting(AppSettings::ColoredHelp)
-        .version(crate_version!())
-        .author(crate_authors!("\n"))
-        .about(crate_description!())
-        .arg(
-            Arg::with_name("rom")
-                .required(true)
-                .help("a file containing a ROM to load into the emulator"),
-        )
-        .arg(Arg::with_name("bios").long("bios").takes_value(true).help(
-            "a file containing a binary dump of the Game Boy BIOS. If not supplied, the emulator \
-             will begin executing the ROM as if the BIOS had succeeded",
-        ))
-        .arg(
-            Arg::with_name("scaling")
-                .required(false)
-                .long("scaling")
-                .takes_value(true)
-                .default_value("1")
-                .help("amount to scale the emulator screen by"),
-        )
-        .arg(
-            Arg::with_name("debug")
-                .long("debug")
-                .short("d")
-                .help("Enable debug mode"),
-        )
-        .get_matches();
-
-    let bios = matches.value_of("bios").map(PathBuf::from);
-    let rom = matches.value_of("rom").unwrap();
-    let scaling = value_t!(matches, "scaling", u8).unwrap_or_else(|e| e.exit());
-
-    let config = Config {
-        bios,
-        rom: PathBuf::from(rom),
-        debug: matches.is_present("debug"),
-        scaling,
-    };
-
-    start_emulator(&config)
-}
-
 fn main() {
-    if let Err(e) = run() {
+    pretty_env_logger::init().unwrap();
+    let opt = Opt::from_args();
+
+    if let Err(e) = run(opt) {
         eprintln!("fatal error");
 
         for cause in e.iter_chain() {
