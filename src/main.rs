@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use log::*;
-use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
+use pixels::{Pixels, SurfaceTexture};
 use structopt::clap::AppSettings::*;
 use structopt::StructOpt;
 use winit::dpi::LogicalSize;
@@ -68,9 +68,9 @@ fn run(opt: Opt) -> Result<()> {
     let mut hidpi_factor = window.scale_factor();
 
     let mut pixels = {
-        let surface = Surface::create(&window);
+        let window_size = window.inner_size();
         let surface_texture =
-            SurfaceTexture::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface);
+            SurfaceTexture::new(window_size.width, window_size.height, &window);
         Pixels::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface_texture)?
     };
 
