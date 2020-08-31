@@ -20,7 +20,7 @@ Enable log output by setting `RUST_LOG=feo_boy`.
 ## Debugging
 
 Enable debug mode by passing the `--debug` flag. You will see a prompt that
-allows you to step emulation an instruction at a time. You may also dump memory
+allows you to step emulation one instruction at a time. You may also dump memory
 or CPU state from this prompt.
 
 Enter `?` at this prompt to see all debug options.
