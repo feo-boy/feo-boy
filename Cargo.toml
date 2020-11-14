@@ -29,8 +29,8 @@ rustyline = "6.2.0"
 smallvec = "1.4.0"
 structopt = "0.3.14"
 thiserror = "1.0.19"
-winit = "0.22.2"
-winit_input_helper = "0.7.0"
+winit = "0.23.0"
+winit_input_helper = "0.8.0"
 
 [build-dependencies]
 anyhow = "1.0.31"
