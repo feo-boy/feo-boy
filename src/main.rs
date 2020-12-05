@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
@@ -46,11 +47,15 @@ fn run(opt: Opt) -> Result<()> {
         Emulator::new()
     };
 
-    if let Some(ref bios) = opt.bios {
-        emulator.load_bios(bios).context("could not load BIOS")?;
+    if let Some(bios) = &opt.bios {
+        info!("loading BIOS from file '{}'", bios.display());
+        let bios = fs::read(&bios).context("could not read BIOS")?;
+        emulator.load_bios(&bios).context("could not load BIOS")?;
     }
 
-    emulator.load_rom(&opt.rom).context("could not load ROM")?;
+    info!("loading ROM from file '{}'", opt.rom.display());
+    let rom = fs::read(&opt.rom).context("could not read ROM")?;
+    emulator.load_rom(&rom).context("could not load ROM")?;
 
     emulator.reset();
 

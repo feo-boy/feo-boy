@@ -13,13 +13,10 @@ pub mod memory;
 pub mod tui;
 
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
 use std::process;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use log::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -81,32 +78,18 @@ impl Emulator {
         self.cpu.reset(&self.bus.mmu);
     }
 
-    /// Load a BIOS dump into the emulator from a file.
-    pub fn load_bios<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        info!("loading BIOS from file '{}'", path.as_ref().display());
-
-        let mut file = File::open(path).context("could not open BIOS file")?;
-
-        let mut buf = vec![];
-        file.read_to_end(&mut buf)?;
-
-        self.bus.mmu.load_bios(&buf)?;
+    /// Load a BIOS dump into the emulator.
+    pub fn load_bios(&mut self, bios: &[u8]) -> Result<()> {
+        self.bus.mmu.load_bios(&bios)?;
 
         info!("loaded BIOS successfully");
 
         Ok(())
     }
 
-    /// Load a cartridge ROM into the emulator from a file.
-    pub fn load_rom<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        info!("loading ROM from file '{}'", path.as_ref().display());
-
-        let mut file = File::open(path).context("could not open ROM file")?;
-
-        let mut buf = vec![];
-        file.read_to_end(&mut buf)?;
-
-        self.bus.mmu.load_rom(&buf)?;
+    /// Load a cartridge ROM into the emulator.
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        self.bus.mmu.load_rom(&rom)?;
 
         info!("loaded ROM successfully");
 
