@@ -179,6 +179,7 @@ impl Mmu {
 
         let title = &rom[0x134..0x144]
             .iter()
+            .take_while(|&&b| b != 0)
             .map(|&c| c as char)
             .collect::<String>();
         info!("title: {}", title);
