@@ -11,14 +11,17 @@ pub mod graphics;
 pub mod input;
 pub mod memory;
 pub mod tui;
+#[cfg(target_arch = "wasm32")]
+pub mod web;
 
 use std::collections::HashSet;
 use std::process;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Result;
+use instant::Instant;
 use log::*;
-use pixels::{Pixels, SurfaceTexture};
+use pixels::{PixelsBuilder, SurfaceTexture};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use winit::dpi::LogicalSize;
@@ -151,17 +154,40 @@ impl Emulator {
     }
 
     /// Open a graphical window and start execution of the emulator.
-    pub fn run(mut self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         let event_loop = EventLoop::new();
         let mut input = WinitInputHelper::new();
         let window = {
             let size = LogicalSize::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1);
-            WindowBuilder::new()
+
+            #[allow(unused_mut)]
+            let mut window_builder = WindowBuilder::new()
                 .with_title("FeO Boy")
                 .with_inner_size(size)
-                .with_min_inner_size(size)
-                .build(&event_loop)
-                .unwrap()
+                .with_min_inner_size(size);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                use wasm_bindgen::JsCast;
+                use web_sys::HtmlCanvasElement;
+                use winit::platform::web::WindowBuilderExtWebSys;
+
+                let document = web_sys::window()
+                    .and_then(|window| window.document())
+                    .unwrap();
+                let screen: HtmlCanvasElement = document
+                    .get_element_by_id("screen")
+                    .expect("no element with id 'screen'")
+                    .dyn_into()
+                    .expect("element with id 'screen' was not a canvas");
+
+                let size = LogicalSize::new(screen.width(), screen.height());
+                window_builder = window_builder.with_canvas(Some(screen));
+                window_builder = window_builder.with_min_inner_size(size);
+                window_builder = window_builder.with_inner_size(size);
+            }
+
+            window_builder.build(&event_loop).unwrap()
         };
         let mut hidpi_factor = window.scale_factor();
 
@@ -169,7 +195,10 @@ impl Emulator {
             let window_size = window.inner_size();
             let surface_texture =
                 SurfaceTexture::new(window_size.width, window_size.height, &window);
-            Pixels::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface_texture)?
+            PixelsBuilder::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface_texture)
+                .texture_format(pixels::wgpu::TextureFormat::Bgra8Unorm) // better supported on web
+                .build()
+                .await?
         };
 
         self.reset();

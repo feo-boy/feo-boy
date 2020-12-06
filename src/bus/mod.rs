@@ -535,7 +535,10 @@ impl Bus {
                 interrupts.joypad.enabled = byte.has_bit_set(4);
             }
 
-            _ => error!("write to unimplemented I/O register {:#02x}", address),
+            _ => {
+                #[cfg(not(target_arch = "wasm32"))]
+                error!("write to unimplemented I/O register {:#02x}", address);
+            }
         }
     }
 }

@@ -17,6 +17,10 @@ jobs:
           toolchain: stable
           override: true
 
+      # https://github.com/timothee-haudebourg/khronos-egl/issues/8
+      - name: Install egl
+        run: sudo apt-get install -y -qq libegl1-mesa-dev
+
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:

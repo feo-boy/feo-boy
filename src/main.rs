@@ -33,7 +33,7 @@ struct Opt {
     debug: bool,
 }
 
-fn run(opt: Opt) -> Result<()> {
+async fn run(opt: Opt) -> Result<()> {
     let mut emulator = if opt.debug {
         Emulator::new_with_debug()
     } else {
@@ -50,14 +50,14 @@ fn run(opt: Opt) -> Result<()> {
     let rom = fs::read(&opt.rom).context("could not read ROM")?;
     emulator.load_rom(&rom).context("could not load ROM")?;
 
-    emulator.run()
+    emulator.run().await
 }
 
 fn main() {
     pretty_env_logger::init();
     let opt = Opt::from_args();
 
-    if let Err(e) = run(opt) {
+    if let Err(e) = pollster::block_on(run(opt)) {
         eprintln!("fatal error: {:?}", e);
 
         if let Some(pixels::Error::AdapterNotFound) = e.downcast_ref() {
