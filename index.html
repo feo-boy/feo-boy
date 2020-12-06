@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+  <head>
+    <title>FeO Boy</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      #screen {
+        display: block;
+        margin: auto;
+        width: calc(160px * 4);
+        height: calc(144px * 4);
+        outline-style: solid;
+      }
+
+      .rom-container {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <canvas id="screen"></canvas>
+    </div>
+    <div class="rom-container">
+      Select a ROM: <input type="file" id="rom">
+    </div>
+    <script type="module">
+      import init, { run_emulator } from "../target/generated/feo-boy.js";
+
+      async function main() {
+        await init();
+
+        initScreen();
+        const romInput = document.getElementById('rom');
+        romInput.addEventListener('change', romChanged, false)
+      }
+
+      function initScreen() {
+        const screen = document.getElementById('screen');
+        screen.width = screen.clientWidth;
+        screen.height = screen.clientHeight;
+      }
+
+      async function romChanged() {
+        const rom = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = function() {
+            resolve(new Uint8Array(this.result));
+          };
+
+          reader.onerror = reject;
+
+          reader.readAsArrayBuffer(this.files[0]);
+        });
+
+        run_emulator(rom);
+      }
+
+      main();
+    </script>
+  </body>
+</html>
