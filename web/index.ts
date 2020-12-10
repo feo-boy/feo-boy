@@ -33,4 +33,17 @@ async function main() {
     romInput.addEventListener('change', romChanged, false)
 }
 
+const modalCloseButton = document.querySelector('#modal button') as HTMLElement;
+modalCloseButton.onclick = () => {
+    const modal = document.getElementById('modal')!;
+    modal.style.display = 'none';
+}
+
+window.onclick = (e: MouseEvent) => {
+    const modal = document.getElementById('modal')!;
+    if (e.target === modal) {
+        modal.style.display = "none";
+    }
+}
+
 main();
