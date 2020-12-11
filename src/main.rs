@@ -60,7 +60,7 @@ fn main() {
     let opt = Opt::from_args();
 
     if let Err(e) = run(opt) {
-        eprintln!("fatal error: {}", e);
+        eprintln!("fatal error: {:?}", e);
 
         if let Some(pixels::Error::AdapterNotFound) = e.downcast_ref() {
             eprintln!("help: ensure your graphics adapter supports Vulkan");
