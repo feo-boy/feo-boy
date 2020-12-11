@@ -31,6 +31,9 @@ pub enum CartridgeError {
 
     #[error("the header checksum {checksum:#02} is not equal to sum {sum:#02}")]
     BadChecksum { checksum: u8, sum: u8 },
+
+    #[error("cartridge type `{0}` is unimplemented")]
+    Unimplemented(String),
 }
 
 /// Operations for memory-like structs.
@@ -240,7 +243,7 @@ impl Mmu {
         };
         info!("cartridge type: {}", cartridge_type);
         if rom[0x147] != 0x00 && self.mbc.is_none() {
-            error!("ROM is from an unsupported cartridge type. The game may not run properly!");
+            return Err(CartridgeError::Unimplemented(cartridge_type.to_owned()));
         }
 
         let num_banks = match rom[0x148] {
