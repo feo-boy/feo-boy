@@ -4,13 +4,31 @@
     <meta charset="utf-8">
     <title>FeO Boy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@1,900&family=Press+Start+2P&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div>
+    <div id="screen-container">
       <canvas id="screen"></canvas>
+      <div id="screen-overlay"></div>
     </div>
     <div class="rom-container">
-      Select a ROM: <input type="file" id="rom">
+      <label>Select a ROM: <input type="file" id="rom"></label>
+    </div>
+    <div>
+      <p>
+        FeO Boy is an emulator for the Nintendo Game Boy.
+      </p>
+      <h1><a id="enabling-webgpu"></a>WebGPU</h1>
+      <p>
+        FeO Boy uses <a href="https://hacks.mozilla.org/2020/04/experimental-webgpu-in-firefox/">WebGPU</a> to render. WebGPU is a highly experimental technology. It is unstable and may stop working at any time. To enable WebGPU in your browser, <a href="https://github.com/gpuweb/gpuweb/wiki/Implementation-Status">please read these instructions.</a>
+      </p>
+      <p>
+        FeO Boy was last tested on Firefox Nightly 85.0.
+      </p>
+      <h1>Technical Details</h1>
+      <p>FeO Boy is built using Rust, WASM, wgpu, and WebGPU. <a href="https://github.com/feo-boy/feo-boy">The source code is available on GitHub.</a></p>
+
     </div>
     <div id="modal" class="modal">
       <div class="modal-content">

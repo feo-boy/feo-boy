@@ -29,8 +29,29 @@ async function romChanged(this: HTMLInputElement) {
 async function main() {
     initScreen();
 
-    const romInput = document.getElementById('rom')!;
+    const romInput = document.getElementById('rom') as HTMLInputElement;
     romInput.addEventListener('change', romChanged, false)
+
+    // Confirm that WebGPU is actually supported.
+    try {
+        if (navigator.gpu === undefined) {
+            throw new Error('`navigator.gpu` is undefined');
+        }
+        await navigator.gpu.requestAdapter();
+    } catch (err) {
+        console.error(err);
+
+        romInput.disabled = true;
+
+        const overlay = document.getElementById('screen-overlay')!;
+        overlay.innerHTML = `
+            <p>WebGPU is not enabled!</p>
+            <p><a href="#enabling-webgpu">Please read the instructions below.</a></p>
+        `;
+        overlay.style.display = 'table-cell';
+
+        return;
+    }
 }
 
 const modalCloseButton = document.querySelector('#modal button') as HTMLElement;

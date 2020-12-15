@@ -1,9 +1,29 @@
+#screen-container {
+  display: grid;
+  grid-template: 1fr / 1fr;
+  place-items: center;
+}
+
+#screen, #screen-overlay {
+  grid-column: 1 / 1;
+  grid-row: 1 / 1;
+}
+
 #screen {
   display: block;
   margin: auto;
   width: calc(160px * 4);
   height: calc(144px * 4);
   outline-style: solid;
+  z-index: 1;
+}
+
+#screen-overlay {
+  text-align: center;
+  display: none;
+  vertical-align: middle;
+  z-index: 2;
+  font-family: "Press Start 2P", monospace;
 }
 
 .rom-container {
