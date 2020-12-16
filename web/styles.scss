@@ -4,32 +4,82 @@ kbd {
   border: 1px solid black;
 }
 
-#screen-container {
+$screen-height: 144px * 3;
+$screen-width: 160px * 3;
+
+#game-boy {
   display: grid;
-  grid-template: 1fr / 1fr;
-  place-items: center;
+  grid-template-columns: auto 100px $screen-width 100px auto;
+  grid-template-rows: 50px 50px ($screen-height / 2) ($screen-height / 2) 50px 50px;
 }
 
-#screen, #screen-overlay {
-  grid-column: 1 / 1;
-  grid-row: 1 / 1;
+#screen, #screen-overlay, .screen-background {
+  grid-column: 3 / 4;
+  grid-row: 3 / 5;
 }
 
 #screen {
   display: block;
   margin: auto;
-  width: calc(160px * 4);
-  height: calc(144px * 4);
+  width: $screen-width;
+  height: $screen-height;
   outline-style: solid;
+  z-index: 2;
+}
+
+.screen-background {
+  display: flex;
+  background: white;
   z-index: 1;
 }
 
 #screen-overlay {
-  text-align: center;
   display: none;
-  vertical-align: middle;
-  z-index: 2;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 3;
   font-family: "Press Start 2P", monospace;
+}
+
+.screen-border {
+  display: inline-block;
+  background-color: gray;
+  border-radius: 25px 25px 100px 25px;
+  grid-column: 2 / 5;
+  grid-row: 2 / 6;
+}
+
+.power {
+  grid-column: 2 / 3;
+  grid-row: 3 / 4;
+  align-self: end;
+  color: white;
+  font-family: sans-serif;
+  text-align: center;
+  font-family: 'Merriweather Sans', sans-serif;
+}
+
+.power-light {
+  margin: auto;
+  margin-bottom: 10px;
+  background: red;
+  border-radius: 50%;
+  height: 10px;
+  width: 10px;
+}
+
+.top-bar-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: right;
+  font-family: sans-serif;
+  grid-column: 3 / 4;
+  grid-row: 2 / 3;
+  font-family: 'Merriweather Sans', sans-serif;
+  color: white;
 }
 
 .rom-container {

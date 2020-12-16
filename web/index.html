@@ -5,12 +5,19 @@
     <title>FeO Boy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@1,900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@1,900&family=Press+Start+2P&family=Merriweather+Sans&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="screen-container">
+    <div id="game-boy">
       <canvas id="screen"></canvas>
+      <div class="screen-background"></div>
       <div id="screen-overlay"></div>
+      <div class="screen-border"></div>
+      <div class="power">
+        <div class="power-light"></div>
+        BATTERY
+      </div>
+      <div class="top-bar-container">DOT MATRIX WITH STEREO SOUND</div>
     </div>
     <div class="rom-container">
       <label>Select a ROM: <input type="file" id="rom"></label>

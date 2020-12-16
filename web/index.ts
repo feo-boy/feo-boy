@@ -48,7 +48,7 @@ async function main() {
             <p>WebGPU is not enabled!</p>
             <p><a href="#enabling-webgpu">Please read the instructions below.</a></p>
         `;
-        overlay.style.display = 'table-cell';
+        overlay.style.display = 'flex';
 
         return;
     }
