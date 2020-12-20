@@ -50,8 +50,6 @@ fn run(opt: Opt) -> Result<()> {
     let rom = fs::read(&opt.rom).context("could not read ROM")?;
     emulator.load_rom(&rom).context("could not load ROM")?;
 
-    emulator.reset();
-
     emulator.run()
 }
 

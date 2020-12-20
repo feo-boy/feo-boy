@@ -79,9 +79,57 @@ impl Emulator {
     }
 
     /// Reset all emulator components to their initial states.
+    ///
+    /// If the BIOS has been loaded, remaps it and sets the PC to 0.
+    ///
+    /// If a BIOS was not loaded, sets register values as if the BIOS had already executed.
     pub fn reset(&mut self) {
         self.bus.mmu.reset();
-        self.cpu.reset(&self.bus.mmu);
+        self.cpu.reset(self.bios_loaded());
+
+        if !self.bios_loaded() {
+            // https://gbdev.io/pandocs/#power-up-sequence
+            //
+            // TODO: The values in the Pan Docs disagree with the values in BGB.
+            // Change these to match what we do when executing the BIOS.
+            const IO_REGISTER_VALUES: &[(u16, u8)] = &[
+                (0xff05, 0x00),
+                (0xff06, 0x00),
+                (0xff07, 0x00),
+                (0xff10, 0x80),
+                (0xff11, 0xbf),
+                (0xff12, 0xf3),
+                (0xff14, 0xbf),
+                (0xff16, 0x3f),
+                (0xff17, 0x00),
+                (0xff19, 0xbf),
+                (0xff1a, 0x7f),
+                (0xff1b, 0xff),
+                (0xff1c, 0x9f),
+                (0xff1e, 0xbf),
+                (0xff20, 0xff),
+                (0xff21, 0x00),
+                (0xff22, 0x00),
+                (0xff23, 0xbf),
+                (0xff24, 0x77),
+                (0xff25, 0xf3),
+                (0xff26, 0xf1),
+                (0xff40, 0x91),
+                (0xff42, 0x00),
+                (0xff43, 0x00),
+                (0xff45, 0x00),
+                (0xff47, 0xfc),
+                (0xff48, 0xff),
+                (0xff49, 0xff),
+                (0xff4a, 0x00),
+                (0xff4b, 0x00),
+                (0xffff, 0x00),
+            ];
+
+            for (addr, value) in IO_REGISTER_VALUES {
+                self.bus.write_byte_no_tick(*addr, *value);
+            }
+        }
     }
 
     /// Load a BIOS dump into the emulator.
@@ -123,6 +171,8 @@ impl Emulator {
                 SurfaceTexture::new(window_size.width, window_size.height, &window);
             Pixels::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1, surface_texture)?
         };
+
+        self.reset();
 
         let mut last_update = Instant::now();
 
@@ -293,6 +343,10 @@ impl Emulator {
     /// address.
     pub fn current_instruction(&self) -> (u16, Instruction) {
         (self.cpu.reg.pc, self.cpu.current_instruction(&self.bus))
+    }
+
+    fn bios_loaded(&self) -> bool {
+        self.bus.mmu.has_bios()
     }
 }
 

@@ -10,7 +10,6 @@ use std::default::Default;
 use std::fmt::{self, Display};
 
 use crate::bus::Bus;
-use crate::memory::Mmu;
 use derive_more::{Add, AddAssign, Sub, SubAssign};
 use log::*;
 
@@ -244,14 +243,25 @@ impl Cpu {
     }
 
     /// Reset registers to their initial values.
-    pub fn reset(&mut self, mmu: &Mmu) {
-        // Skip the BIOS if we didn't load it.
-        self.reg.pc = if !mmu.has_bios() {
-            info!("skipping BIOS: none loaded");
-            0x100
+    pub fn reset(&mut self, bios_loaded: bool) {
+        if bios_loaded {
+            self.reg.pc = 0x00;
         } else {
-            0x00
-        };
+            info!("skipping BIOS: none loaded");
+
+            // https://gbdev.io/pandocs/#power-up-sequence
+            //
+            // At the time of this writing, the flags value differs from the value given in the Pan
+            // Docs. However, it matches the value after execution of the real BIOS in this
+            // emulator, as well as the value in BGB.
+            self.reg.a = 0x01;
+            self.reg.f = Flags::from_bits_truncate(0x90);
+            self.reg.bc_mut().write(0x0013);
+            self.reg.de_mut().write(0x00d8);
+            self.reg.hl_mut().write(0x014d);
+            self.reg.sp = 0xfffe;
+            self.reg.pc = 0x100;
+        }
 
         self.state = State::Running;
     }
@@ -271,9 +281,8 @@ mod tests {
 
     #[test]
     fn skip_bios() {
-        let bus = Bus::default();
         let mut cpu = Cpu::new();
-        cpu.reset(&bus.mmu);
+        cpu.reset(false);
 
         assert_eq!(cpu.reg.pc, 0x100);
 
@@ -282,7 +291,7 @@ mod tests {
 
         // Load dummy BIOS
         bus.mmu.load_bios(&[0; 256]).unwrap();
-        cpu.reset(&bus.mmu);
+        cpu.reset(true);
 
         assert_eq!(cpu.reg.pc, 0x00);
     }

@@ -313,7 +313,13 @@ impl Mmu {
 
     /// Resets the MMU to its initial state, including all I/O registers.
     pub fn reset(&mut self) {
-        self.bios_mapped = true;
+        for byte in &mut self.mem.wram {
+            *byte = 0;
+        }
+
+        if self.mem.bios.is_some() {
+            self.bios_mapped = true;
+        }
     }
 
     /// Unmaps the BIOS from the memory map, meaning that bytes `0x00`-`0x100` will read as

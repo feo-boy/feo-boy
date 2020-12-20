@@ -73,7 +73,7 @@ impl Bus {
         }
     }
 
-    /// Writes a single byte to memory. This read happens instantaneously: no components are
+    /// Writes a single byte to memory. This write happens instantaneously: no components are
     /// ticked.
     pub fn write_byte_no_tick(&mut self, address: u16, byte: u8) {
         match address {
