@@ -455,7 +455,7 @@ impl Registers {
 
 impl fmt::Display for Registers {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "A {:#04x}", self.a)?;
+        writeln!(f, "A {:#04x}  {:#04x} F", self.a, self.f)?;
         writeln!(f, "B {:#04x}  {:#04x} C", self.b, self.c)?;
         writeln!(f, "D {:#04x}  {:#04x} E", self.d, self.e)?;
         writeln!(f, "H {:#04x}  {:#04x} L", self.h, self.l)?;
@@ -474,6 +474,7 @@ impl fmt::Display for Registers {
 mod tests {
     use std::ops::SubAssign;
 
+    use indoc::indoc;
     use quickcheck::quickcheck;
 
     use super::{Flags, Registers};
@@ -963,5 +964,34 @@ mod tests {
                 assert!(registers.f.contains(Flags::CARRY));
             }
         }
+    }
+
+    #[test]
+    fn display() {
+        let mut registers = Registers::new();
+
+        registers.a = 0x01;
+        registers.f = Flags::from_bits_truncate(0xb0);
+        registers.bc_mut().write(0x0013);
+        registers.de_mut().write(0x00d8);
+        registers.hl_mut().write(0x014d);
+        registers.sp = 0xfffe;
+        registers.pc = 0x0100;
+
+        assert_eq!(
+            registers.to_string(),
+            indoc! {"
+                A 0x01  0xb0 F
+                B 0x00  0x13 C
+                D 0x00  0xd8 E
+                H 0x01  0x4d L
+
+                SP 0xfffe
+                PC 0x0100
+
+                  ZNHC
+                F 10110000
+            "},
+        );
     }
 }
