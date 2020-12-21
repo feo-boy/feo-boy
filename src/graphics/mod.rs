@@ -6,6 +6,7 @@ use std::fmt::{self, Debug, Formatter};
 
 use byteorder::{ByteOrder, LittleEndian};
 use log::*;
+use num_enum::IntoPrimitive;
 
 use crate::bytes::ByteExt;
 use crate::cpu::{Interrupts, TCycles};
@@ -68,22 +69,14 @@ pub struct LcdcStatusInterrupts {
 }
 
 /// The location of the window or background tile map.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive)]
+#[repr(u16)]
 pub enum TileMapStart {
     /// The low tile map (0x9800).
-    Low,
+    Low = 0x9800,
 
     /// The high tile map (0x9C00).
-    High,
-}
-
-impl TileMapStart {
-    fn address(&self) -> u16 {
-        match *self {
-            TileMapStart::Low => 0x9800,
-            TileMapStart::High => 0x9C00,
-        }
-    }
+    High = 0x9C00,
 }
 
 impl Default for TileMapStart {
@@ -93,22 +86,14 @@ impl Default for TileMapStart {
 }
 
 /// The location of the window or background tile data.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive)]
+#[repr(u16)]
 pub enum TileDataStart {
     /// The low address (0x8000). Offsets are unsigned.
-    Low,
+    Low = 0x8000,
 
     /// The high address (0x8800). Offsets are signed.
-    High,
-}
-
-impl TileDataStart {
-    fn address(&self) -> u16 {
-        match *self {
-            TileDataStart::Low => 0x8000,
-            TileDataStart::High => 0x8800,
-        }
-    }
+    High = 0x8800,
 }
 
 impl Default for TileDataStart {
@@ -417,10 +402,10 @@ impl Ppu {
 
             // Get the address of the tile in memory.
             let tile_id_address = {
-                let tile_start_address = if using_window {
-                    self.control.window_map_start.address()
+                let tile_start_address: u16 = if using_window {
+                    self.control.window_map_start.into()
                 } else {
-                    self.control.bg_map_start.address()
+                    self.control.bg_map_start.into()
                 };
                 tile_start_address + tile_row_offset + u16::from(tile_offset)
             };
@@ -449,15 +434,15 @@ impl Ppu {
         const SIGNED_TILE_OFFSET: i16 = 128;
         const TILE_DATA_ROW_SIZE: u16 = 16;
 
-        let start = &self.control.tile_data_start;
+        let start = self.control.tile_data_start;
 
         // Depending on which tile map we're using, the offset can be signed or unsigned.
-        let offset = match *start {
+        let offset = match start {
             TileDataStart::Low => tile_id.into(),
             TileDataStart::High => (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16,
         };
 
-        start.address() + offset * TILE_DATA_ROW_SIZE
+        u16::from(start) + offset * TILE_DATA_ROW_SIZE
     }
 
     /// Gets the shade number for a particular pixel on the screen.

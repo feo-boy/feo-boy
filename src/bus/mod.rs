@@ -432,9 +432,9 @@ impl Bus {
 
                 control.display_enabled = byte.has_bit_set(7);
                 control.window_map_start = if byte.has_bit_set(6) {
-                    TileMapStart::Low
-                } else {
                     TileMapStart::High
+                } else {
+                    TileMapStart::Low
                 };
                 control.window_enabled = byte.has_bit_set(5);
                 control.tile_data_start = if byte.has_bit_set(4) {
@@ -589,7 +589,7 @@ mod tests {
     use quickcheck::{QuickCheck, StdGen, TestResult};
     use rand;
 
-    use crate::graphics::{BackgroundPalette, Shade};
+    use crate::graphics::{BackgroundPalette, Shade, SpriteSize};
     use crate::input::Button;
     use crate::memory::BIOS_SIZE;
 
@@ -735,5 +735,50 @@ mod tests {
 
         bus.button_state.press(Button::A);
         assert_eq!(bus.read_byte(0xFF00) & 0x3F, 0x3C);
+    }
+
+    #[test]
+    fn lcd_control() {
+        let mut bus = Bus::default();
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert!(!bus.ppu.control.display_enabled);
+        bus.write_byte(0xFF40, 0b1000_0000);
+        assert!(bus.ppu.control.display_enabled);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert_eq!(u16::from(bus.ppu.control.window_map_start), 0x9800);
+        bus.write_byte(0xFF40, 0b0100_0000);
+        assert_eq!(u16::from(bus.ppu.control.window_map_start), 0x9C00);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert!(!bus.ppu.control.window_enabled);
+        bus.write_byte(0xFF40, 0b0010_0000);
+        assert!(bus.ppu.control.window_enabled);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert_eq!(u16::from(bus.ppu.control.tile_data_start), 0x8800);
+        bus.write_byte(0xFF40, 0b0001_0000);
+        assert_eq!(u16::from(bus.ppu.control.tile_data_start), 0x8000);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert_eq!(u16::from(bus.ppu.control.bg_map_start), 0x9800);
+        bus.write_byte(0xFF40, 0b0000_1000);
+        assert_eq!(u16::from(bus.ppu.control.bg_map_start), 0x9C00);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert_eq!(bus.ppu.control.sprite_size, SpriteSize::Small);
+        bus.write_byte(0xFF40, 0b0000_0100);
+        assert_eq!(bus.ppu.control.sprite_size, SpriteSize::Large);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert!(!bus.ppu.control.sprites_enabled);
+        bus.write_byte(0xFF40, 0b0000_0010);
+        assert!(bus.ppu.control.sprites_enabled);
+
+        bus.write_byte(0xFF40, 0b0000_0000);
+        assert!(!bus.ppu.control.background_enabled);
+        bus.write_byte(0xFF40, 0b0000_0001);
+        assert!(bus.ppu.control.background_enabled);
     }
 }
