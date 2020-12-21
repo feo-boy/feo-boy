@@ -124,6 +124,21 @@ enum RamRtcSelect {
     Rtc(u8), // 8-c -> 0-4
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum LatchStatus {
+    /// Not latched.
+    Unlatched,
+
+    /// Ready for latch (0x00 written).
+    LatchPrimed,
+
+    /// Ready for unlatch (0x00 written).
+    UnlatchPrimed,
+
+    /// Latched (0x01 written).
+    Latched,
+}
+
 pub struct Mbc3 {
     rom: Rc<Vec<u8>>,
     ram: [u8; RAM_SIZE],
@@ -131,6 +146,7 @@ pub struct Mbc3 {
     ram_timer_enabled: bool,
     rom_select: u8,
     ram_rtc_select: RamRtcSelect,
+    rtc_latch: LatchStatus,
 }
 
 impl Mbc3 {
@@ -142,6 +158,7 @@ impl Mbc3 {
             ram_timer_enabled: false,
             rom_select: 1,
             ram_rtc_select: RamRtcSelect::Ram(0),
+            rtc_latch: LatchStatus::Unlatched,
         }
     }
 }
@@ -210,11 +227,15 @@ impl super::Addressable for Mbc3 {
             }
 
             // Latch Clock Data (WO)
-            0x6000..=0x7fff => match value {
-                0x00 => unimplemented!(), // TODO fix?
-                0x01 => unimplemented!(),
-                _ => unimplemented!(),
-            },
+            0x6000..=0x7fff => {
+                self.rtc_latch = match (value, self.rtc_latch) {
+                    (0x00, LatchStatus::Unlatched) => LatchStatus::LatchPrimed,
+                    (0x01, LatchStatus::LatchPrimed) => LatchStatus::Latched,
+                    (0x00, LatchStatus::Latched) => LatchStatus::UnlatchPrimed,
+                    (0x01, LatchStatus::UnlatchPrimed) => LatchStatus::Unlatched,
+                    _ => return,
+                }
+            }
 
             // RAM Bank 00-03 (RW) && RTC Register 08-0C (RW)
             0xa000..=0xbfff => match self.ram_rtc_select {
@@ -250,5 +271,20 @@ impl Debug for Mbc3 {
             .field("rom_select", &self.rom_select)
             .field("ram_rtc_select", &self.ram_rtc_select)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use super::{Addressable, LatchStatus, Mbc3};
+
+    #[test]
+    fn mbc3_rtc_latch() {
+        let mut mbc = Mbc3::new(Rc::new(vec![]));
+        mbc.write_byte(0x6000, 0x00);
+        mbc.write_byte(0x6000, 0x01);
+        assert_eq!(mbc.rtc_latch, LatchStatus::Latched);
     }
 }
