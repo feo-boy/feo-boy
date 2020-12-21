@@ -131,6 +131,7 @@ pub struct Mmu {
     /// The entire ROM contained on the inserted cartridge.
     cartridge_rom: Rc<Vec<u8>>,
 
+    /// Memory bank controller.
     mbc: Option<Box<dyn Mbc>>,
 }
 
@@ -206,10 +207,7 @@ impl Mmu {
 
         let cartridge_type = match rom[0x147] {
             0x00 => "ROM ONLY",
-            0x01 => {
-                self.mbc = Some(Box::new(Mbc1::new(Rc::clone(&self.cartridge_rom))));
-                "MBC1"
-            }
+            0x01 => "MBC1",
             0x02 => "MBC1+RAM",
             0x03 => "MBC1+RAM+BATTERY",
             0x05 => "MBC2",
@@ -223,10 +221,7 @@ impl Mmu {
             0x10 => "MBC3+TIMER+RAM+BATTERY",
             0x11 => "MBC3",
             0x12 => "MBC3+RAM",
-            0x13 => {
-                self.mbc = Some(Box::new(Mbc3::new(Rc::clone(&self.cartridge_rom))));
-                "MBC3+RAM+BATTERY"
-            }
+            0x13 => "MBC3+RAM+BATTERY",
             0x19 => "MBC5",
             0x1A => "MBC5+RAM",
             0x1B => "MBC4+RAM+BATTERY",
@@ -242,9 +237,16 @@ impl Mmu {
             _ => "unknown",
         };
         info!("cartridge type: {}", cartridge_type);
-        if rom[0x147] != 0x00 && self.mbc.is_none() {
+
+        self.mbc = if cartridge_type.contains("ROM") {
+            None
+        } else if cartridge_type.contains("MBC1") {
+            Some(Box::new(Mbc1::new(Rc::clone(&self.cartridge_rom))))
+        } else if cartridge_type.contains("MBC3") {
+            Some(Box::new(Mbc3::new(Rc::clone(&self.cartridge_rom))))
+        } else {
             return Err(CartridgeError::Unimplemented(cartridge_type.to_owned()));
-        }
+        };
 
         let num_banks = match rom[0x148] {
             0x00 => Some(0),
