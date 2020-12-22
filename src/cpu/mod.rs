@@ -16,6 +16,9 @@ use log::*;
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
 
+/// CPU frequency in Hz.
+pub const FREQUENCY: u32 = 4_194_304;
+
 /// Machine cycles. The minimum number of cycles that must occur before another instruction can be
 /// decoded.
 ///

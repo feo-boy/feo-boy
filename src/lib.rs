@@ -250,6 +250,8 @@ impl Emulator {
         self.cpu.step(&mut self.bus);
         cycles += self.bus.timer.diff();
 
+        self.bus.audio.step(cycles.into());
+
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;
             if debugger.breakpoints.contains(&pc) {
@@ -348,6 +350,7 @@ impl Default for Emulator {
 pub struct EmulatorBuilder {
     debug: bool,
     serial_out: Option<Box<dyn Write>>,
+    playback: bool,
 }
 
 impl EmulatorBuilder {
@@ -356,6 +359,7 @@ impl EmulatorBuilder {
         EmulatorBuilder {
             serial_out: None,
             debug: false,
+            playback: false,
         }
     }
 
@@ -371,13 +375,33 @@ impl EmulatorBuilder {
         self
     }
 
+    /// Enable audio playback.
+    ///
+    /// If the system does not support audio or the audio controller cannot be initialized, the
+    /// builder will fall back to no audio.
+    pub fn with_playback(mut self) -> Self {
+        self.playback = true;
+        self
+    }
+
     /// Construct the emulator from the builder options.
     pub fn build(self) -> Emulator {
+        let audio = if self.playback {
+            SoundController::new_with_playback()
+                .map_err(|err| {
+                    error!("unable to initialize audio playback: {}", err);
+                    err
+                })
+                .unwrap_or_default()
+        } else {
+            SoundController::default()
+        };
+
         Emulator {
             cpu: Cpu::new(),
             bus: Bus {
                 ppu: Ppu::new(),
-                audio: SoundController::new(),
+                audio,
                 mmu: Mmu::new(),
                 serial_out: self.serial_out,
                 ..Default::default()

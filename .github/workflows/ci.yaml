@@ -7,6 +7,9 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -yq libasound2-dev
+
       - name: Checkout sources
         uses: actions/checkout@v2
         with:
