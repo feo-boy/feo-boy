@@ -71,6 +71,18 @@ impl Emulator {
         }
     }
 
+    /// Create a new emulator with audio playback enabled.
+    pub fn new_with_playback() -> Self {
+        let mut emulator = Emulator::new();
+
+        match SoundController::new_with_playback() {
+            Ok(controller) => emulator.bus.audio = controller,
+            Err(err) => error!("unable to initialize audio playback: {}", err),
+        }
+
+        emulator
+    }
+
     /// Create a new emulator with the debugger enabled.
     pub fn new_with_debug() -> Self {
         let mut emulator = Emulator::new();
@@ -261,6 +273,8 @@ impl Emulator {
 
         self.cpu.step(&mut self.bus);
         cycles += self.bus.timer.diff();
+
+        self.bus.audio.step(cycles.into());
 
         if let Some(ref mut debugger) = self.debug {
             let pc = self.cpu.reg.pc;

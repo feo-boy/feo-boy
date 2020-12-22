@@ -28,6 +28,10 @@ struct Opt {
     #[structopt(long, default_value = "1")]
     scaling: u8,
 
+    /// Disable audio playback.
+    #[structopt(long)]
+    disable_audio: bool,
+
     /// Enable debug mode.
     #[structopt(short, long)]
     debug: bool,
@@ -36,8 +40,10 @@ struct Opt {
 fn run(opt: Opt) -> Result<()> {
     let mut emulator = if opt.debug {
         Emulator::new_with_debug()
-    } else {
+    } else if opt.disable_audio {
         Emulator::new()
+    } else {
+        Emulator::new_with_playback()
     };
 
     if let Some(bios) = &opt.bios {
