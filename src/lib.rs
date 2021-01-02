@@ -41,7 +41,9 @@ pub use crate::input::Button;
 /// The amount of time it takes for a physical Game Boy to complete a single cycle.
 ///
 /// Sourced from this [timing document](http://gameboy.mongenel.com/dmg/gbc_cpu_timing.txt).
-const CYCLE_DURATION: Duration = Duration::from_nanos(234);
+///
+/// See also [`crate::cpu::Frequency`].
+const CYCLE_DURATION: Duration = Duration::from_nanos(238);
 
 /// The emulator itself. Contains all components required to emulate the Game Boy.
 #[derive(Debug)]
