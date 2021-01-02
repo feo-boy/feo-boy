@@ -16,6 +16,10 @@ use log::*;
 pub use self::instructions::Instruction;
 pub use self::registers::{Flags, Registers};
 
+/// Machine cycles. The minimum number of cycles that must occur before another instruction can be
+/// decoded.
+///
+/// All instructions take 1-6 whole M-cycles to complete. An M-cycle is equivalent to 4 T-cycles.
 #[derive(
     Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign,
 )]
@@ -33,6 +37,7 @@ impl From<TCycles> for MCycles {
     }
 }
 
+/// Time cycles. An individual clock of the CPU.
 #[derive(
     Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Add, AddAssign, Sub, SubAssign,
 )]
