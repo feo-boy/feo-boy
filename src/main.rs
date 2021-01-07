@@ -34,11 +34,13 @@ struct Opt {
 }
 
 fn run(opt: Opt) -> Result<()> {
-    let mut emulator = if opt.debug {
-        Emulator::new_with_debug()
-    } else {
-        Emulator::new()
-    };
+    let mut builder = Emulator::builder();
+
+    if opt.debug {
+        builder = builder.with_debug();
+    }
+
+    let mut emulator = builder.build();
 
     if let Some(bios) = &opt.bios {
         info!("loading BIOS from file '{}'", bios.display());

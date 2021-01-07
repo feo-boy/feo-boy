@@ -13,6 +13,8 @@ pub mod memory;
 pub mod tui;
 
 use std::collections::HashSet;
+use std::fmt::Debug;
+use std::io::Write;
 use std::process;
 use std::time::{Duration, Instant};
 
@@ -56,26 +58,12 @@ pub struct Emulator {
 impl Emulator {
     /// Create a new emulator.
     pub fn new() -> Self {
-        let cpu = Cpu::new();
-        let bus = Bus {
-            ppu: Ppu::new(),
-            audio: SoundController::new(),
-            mmu: Mmu::new(),
-            ..Default::default()
-        };
-
-        Emulator {
-            cpu,
-            bus,
-            debug: None,
-        }
+        Self::builder().build()
     }
 
-    /// Create a new emulator with the debugger enabled.
-    pub fn new_with_debug() -> Self {
-        let mut emulator = Emulator::new();
-        emulator.debug = Some(Debugger::new());
-        emulator
+    /// Create a new emulator builder.
+    pub fn builder() -> EmulatorBuilder {
+        EmulatorBuilder::new()
     }
 
     /// Reset all emulator components to their initial states.
@@ -353,6 +341,53 @@ impl Emulator {
 impl Default for Emulator {
     fn default() -> Self {
         Emulator::new()
+    }
+}
+
+/// Non-default emulator options.
+pub struct EmulatorBuilder {
+    debug: bool,
+    serial_out: Option<Box<dyn Write>>,
+}
+
+impl EmulatorBuilder {
+    /// Create a new builder.
+    pub fn new() -> EmulatorBuilder {
+        EmulatorBuilder {
+            serial_out: None,
+            debug: false,
+        }
+    }
+
+    /// Connect the emulator's serial port to a write instance.
+    pub fn with_serial_out(mut self, out: impl Write + 'static) -> Self {
+        self.serial_out = Some(Box::new(out));
+        self
+    }
+
+    /// Enable the debugger.
+    pub fn with_debug(mut self) -> Self {
+        self.debug = true;
+        self
+    }
+
+    /// Construct the emulator from the builder options.
+    pub fn build(self) -> Emulator {
+        Emulator {
+            cpu: Cpu::new(),
+            bus: Bus {
+                ppu: Ppu::new(),
+                audio: SoundController::new(),
+                mmu: Mmu::new(),
+                serial_out: self.serial_out,
+                ..Default::default()
+            },
+            debug: if self.debug {
+                Some(Debugger::new())
+            } else {
+                None
+            },
+        }
     }
 }
 

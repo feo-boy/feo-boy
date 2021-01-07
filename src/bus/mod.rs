@@ -3,9 +3,11 @@
 mod timer;
 
 use std::fmt::{self, Display};
+use std::io::Write;
 use std::ops::Range;
 
 use byteorder::{ByteOrder, LittleEndian};
+use derivative::Derivative;
 use itertools::Itertools;
 use log::*;
 
@@ -22,7 +24,8 @@ use self::timer::Timer;
 ///
 /// The `Bus` contains each individual component. All memory accesses are proxied through the
 /// `Bus`, which then dispatches the read or write to the correct component.
-#[derive(Debug, Default)]
+#[derive(Default, Derivative)]
+#[derivative(Debug)]
 pub struct Bus {
     pub ppu: Ppu,
     pub audio: SoundController,
@@ -30,6 +33,9 @@ pub struct Bus {
     pub interrupts: Interrupts,
     pub timer: Timer,
     pub button_state: ButtonState,
+    pub serial_transfer_data: u8,
+    #[derivative(Debug = "ignore")]
+    pub serial_out: Option<Box<dyn Write>>,
 }
 
 impl Bus {
@@ -391,13 +397,16 @@ impl Bus {
             0xFF00 => self.button_state.select(byte),
 
             // SB - Serial transfer data
-            0xFF01 => {
-                warn!("serial transfer is unimplemented");
-            }
+            0xFF01 => self.serial_transfer_data = byte,
 
             // SC - Serial Transfer Control
             0xFF02 => {
-                warn!("serial transfer is unimplemented");
+                warn!("serial transfer is unfinished");
+
+                if let Some(out) = &mut self.serial_out {
+                    out.write_all(&[self.serial_transfer_data])
+                        .expect("failed to write to serial port");
+                }
             }
 
             // DIV - Divider Register
