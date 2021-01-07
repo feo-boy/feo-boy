@@ -487,6 +487,9 @@ impl Bus {
                 ppu.bg_scroll.x = byte;
             }
 
+            // LYC - LY Compare
+            0xFF45 => self.ppu.line_compare = byte,
+
             // DMA Transfer
             0xFF46 => {
                 // The actual address is 0x100 * the written value, that is, transfer_address
