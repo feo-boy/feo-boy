@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{OutputCallbackInfo, SampleFormat, SampleRate, Stream};
+use cpal::{OutputCallbackInfo, SampleFormat, Stream};
 use derivative::Derivative;
 use log::*;
 
@@ -38,7 +38,7 @@ impl Output {
             .supported_output_configs()?
             .filter(|config| config.channels() == 1 && config.sample_format() == SampleFormat::F32)
             .next()
-            .map(|config| config.with_sample_rate(SampleRate(44_100))) // TODO: use max?
+            .map(|config| config.with_max_sample_rate())
             .ok_or_else(|| anyhow!("no supported audio output configuration found"))?
             .config();
 
@@ -53,11 +53,17 @@ impl Output {
                 let mut src = stream_buffer.lock().unwrap();
 
                 // Naive nearest-neighbor downsampling
-                for (i, sample) in dst.iter_mut().enumerate() {
-                    *sample = *src.get(i * skipped_samples).unwrap_or(&0.0);
+                for sample in dst.iter_mut() {
+                    *sample = src.pop_front().unwrap_or(0.0);
+
+                    for _ in 0..skipped_samples {
+                        src.pop_front();
+                    }
                 }
 
-                src.clear();
+                // FIXME: There are extra samples left over here, and the number of skipped
+                // samples isn't quite accurate. If we were a bit more accurate here, we might be
+                // able to fix some crackles in the output.
             },
             |err| panic!("{}", err),
         )?;
