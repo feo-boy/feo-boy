@@ -566,6 +566,71 @@ impl Addressable for Ppu {
                 self.mem.oam[index as usize]
             }
 
+            // LCDC - LCD Control
+            0xFF40 => {
+                let mut register = 0u8;
+                register.set_bit(7, self.control.display_enabled);
+                register.set_bit(6, self.control.window_map_start != TileMapStart::default());
+                register.set_bit(5, self.control.window_enabled);
+                register.set_bit(4, self.control.tile_data_start != TileDataStart::default());
+                register.set_bit(3, self.control.bg_map_start != TileMapStart::default());
+                register.set_bit(2, self.control.sprite_size != SpriteSize::default());
+                register.set_bit(1, self.control.sprites_enabled);
+                register.set_bit(0, self.control.background_enabled);
+                register
+            }
+
+            // STAT - LCDC Status
+            0xFF41 => {
+                let mut register = 0u8;
+
+                // Set the lowest two bits to the mode.
+                register |= self.mode();
+
+                // Set bit 2 if LY == LYC
+                register.set_bit(2, self.line == self.line_compare);
+
+                // Other bits are set if the various interrupts are enabled.
+                register.set_bit(3, self.lcd_status_interrupts.hblank);
+                register.set_bit(4, self.lcd_status_interrupts.vblank);
+                register.set_bit(5, self.lcd_status_interrupts.oam);
+                register.set_bit(6, self.lcd_status_interrupts.ly_lyc_coincidence);
+
+                // The highest bit is unspecified.
+
+                register
+            }
+
+            // SCY - Scroll Y
+            0xFF42 => self.bg_scroll.y,
+
+            // SCX - Scroll X
+            0xFF43 => self.bg_scroll.x,
+
+            // LCDC Y-Coordinate
+            0xFF44 => self.line(),
+
+            // LYC - LY Compare
+            0xFF45 => self.line_compare,
+
+            // DMA Transfer
+            0xFF46 => unreachable!("handled in bus"),
+
+            // BGP - BG Palette Data
+            0xFF47 => self.bg_palette.as_byte(),
+
+            // OBP0 - Object Palette 0 Data
+            0xFF48 => self.sprite_palette[0].as_byte(),
+
+            // OBP1 - Object Palette 1 Data
+            0xFF49 => self.sprite_palette[1].as_byte(),
+
+            // WY - Window Y Position
+            0xFF4A => self.window.y,
+
+            // WX - Window X Position minus 7
+            0xFF4B => self.window.x.wrapping_add(7),
+
             _ => panic!("read out-of-range address in PPU: {:#0x}", address),
         }
     }
@@ -592,6 +657,72 @@ impl Addressable for Ppu {
                 self.mem.oam[index as usize] = byte;
             }
 
+            // LCDC - LCD Control
+            0xFF40 => {
+                self.control.display_enabled = byte.has_bit_set(7);
+                self.control.window_map_start = if byte.has_bit_set(6) {
+                    TileMapStart::High
+                } else {
+                    TileMapStart::Low
+                };
+                self.control.window_enabled = byte.has_bit_set(5);
+                self.control.tile_data_start = if byte.has_bit_set(4) {
+                    TileDataStart::Low
+                } else {
+                    TileDataStart::High
+                };
+                self.control.bg_map_start = if byte.has_bit_set(3) {
+                    TileMapStart::High
+                } else {
+                    TileMapStart::Low
+                };
+                self.control.sprite_size = if byte.has_bit_set(2) {
+                    SpriteSize::Large
+                } else {
+                    SpriteSize::Small
+                };
+                self.control.sprites_enabled = byte.has_bit_set(1);
+                self.control.background_enabled = byte.has_bit_set(0);
+            }
+
+            // STAT - LCDC Status
+            0xFF41 => {
+                self.lcd_status_interrupts.hblank = byte.has_bit_set(3);
+                self.lcd_status_interrupts.vblank = byte.has_bit_set(4);
+                self.lcd_status_interrupts.oam = byte.has_bit_set(5);
+                self.lcd_status_interrupts.ly_lyc_coincidence = byte.has_bit_set(6);
+            }
+
+            // SCY - Scroll Y
+            0xFF42 => self.bg_scroll.y = byte,
+
+            // SCX - Scroll X
+            0xFF43 => self.bg_scroll.x = byte,
+
+            // LY - LCDC Y-Coordinate (Read-only),
+            0xFF44 => (),
+
+            // LYC - LY Compare
+            0xFF45 => self.line_compare = byte,
+
+            // DMA Transfer
+            0xFF46 => unreachable!("handled in bus"),
+
+            // BGP - BG Palette Data
+            0xFF47 => self.bg_palette = byte.into(),
+
+            // OBP0 - Object Palette 0 Data
+            0xFF48 => self.sprite_palette[0] = byte.into(),
+
+            // OBP1 - Object Palette 1 Data
+            0xFF49 => self.sprite_palette[1] = byte.into(),
+
+            // WY - Window Y position
+            0xFF4A => self.window.y = byte,
+
+            // WB - Window X position minus 7
+            0xFF4B => self.window.x = byte.wrapping_sub(7),
+
             _ => panic!("write out-of-range address in PPU"),
         }
     }
@@ -616,6 +747,7 @@ mod tests {
     use std::u8;
 
     use byteorder::{ByteOrder, LittleEndian};
+    use proptest::proptest;
 
     use crate::bytes::ByteExt;
     use crate::cpu::{Interrupts, TCycles};
@@ -972,5 +1104,141 @@ mod tests {
         let line = ppu.pixels.0[0].to_vec();
         let expected_line = vec![Shade::White; 160];
         assert_eq!(line, expected_line);
+    }
+
+    proptest! {
+        #[test]
+        fn lcdc(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF40, byte);
+
+            assert_eq!(ppu.control.display_enabled, byte.has_bit_set(7));
+            assert_eq!(
+                ppu.control.window_map_start as u16,
+                if byte.has_bit_set(6) { 0x9C00 } else { 0x9800 }
+            );
+            assert_eq!(ppu.control.window_enabled, byte.has_bit_set(5));
+            assert_eq!(
+                ppu.control.tile_data_start as u16,
+                if byte.has_bit_set(4) { 0x8000 } else { 0x8800 }
+            );
+            assert_eq!(
+                ppu.control.bg_map_start as u16,
+                if byte.has_bit_set(3) { 0x9C00 } else { 0x9800 }
+            );
+            assert_eq!(
+                ppu.control.sprite_size,
+                if byte.has_bit_set(2) {
+                    SpriteSize::Large
+                } else {
+                    SpriteSize::Small
+                }
+            );
+            assert_eq!(ppu.control.sprites_enabled, byte.has_bit_set(1));
+            assert_eq!(ppu.control.background_enabled, byte.has_bit_set(0));
+
+            assert_eq!(ppu.read_byte(0xFF40), byte);
+        }
+
+        #[test]
+        fn stat(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF41, byte);
+
+            assert_eq!(ppu.lcd_status_interrupts.ly_lyc_coincidence, byte.has_bit_set(6));
+            assert_eq!(ppu.lcd_status_interrupts.oam, byte.has_bit_set(5));
+            assert_eq!(ppu.lcd_status_interrupts.vblank, byte.has_bit_set(4));
+            assert_eq!(ppu.lcd_status_interrupts.hblank, byte.has_bit_set(3));
+
+            assert_eq!(ppu.read_byte(0xFF41) & 0x78, byte & 0x78);
+        }
+
+        #[test]
+        fn scy(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF42, byte);
+
+            assert_eq!(ppu.bg_scroll.y, byte);
+
+            assert_eq!(ppu.read_byte(0xFF42), byte);
+        }
+
+        #[test]
+        fn scx(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF43, byte);
+
+            assert_eq!(ppu.bg_scroll.x, byte);
+
+            assert_eq!(ppu.read_byte(0xFF43), byte);
+        }
+
+        #[test]
+        fn lyc(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF45, byte);
+
+            assert_eq!(ppu.line_compare, byte);
+
+            assert_eq!(ppu.read_byte(0xFF45), byte);
+        }
+
+        #[test]
+        fn bgp(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF47, byte);
+
+            assert_eq!(byte >> 6, ppu.bg_palette.get(3) as u8);
+            assert_eq!(byte >> 4 & 0b11, ppu.bg_palette.get(2) as u8);
+            assert_eq!(byte >> 2 & 0b11, ppu.bg_palette.get(1) as u8);
+            assert_eq!(byte & 0b11, ppu.bg_palette.get(0) as u8);
+
+            assert_eq!(ppu.read_byte(0xFF47), byte);
+        }
+
+        #[test]
+        fn obp0(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF48, byte);
+
+            assert_eq!(ppu.sprite_palette[0].get(3), Some((byte >> 6).into()));
+            assert_eq!(ppu.sprite_palette[0].get(2), Some((byte >> 4 & 0b11).into()));
+            assert_eq!(ppu.sprite_palette[0].get(1), Some((byte >> 2 & 0b11).into()));
+            assert_eq!(ppu.sprite_palette[0].get(0), None);
+
+            assert_eq!(ppu.read_byte(0xFF48), byte);
+        }
+
+        #[test]
+        fn obp1(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF49, byte);
+
+            assert_eq!(ppu.sprite_palette[1].get(3), Some((byte >> 6).into()));
+            assert_eq!(ppu.sprite_palette[1].get(2), Some((byte >> 4 & 0b11).into()));
+            assert_eq!(ppu.sprite_palette[1].get(1), Some((byte >> 2 & 0b11).into()));
+            assert_eq!(ppu.sprite_palette[1].get(0), None);
+
+            assert_eq!(ppu.read_byte(0xFF49), byte);
+
+        }
+
+        #[test]
+        fn wy(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF4A, byte);
+            assert_eq!(ppu.window.y, byte);
+
+            assert_eq!(ppu.read_byte(0xFF4A), byte);
+        }
+
+        #[test]
+        fn wx(byte: u8) {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF4B, byte);
+            assert_eq!(ppu.window.x, byte.wrapping_sub(7));
+
+            assert_eq!(ppu.read_byte(0xFF4B), byte);
+        }
     }
 }

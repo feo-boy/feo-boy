@@ -14,7 +14,7 @@ use log::*;
 use crate::audio::SoundController;
 use crate::bytes::ByteExt;
 use crate::cpu::{Interrupts, MCycles, TCycles};
-use crate::graphics::{Ppu, SpriteSize, TileDataStart, TileMapStart};
+use crate::graphics::Ppu;
 use crate::input::ButtonState;
 use crate::memory::{Addressable, Mmu};
 
@@ -149,69 +149,8 @@ impl Bus {
             // Sound memory
             0xFF10..=0xFF3F => audio.read_byte(address),
 
-            // LCDC - LCD Control
-            0xFF40 => {
-                let control = &ppu.control;
-
-                let mut register = 0u8;
-                register.set_bit(7, control.display_enabled);
-                register.set_bit(6, control.window_map_start != TileMapStart::default());
-                register.set_bit(5, control.window_enabled);
-                register.set_bit(4, control.tile_data_start != TileDataStart::default());
-                register.set_bit(3, control.bg_map_start != TileMapStart::default());
-                register.set_bit(2, control.sprite_size != SpriteSize::default());
-                register.set_bit(1, control.sprites_enabled);
-                register.set_bit(0, control.background_enabled);
-                register
-            }
-
-            // STAT - LCDC Status
-            0xFF41 => {
-                let mut register = 0u8;
-
-                // Set the lowest two bits to the mode.
-                register |= ppu.mode();
-
-                // Set bit 2 if LY == LYC
-                register.set_bit(
-                    2,
-                    self.read_io_register(0xFF44) == self.read_io_register(0xFF45),
-                );
-
-                // Other bits are set if the various interrupts are enabled.
-                register.set_bit(3, ppu.lcd_status_interrupts.hblank);
-                register.set_bit(4, ppu.lcd_status_interrupts.vblank);
-                register.set_bit(5, ppu.lcd_status_interrupts.oam);
-                register.set_bit(6, ppu.lcd_status_interrupts.ly_lyc_coincidence);
-
-                // The highest bit is unspecified.
-
-                register
-            }
-
-            // SCY - Scroll Y
-            0xFF42 => ppu.bg_scroll.y,
-
-            // SCX - Scroll X
-            0xFF43 => ppu.bg_scroll.x,
-
-            // LCDC Y-Coordinate
-            0xFF44 => ppu.line(),
-
-            // LYC - LY Compare
-            0xFF45 => ppu.line_compare,
-
-            // BGP - BG Palette Data
-            0xFF47 => ppu.bg_palette.as_byte(),
-
-            // OBP0 - Object Palette 0 Data
-            0xFF48 => ppu.sprite_palette[0].as_byte(),
-
-            // OBP1 - Object Palette 1 Data
-            0xFF49 => ppu.sprite_palette[1].as_byte(),
-
-            // WX - Window X Position minus 7
-            0xFF4B => ppu.window.x.wrapping_add(7),
+            // LCD registers
+            0xFF40..=0xFF4B => ppu.read_byte(address),
 
             // Undocumented
             0xFF4C => 0xFF,
@@ -433,62 +372,7 @@ impl Bus {
             }
 
             // Sound control registers
-            0xFF10..=0xFF30 => self.audio.write_byte(address, byte),
-
-            // LCDC - LCD Control
-            0xFF40 => {
-                let control = &mut self.ppu.control;
-
-                control.display_enabled = byte.has_bit_set(7);
-                control.window_map_start = if byte.has_bit_set(6) {
-                    TileMapStart::High
-                } else {
-                    TileMapStart::Low
-                };
-                control.window_enabled = byte.has_bit_set(5);
-                control.tile_data_start = if byte.has_bit_set(4) {
-                    TileDataStart::Low
-                } else {
-                    TileDataStart::High
-                };
-                control.bg_map_start = if byte.has_bit_set(3) {
-                    TileMapStart::High
-                } else {
-                    TileMapStart::Low
-                };
-                control.sprite_size = if byte.has_bit_set(2) {
-                    SpriteSize::Large
-                } else {
-                    SpriteSize::Small
-                };
-                control.sprites_enabled = byte.has_bit_set(1);
-                control.background_enabled = byte.has_bit_set(0);
-            }
-
-            // STAT - LCDC Status
-            0xFF41 => {
-                let ppu = &mut self.ppu;
-
-                ppu.lcd_status_interrupts.hblank = byte.has_bit_set(3);
-                ppu.lcd_status_interrupts.vblank = byte.has_bit_set(4);
-                ppu.lcd_status_interrupts.oam = byte.has_bit_set(5);
-                ppu.lcd_status_interrupts.ly_lyc_coincidence = byte.has_bit_set(6);
-            }
-
-            // SCY - Scroll Y
-            0xFF42 => {
-                let ppu = &mut self.ppu;
-                ppu.bg_scroll.y = byte;
-            }
-
-            // SCX - Scroll X
-            0xFF43 => {
-                let ppu = &mut self.ppu;
-                ppu.bg_scroll.x = byte;
-            }
-
-            // LYC - LY Compare
-            0xFF45 => self.ppu.line_compare = byte,
+            0xFF10..=0xFF3F => self.audio.write_byte(address, byte),
 
             // DMA Transfer
             0xFF46 => {
@@ -503,26 +387,8 @@ impl Bus {
                 }
             }
 
-            // BGP - BG Palette Data
-            0xFF47 => self.ppu.bg_palette = byte.into(),
-
-            // OBP0 - Object Palette 0 Data
-            0xFF48 => self.ppu.sprite_palette[0] = byte.into(),
-
-            // OBP1 - Object Palette 1 Data
-            0xFF49 => self.ppu.sprite_palette[1] = byte.into(),
-
-            // WY - Window Y position
-            0xFF4A => {
-                let ppu = &mut self.ppu;
-                ppu.window.y = byte;
-            }
-
-            // WB - Window X position minus 7
-            0xFF4B => {
-                let ppu = &mut self.ppu;
-                ppu.window.x = byte.wrapping_sub(7);
-            }
+            // LCD registers
+            0xFF40..=0xFF4B => self.ppu.write_byte(address, byte),
 
             // Unmap BIOS
             0xFF50 => {
@@ -547,7 +413,7 @@ impl Bus {
                 interrupts.joypad.enabled = byte.has_bit_set(4);
             }
 
-            _ => error!("write to unimplemented I/O register {:#02x}", address),
+            _ => unimplemented!("write to unimplemented I/O register {:#02x}", address),
         }
     }
 }
