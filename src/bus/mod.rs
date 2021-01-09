@@ -565,7 +565,7 @@ mod tests {
         bus.ppu.line_compare = 40;
         bus.ppu.lcd_status_interrupts.vblank = true;
 
-        assert_eq!(bus.read_byte(0xFF41), 0b00010101);
+        assert_eq!(bus.read_byte(0xFF41), 0b00010110);
     }
 
     #[test]

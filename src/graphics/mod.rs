@@ -168,24 +168,24 @@ impl Default for ScreenBuffer {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Mode {
-    /// Horizontal blank.
+    /// Horizontal blank (HBLANK).
     HorizontalBlank = 0,
 
-    /// Vertical blank.
+    /// Vertical blank (VBLANK).
     VerticalBlank = 1,
 
-    /// Scanline (accessing OAM).
+    /// Accessing OAM.
     ScanlineOam = 2,
 
-    /// Scanline (accessing VRAM).
+    /// Accessing VRAM and drawing.
     ScanlineVram = 3,
 }
 
 impl Default for Mode {
     fn default() -> Self {
-        Mode::VerticalBlank
+        Mode::ScanlineOam
     }
 }
 
@@ -754,8 +754,55 @@ mod tests {
     use crate::memory::Addressable;
 
     use super::{
-        BackgroundPalette, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart, TileMapStart,
+        BackgroundPalette, Mode, Ppu, Shade, SpritePalette, SpriteSize, TileDataStart, TileMapStart,
     };
+
+    #[test]
+    fn scanline_timing() {
+        let mut ppu = Ppu::new();
+        let mut interrupts = Interrupts::default();
+
+        assert_eq!(ppu.mode, Mode::ScanlineOam);
+
+        for _ in 0..80 {
+            ppu.step(&mut interrupts);
+        }
+
+        assert_eq!(ppu.mode, Mode::ScanlineVram);
+
+        for _ in 0..172 {
+            ppu.step(&mut interrupts);
+        }
+
+        assert_eq!(ppu.mode, Mode::HorizontalBlank);
+
+        for _ in 0..204 {
+            ppu.step(&mut interrupts);
+        }
+
+        assert_eq!(ppu.mode, Mode::ScanlineOam);
+        assert_eq!(ppu.line, 1);
+    }
+
+    #[test]
+    fn vblank_timing() {
+        let mut ppu = Ppu::new();
+        let mut interrupts = Interrupts::default();
+
+        for _ in 0..(456 * 144) {
+            ppu.step(&mut interrupts);
+        }
+
+        assert_eq!(ppu.line, 144);
+        assert_eq!(ppu.mode, Mode::VerticalBlank);
+
+        for _ in 0..4560 {
+            ppu.step(&mut interrupts);
+        }
+
+        assert_eq!(ppu.line, 0);
+        assert_eq!(ppu.mode, Mode::ScanlineOam);
+    }
 
     #[test]
     fn chram() {
