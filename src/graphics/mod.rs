@@ -379,26 +379,28 @@ impl Ppu {
         debug_assert!(self.line <= 143, "scanline out of range");
 
         // Draw the line.
-        for x in 0..SCREEN_WIDTH as u8 {
-            // Check if we should be rendering window or background tiles.
-            let use_window =
-                self.control.window_enabled && self.line >= self.window.y && x >= self.window.x;
+        for screen_x in 0..SCREEN_WIDTH as u8 {
+            let screen_y = self.line;
 
-            let (y_position, x_position) = if use_window {
-                let y = self.window.y.wrapping_add(self.line);
-                let x = x.wrapping_sub(self.window.x);
+            let use_window = self.control.window_enabled
+                && screen_y >= self.window.y
+                && screen_x >= self.window.x;
+
+            let (tile_y, tile_x) = if use_window {
+                let y = screen_y.wrapping_sub(self.window.y);
+                let x = screen_x.wrapping_sub(self.window.x);
                 (u16::from(y), x)
             } else {
-                let y = self.bg_scroll.y.wrapping_add(self.line);
-                let x = x.wrapping_add(self.bg_scroll.x);
+                let y = screen_y.wrapping_add(self.bg_scroll.y);
+                let x = screen_x.wrapping_add(self.bg_scroll.x);
                 (u16::from(y), x)
             };
 
             // Find which row of the 32x32 tile map the tile is in.
-            let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
+            let tile_row_offset: u16 = (tile_y / TILE_HEIGHT) * TILE_MAP_HEIGHT;
 
             // Find x-position of the tile in the row of tiles.
-            let tile_offset = x_position / 8;
+            let tile_offset = tile_x / 8;
 
             // Get the address of the tile in memory.
             let tile_id_address = {
@@ -415,14 +417,12 @@ impl Ppu {
 
             // Find the correct vertical position within the tile. Multiply by two because each
             // row of the tile takes two bytes.
-            let tile_line = (y_position % TILE_HEIGHT) * 2;
+            let tile_line = (tile_y % TILE_HEIGHT) * 2;
 
-            let shade_number = Self::shade_number(
-                self.read_word(tile_address + tile_line as u16),
-                x_position % 8,
-            );
+            let shade_number =
+                Self::shade_number(self.read_word(tile_address + tile_line as u16), tile_x % 8);
 
-            self.pixels.0[self.line as usize][x as usize] = self.bg_palette.get(shade_number);
+            self.pixels.0[screen_y as usize][screen_x as usize] = self.bg_palette.get(shade_number);
         }
     }
 
@@ -855,12 +855,15 @@ mod tests {
         ppu.control.tile_data_start = TileDataStart::Low;
         assert_eq!(ppu.tile_data_address(0), 0x8000);
         assert_eq!(ppu.tile_data_address(37), 0x8250);
+        assert_eq!(ppu.tile_data_address(128), 0x8800);
         assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
 
         let mut ppu = Ppu::new();
         ppu.control.tile_data_start = TileDataStart::High;
         assert_eq!(ppu.tile_data_address(0), 0x9000);
         assert_eq!(ppu.tile_data_address(37), 0x9250);
+        assert_eq!(ppu.tile_data_address(127), 0x97F0);
+        assert_eq!(ppu.tile_data_address(128), 0x8800);
         assert_eq!(ppu.tile_data_address(u8::MAX), 0x8FF0);
     }
 
