@@ -91,7 +91,12 @@ impl Bus {
 
     /// Tick each component individually.
     pub fn tick(&mut self, cycles: MCycles) {
-        self.ppu.step(TCycles::from(cycles), &mut self.interrupts);
+        let t_cycles = TCycles::from(cycles);
+
+        for _ in 0..t_cycles.0 {
+            self.ppu.step(&mut self.interrupts);
+        }
+
         self.timer
             .tick(cycles, &mut self.interrupts.timer.requested);
     }

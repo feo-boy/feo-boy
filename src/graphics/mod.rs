@@ -9,7 +9,7 @@ use log::*;
 use num_enum::IntoPrimitive;
 
 use crate::bytes::ByteExt;
-use crate::cpu::{Interrupts, TCycles};
+use crate::cpu::Interrupts;
 use crate::memory::Addressable;
 
 mod palette;
@@ -258,8 +258,8 @@ impl Ppu {
     }
 
     /// Performs one clock step of the PPU.
-    pub fn step(&mut self, cycles: TCycles, interrupts: &mut Interrupts) {
-        self.modeclock += u32::from(cycles.0);
+    pub fn step(&mut self, interrupts: &mut Interrupts) {
+        self.modeclock += 1;
 
         // Mode changes are a state machine. This match block returns an option indicating whether
         // there was a mode change, and if there was, the new mode.
@@ -750,7 +750,7 @@ mod tests {
     use proptest::proptest;
 
     use crate::bytes::ByteExt;
-    use crate::cpu::{Interrupts, TCycles};
+    use crate::cpu::Interrupts;
     use crate::memory::Addressable;
 
     use super::{
@@ -850,7 +850,7 @@ mod tests {
                 break;
             }
 
-            ppu.step(TCycles(1), &mut interrupts);
+            ppu.step(&mut interrupts);
         }
 
         ppu.control.display_enabled = false;
