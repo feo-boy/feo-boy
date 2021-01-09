@@ -378,33 +378,31 @@ impl Ppu {
 
         debug_assert!(self.line <= 143, "scanline out of range");
 
-        // Check if the window is enabled.
-        let using_window = self.control.window_enabled && self.window.y <= self.line;
-
-        // Calculate the absolute y-position of the pixel in the background map.
-        let y_position: u16 = if using_window {
-            self.window.y.wrapping_add(self.line).into()
-        } else {
-            self.bg_scroll.y.wrapping_add(self.line).into()
-        };
-
-        // Find which row of the 32x32 tile map the tile is in.
-        let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
-
         // Draw the line.
         for x in 0..SCREEN_WIDTH as u8 {
-            let x_position = if using_window && x >= self.window.x {
-                x.wrapping_sub(self.window.x)
+            // Check if we should be rendering window or background tiles.
+            let use_window =
+                self.control.window_enabled && self.line >= self.window.y && x >= self.window.x;
+
+            let (y_position, x_position) = if use_window {
+                let y = self.window.y.wrapping_add(self.line);
+                let x = x.wrapping_sub(self.window.x);
+                (u16::from(y), x)
             } else {
-                x.wrapping_add(self.bg_scroll.x)
+                let y = self.bg_scroll.y.wrapping_add(self.line);
+                let x = x.wrapping_add(self.bg_scroll.x);
+                (u16::from(y), x)
             };
+
+            // Find which row of the 32x32 tile map the tile is in.
+            let tile_row_offset: u16 = (y_position / TILE_HEIGHT) * TILE_MAP_HEIGHT;
 
             // Find x-position of the tile in the row of tiles.
             let tile_offset = x_position / 8;
 
             // Get the address of the tile in memory.
             let tile_id_address = {
-                let tile_start_address: u16 = if using_window {
+                let tile_start_address: u16 = if use_window {
                     self.control.window_map_start.into()
                 } else {
                     self.control.bg_map_start.into()
