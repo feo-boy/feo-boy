@@ -276,6 +276,10 @@ impl Ppu {
                 self.modeclock = 0;
                 self.line += 1;
 
+                if self.lcd_status_interrupts.ly_lyc_coincidence && self.line == self.line_compare {
+                    interrupts.lcd_status.requested = true;
+                }
+
                 if self.line > 143 {
                     // Push the pixels to a frame.
                     self.frame = self.pixels.clone();
@@ -336,10 +340,6 @@ impl Ppu {
                     }
                 }
                 _ => (),
-            }
-
-            if self.lcd_status_interrupts.ly_lyc_coincidence && self.line == self.line_compare {
-                interrupts.lcd_status.requested = true;
             }
         }
     }
