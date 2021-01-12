@@ -376,7 +376,7 @@ impl Ppu {
         }
 
         if self.control.sprites_enabled {
-            self.render_sprite();
+            self.render_sprites();
         }
     }
 
@@ -470,8 +470,8 @@ impl Ppu {
         color_num
     }
 
-    /// Render the sprites on the screen.
-    pub fn render_sprite(&mut self) {
+    /// Render sprites for the current scanline on the screen.
+    pub fn render_sprites(&mut self) {
         for sprite in 0..40 {
             // The sprite occupies 4 bytes in the table
             let index = (sprite as u8) * 4;
@@ -479,7 +479,15 @@ impl Ppu {
             let absolute_index: u16 = SPRITE_START + u16::from(index);
             let y_position = self.read_byte(absolute_index).wrapping_sub(16);
             let x_position = self.read_byte(absolute_index + 1).wrapping_sub(8);
-            let tile_location = self.read_byte(absolute_index + 2);
+            let tile_number = {
+                let number = self.read_byte(absolute_index + 2);
+
+                if self.control.sprite_size == SpriteSize::Large {
+                    number & 0xFE
+                } else {
+                    number
+                }
+            };
             let attributes = self.read_byte(absolute_index + 3);
 
             // Determine the background priority of the sprite
@@ -507,8 +515,8 @@ impl Ppu {
                 // Get the address of the color information within the sprite tile data. The color
                 // is stored as two bytes corresponding to an 8-pixel line, as with background
                 // tiles.
-                let data_address: u16 = (SPRITE_TILE_DATA_START + (u16::from(tile_location) * 16))
-                    + current_line as u16;
+                let data_address: u16 =
+                    (SPRITE_TILE_DATA_START + (u16::from(tile_number) * 16)) + current_line as u16;
                 let color_row = self.read_word(data_address);
 
                 // Find the shade for each pixel in the line
@@ -1026,7 +1034,7 @@ mod tests {
 
         // Render
         ppu.render_tiles();
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         // Enumerate the expected output
         let expected_pixels = [
@@ -1054,7 +1062,7 @@ mod tests {
             ppu.pixels.0[0][i] = Shade::White;
         }
 
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[0][i], expected_pixels[i]);
@@ -1065,7 +1073,7 @@ mod tests {
             ppu.pixels.0[0][i] = Shade::Black;
         }
 
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[0][i], Shade::Black);
@@ -1078,7 +1086,7 @@ mod tests {
             ppu.pixels.0[0][i] = Shade::White;
         }
 
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         for i in 0..8 {
             assert_eq!(
@@ -1091,7 +1099,7 @@ mod tests {
         ppu.write_byte(0xFE03, 0x40);
 
         ppu.line = 7;
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         for i in 0..8 {
             assert_eq!(ppu.pixels.0[7][i], expected_pixels[i]);
@@ -1155,7 +1163,7 @@ mod tests {
         ppu.control.sprites_enabled = true;
 
         // Render
-        ppu.render_sprite();
+        ppu.render_sprites();
 
         let line = ppu.pixels.0[0].to_vec();
         let expected_line = vec![Shade::White; 160];
