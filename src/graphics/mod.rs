@@ -2,9 +2,11 @@
 //!
 //! Contains an implementation of a PPU.
 
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug};
+use std::ops::{Index, IndexMut};
 
 use byteorder::{ByteOrder, LittleEndian};
+use derivative::Derivative;
 use log::*;
 use num_enum::IntoPrimitive;
 
@@ -153,18 +155,24 @@ pub struct Position {
     pub y: u8,
 }
 
-#[derive(Clone)]
-pub struct ScreenBuffer(pub [[Shade; SCREEN_WIDTH]; SCREEN_HEIGHT]);
+#[derive(Clone, Derivative)]
+#[derivative(Debug, Default)]
+pub struct ScreenBuffer(
+    #[derivative(Debug = "ignore")]
+    #[derivative(Default(value = "[[Shade::default(); SCREEN_WIDTH]; SCREEN_HEIGHT]"))]
+    [[Shade; SCREEN_WIDTH]; SCREEN_HEIGHT],
+);
 
-impl Debug for ScreenBuffer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ScreenBuffer").finish()
+impl Index<(u8, u8)> for ScreenBuffer {
+    type Output = Shade;
+    fn index(&self, (y, x): (u8, u8)) -> &Self::Output {
+        &self.0[usize::from(y)][usize::from(x)]
     }
 }
 
-impl Default for ScreenBuffer {
-    fn default() -> ScreenBuffer {
-        ScreenBuffer([[Shade::default(); SCREEN_WIDTH]; SCREEN_HEIGHT])
+impl IndexMut<(u8, u8)> for ScreenBuffer {
+    fn index_mut(&mut self, (y, x): (u8, u8)) -> &mut Self::Output {
+        &mut self.0[usize::from(y)][usize::from(x)]
     }
 }
 
@@ -422,7 +430,7 @@ impl Ppu {
             let shade_number =
                 Self::shade_number(self.read_word(tile_address + tile_line as u16), tile_x % 8);
 
-            self.pixels.0[screen_y as usize][screen_x as usize] = self.bg_palette.get(shade_number);
+            self.pixels[(screen_y, screen_x)] = self.bg_palette.get(shade_number);
         }
     }
 
@@ -531,10 +539,8 @@ impl Ppu {
                     let shade_number = Self::shade_number(color_row, color_bit);
 
                     if let Some(shade) = sprite_palette.get(shade_number) {
-                        if !behind_bg
-                            || self.pixels.0[self.line as usize][pixel as usize] == Shade::White
-                        {
-                            self.pixels.0[self.line as usize][pixel as usize] = shade;
+                        if !behind_bg || self.pixels[(self.line, pixel)] == Shade::White {
+                            self.pixels[(self.line, pixel)] = shade;
                         }
                     }
                 }
