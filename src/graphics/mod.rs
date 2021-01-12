@@ -369,9 +369,7 @@ impl Ppu {
             return;
         }
 
-        if self.control.background_enabled
-            || (self.control.background_enabled && self.control.window_enabled)
-        {
+        if self.control.background_enabled {
             self.render_tiles();
         }
 
@@ -381,8 +379,11 @@ impl Ppu {
     }
 
     fn render_tiles(&mut self) {
-        const TILE_HEIGHT: u16 = 8;
-        const TILE_MAP_HEIGHT: u16 = 32;
+        /// Width or height of a tile, in pixels.
+        const TILE_SIZE: u16 = 8;
+
+        /// Width of the tile map, in bytes.
+        const TILE_MAP_WIDTH: u16 = 32;
 
         debug_assert!(self.line <= 143, "scanline out of range");
 
@@ -404,20 +405,18 @@ impl Ppu {
                 (u16::from(y), x)
             };
 
-            // Find which row of the 32x32 tile map the tile is in.
-            let tile_row_offset: u16 = (tile_y / TILE_HEIGHT) * TILE_MAP_HEIGHT;
-
-            // Find x-position of the tile in the row of tiles.
-            let tile_offset = tile_x / 8;
-
             // Get the address of the tile in memory.
             let tile_id_address = {
+                let tile_map_row = tile_y / TILE_SIZE;
+                let tile_map_col = u16::from(tile_x) / TILE_SIZE;
+
                 let tile_start_address: u16 = if use_window {
                     self.control.window_map_start.into()
                 } else {
                     self.control.bg_map_start.into()
                 };
-                tile_start_address + tile_row_offset + u16::from(tile_offset)
+
+                tile_start_address + tile_map_row * TILE_MAP_WIDTH + tile_map_col
             };
 
             let tile_id = self.read_byte(tile_id_address);
@@ -425,7 +424,7 @@ impl Ppu {
 
             // Find the correct vertical position within the tile. Multiply by two because each
             // row of the tile takes two bytes.
-            let tile_line = (tile_y % TILE_HEIGHT) * 2;
+            let tile_line = (tile_y % TILE_SIZE) * 2;
 
             let shade_number =
                 Self::shade_number(self.read_word(tile_address + tile_line as u16), tile_x % 8);
