@@ -106,7 +106,7 @@ impl Default for TileDataStart {
 }
 
 /// The available sizes of sprites.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SpriteSize {
     /// 8x8
     Small,
@@ -470,95 +470,98 @@ impl Ppu {
         color_num
     }
 
+    /// Read the information for the nth sprite in OAM.
+    fn read_sprite(&self, index: u8) -> Sprite {
+        let oam_address = SPRITE_START + u16::from(index * 4);
+
+        let y = self.read_byte(oam_address).wrapping_sub(16);
+        let x = self.read_byte(oam_address + 1).wrapping_sub(8);
+        let tile_number = {
+            let number = self.read_byte(oam_address + 2);
+            match self.control.sprite_size {
+                SpriteSize::Large => number & 0xFE,
+                SpriteSize::Small => number,
+            }
+        };
+        let attributes = self.read_byte(oam_address + 3);
+
+        Sprite {
+            index,
+            x,
+            y,
+            tile_number,
+            attributes,
+            size: self.control.sprite_size,
+        }
+    }
+
     /// Render sprites for the current scanline on the screen.
     pub fn render_sprites(&mut self) {
-        let mut remaining_sprites = 10;
+        let mut sprites_on_scanline = (0..40)
+            .map(|index| self.read_sprite(index))
+            .filter(|sprite| sprite.y <= self.line && self.line <= sprite.y + sprite.height())
+            .collect::<Vec<_>>();
 
-        for sprite in 0..40 {
-            // The sprite occupies 4 bytes in the table
-            let index = (sprite as u8) * 4;
-            // Get the index of the sprite
-            let absolute_index: u16 = SPRITE_START + u16::from(index);
-            let y_position = self.read_byte(absolute_index).wrapping_sub(16);
-            let x_position = self.read_byte(absolute_index + 1).wrapping_sub(8);
-            let tile_number = {
-                let number = self.read_byte(absolute_index + 2);
+        // Sort sprites by priority. Sprites with lower X-coordinates are prioritized. If sprites
+        // have the same X-coordinate, sprites earlier in OAM have priority.
+        sprites_on_scanline.sort_by_key(|sprite| (sprite.x, sprite.index));
 
-                if self.control.sprite_size == SpriteSize::Large {
-                    number & 0xFE
-                } else {
-                    number
-                }
-            };
-            let attributes = self.read_byte(absolute_index + 3);
+        // 10 sprites per line.
+        sprites_on_scanline.truncate(10);
 
+        for sprite in sprites_on_scanline.iter().rev() {
             // Determine the background priority of the sprite
-            let behind_bg = attributes.has_bit_set(7);
+            let behind_bg = sprite.attributes.has_bit_set(7);
 
             // Determine whether the sprite is flipped horizontally or vertically
-            let y_flip = attributes.has_bit_set(6);
-            let x_flip = attributes.has_bit_set(5);
+            let y_flip = sprite.attributes.has_bit_set(6);
+            let x_flip = sprite.attributes.has_bit_set(5);
 
-            // Determine whether this is an 8x8 or 8x16 sprite
-            let y_size = match self.control.sprite_size {
-                SpriteSize::Small => 7,
-                SpriteSize::Large => 15,
+            // Get the line of the sprite to be displayed
+            let current_line = if y_flip {
+                (i16::from(sprite.y) + i16::from(sprite.height()) - i16::from(self.line)) * 2
+            } else {
+                (i16::from(self.line) - i16::from(sprite.y)) * 2
             };
 
-            // Continue if the sprite is on the current line
-            if (self.line >= y_position) && (self.line <= (y_position + y_size)) {
-                // Get the line of the sprite to be displayed
-                let current_line = if y_flip {
-                    (i16::from(y_position) + i16::from(y_size) - i16::from(self.line)) * 2
+            // Get the address of the color information within the sprite tile data. The color
+            // is stored as two bytes corresponding to an 8-pixel line, as with background
+            // tiles.
+            let data_address: u16 = (SPRITE_TILE_DATA_START + (u16::from(sprite.tile_number) * 16))
+                + current_line as u16;
+            let color_row = self.read_word(data_address);
+
+            // Find the shade for each pixel in the line
+            for tile_pixel in (0..8).rev() {
+                // Get the bit that corresponds to the pixel within the line
+                let color_bit = if x_flip {
+                    tile_pixel as u8
                 } else {
-                    (i16::from(self.line) - i16::from(y_position)) * 2
+                    (7 - tile_pixel as i8) as u8
                 };
 
-                // Get the address of the color information within the sprite tile data. The color
-                // is stored as two bytes corresponding to an 8-pixel line, as with background
-                // tiles.
-                let data_address: u16 =
-                    (SPRITE_TILE_DATA_START + (u16::from(tile_number) * 16)) + current_line as u16;
-                let color_row = self.read_word(data_address);
+                // Determine which sprite palette to use
+                let sprite_palette = if sprite.attributes.has_bit_set(4) {
+                    &self.sprite_palette[1]
+                } else {
+                    &self.sprite_palette[0]
+                };
 
-                // Find the shade for each pixel in the line
-                for tile_pixel in (0..8).rev() {
-                    // Get the bit that corresponds to the pixel within the line
-                    let color_bit = if x_flip {
-                        tile_pixel as u8
-                    } else {
-                        (7 - tile_pixel as i8) as u8
-                    };
+                // Find the horizontal position of the pixel on the screen
+                let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
+                let pixel = sprite.x.wrapping_add(x_pixel);
 
-                    // Determine which sprite palette to use
-                    let sprite_palette = if attributes.has_bit_set(4) {
-                        &self.sprite_palette[1]
-                    } else {
-                        &self.sprite_palette[0]
-                    };
-
-                    // Find the horizontal position of the pixel on the screen
-                    let x_pixel: u8 = (7 - (tile_pixel as i8)) as u8;
-                    let pixel = x_position.wrapping_add(x_pixel);
-
-                    // Bail if the pixel isn't on the screen.
-                    if pixel >= SCREEN_WIDTH as u8 {
-                        continue;
-                    }
-
-                    let shade_number = Self::shade_number(color_row, color_bit);
-
-                    if let Some(shade) = sprite_palette.get(shade_number) {
-                        if !behind_bg || self.pixels[(self.line, pixel)] == Shade::White {
-                            self.pixels[(self.line, pixel)] = shade;
-                        }
-                    }
+                // Bail if the pixel isn't on the screen.
+                if pixel >= SCREEN_WIDTH as u8 {
+                    continue;
                 }
 
-                remaining_sprites -= 1;
+                let shade_number = Self::shade_number(color_row, color_bit);
 
-                if remaining_sprites == 0 {
-                    break;
+                if let Some(shade) = sprite_palette.get(shade_number) {
+                    if !behind_bg || self.pixels[(self.line, pixel)] == Shade::White {
+                        self.pixels[(self.line, pixel)] = shade;
+                    }
                 }
             }
         }
@@ -761,6 +764,38 @@ impl fmt::Debug for Memory {
             .field("bg_map", &bg_map)
             .field("oam", &oam)
             .finish()
+    }
+}
+
+/// A sprite read from memory.
+#[derive(Debug)]
+struct Sprite {
+    /// The index of the sprite in OAM.
+    index: u8,
+
+    /// The Y-position of the sprite on the screen.
+    y: u8,
+
+    /// The X-position of the sprite on the screen.
+    x: u8,
+
+    /// Which tile number should be used for the sprite.
+    tile_number: u8,
+
+    /// Sprite attributes.
+    attributes: u8,
+
+    /// The sprite size at the time of reading the sprite.
+    size: SpriteSize,
+}
+
+impl Sprite {
+    /// The height of the sprite, in pixels.
+    fn height(&self) -> u8 {
+        match self.size {
+            SpriteSize::Small => 7,
+            SpriteSize::Large => 15,
+        }
     }
 }
 
