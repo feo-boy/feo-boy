@@ -22,6 +22,7 @@ pub use self::palette::{BackgroundPalette, Shade, SpritePalette};
 pub const SCREEN_DIMENSIONS: (u32, u32) = (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
+/// The address that OAM starts at.
 pub const SPRITE_START: u16 = 0xFE00;
 pub const SPRITE_TILE_DATA_START: u16 = 0x8000;
 
@@ -471,6 +472,8 @@ impl Ppu {
 
     /// Render sprites for the current scanline on the screen.
     pub fn render_sprites(&mut self) {
+        let mut remaining_sprites = 10;
+
         for sprite in 0..40 {
             // The sprite occupies 4 bytes in the table
             let index = (sprite as u8) * 4;
@@ -550,6 +553,12 @@ impl Ppu {
                             self.pixels[(self.line, pixel)] = shade;
                         }
                     }
+                }
+
+                remaining_sprites -= 1;
+
+                if remaining_sprites == 0 {
+                    break;
                 }
             }
         }
