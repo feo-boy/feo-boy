@@ -127,10 +127,7 @@ impl super::Cpu {
             .map(|i| bus.read_byte_no_tick(self.reg.pc + 1 + u16::from(i)))
             .collect();
 
-        Instruction {
-            def: def,
-            operands: operands,
-        }
+        Instruction { def, operands }
     }
 
     /// Decodes the next instruction.
@@ -143,10 +140,7 @@ impl super::Cpu {
             .map(|i| bus.read_byte(self.reg.pc + 1 + u16::from(i)))
             .collect();
 
-        Instruction {
-            def: def,
-            operands: operands,
-        }
+        Instruction { def, operands }
     }
 
     /// Executes an instruction.
@@ -206,6 +200,7 @@ impl super::Cpu {
             }
 
             // LD B,B
+            #[allow(clippy::self_assignment)]
             0x40 => self.reg.b = self.reg.b,
 
             // LD D,B
@@ -385,6 +380,7 @@ impl super::Cpu {
             0x42 => self.reg.b = self.reg.d,
 
             // LD D,D
+            #[allow(clippy::self_assignment)]
             0x52 => self.reg.d = self.reg.d,
 
             // LD H,D
@@ -561,6 +557,7 @@ impl super::Cpu {
             0x54 => self.reg.d = self.reg.h,
 
             // LD H,H
+            #[allow(clippy::self_assignment)]
             0x64 => self.reg.h = self.reg.h,
 
             // LD (HL),H
@@ -736,6 +733,7 @@ impl super::Cpu {
             //
             // See https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf
             0x76 => {
+                #[allow(clippy::if_same_then_else)]
                 if bus.interrupts.enabled {
                     // HALT executed normally.
                     self.state = State::Halted;
@@ -1021,6 +1019,7 @@ impl super::Cpu {
             }
 
             // LD C,C
+            #[allow(clippy::self_assignment)]
             0x49 => self.reg.c = self.reg.c,
 
             // LD E,C
@@ -1210,6 +1209,7 @@ impl super::Cpu {
             0x4b => self.reg.c = self.reg.e,
 
             // LD E,E
+            #[allow(clippy::self_assignment)]
             0x5b => self.reg.e = self.reg.e,
 
             // LD L,E
@@ -1355,6 +1355,7 @@ impl super::Cpu {
             0x5d => self.reg.e = self.reg.l,
 
             // LD L,L
+            #[allow(clippy::self_assignment)]
             0x6d => self.reg.l = self.reg.l,
 
             // LD A,L
@@ -1485,6 +1486,7 @@ impl super::Cpu {
             0x6f => self.reg.l = self.reg.a,
 
             // LD A,A
+            #[allow(clippy::self_assignment)]
             0x7f => self.reg.a = self.reg.a,
 
             // ADC A,A
@@ -1608,7 +1610,7 @@ mod tests {
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
-        #[cfg_attr(rustfmt, rustfmt_skip)]
+        #[rustfmt::skip]
         let timings = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
@@ -1628,7 +1630,7 @@ mod tests {
             3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
         ];
 
-        #[cfg_attr(rustfmt, rustfmt_skip)]
+        #[rustfmt::skip]
         let condition_timings = vec![
             1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
             0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,

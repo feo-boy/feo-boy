@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn timings() {
         // These timings taken from blargg's instruction timing test ROM.
-        #[cfg_attr(rustfmt, rustfmt_skip)]
+        #[rustfmt::skip]
         let timings = vec![
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
             2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,

@@ -138,9 +138,9 @@ impl Wave {
 
         if self.length == 0 {
             self.enabled = false;
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 }
@@ -609,7 +609,6 @@ impl Addressable for SoundController {
             return 0xFF;
         }
 
-        #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         match address {
             // NR10: Sound 1 sweep register
             // Bit 6-4 - Sweep time

@@ -24,10 +24,10 @@ pub enum Button {
 
 impl Button {
     fn is_direction(&self) -> bool {
-        match *self {
-            Button::Up | Button::Down | Button::Right | Button::Left => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Button::Up | Button::Down | Button::Right | Button::Left
+        )
     }
 }
 

@@ -119,7 +119,6 @@ impl Bus {
             ..
         } = *self;
 
-        #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         match address {
             // P1/JOYP - Joypad
             0xFF00 => button_state.as_byte(),
@@ -379,21 +378,23 @@ impl Bus {
             // Sound control registers
             0xFF10..=0xFF3F => self.audio.write_byte(address, byte),
 
-            // DMA Transfer
-            0xFF46 => {
-                // The actual address is 0x100 * the written value, that is, transfer_address
-                // fills the XX in 0xXXNN, where 00 <= NN < A0
-                let transfer_address = u16::from(byte) << 8;
+            // LCD registers
+            0xFF40..=0xFF4B => {
+                // DMA Transfer
+                if address == 0xFF46 {
+                    // The actual address is 0x100 * the written value, that is, transfer_address
+                    // fills the XX in 0xXXNN, where 00 <= NN < A0
+                    let transfer_address = u16::from(byte) << 8;
 
-                // FIXME: The timing is more subtle than this.
-                for i in 0..0xA0 {
-                    let transfer_byte = self.read_byte_no_tick(transfer_address + (i as u16));
-                    self.write_byte_no_tick(0xFE00 + (i as u16), transfer_byte);
+                    // FIXME: The timing is more subtle than this.
+                    for i in 0..0xA0 {
+                        let transfer_byte = self.read_byte_no_tick(transfer_address + (i as u16));
+                        self.write_byte_no_tick(0xFE00 + (i as u16), transfer_byte);
+                    }
+                } else {
+                    self.ppu.write_byte(address, byte);
                 }
             }
-
-            // LCD registers
-            0xFF40..=0xFF4B => self.ppu.write_byte(address, byte),
 
             // Unmap BIOS
             0xFF50 => {

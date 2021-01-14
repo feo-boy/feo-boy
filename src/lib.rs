@@ -417,6 +417,12 @@ impl EmulatorBuilder {
     }
 }
 
+impl Default for EmulatorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 struct Debugger {
     editor: Editor<()>,

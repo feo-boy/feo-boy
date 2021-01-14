@@ -36,8 +36,7 @@ impl Output {
 
         let config = device
             .supported_output_configs()?
-            .filter(|config| config.channels() == 1 && config.sample_format() == SampleFormat::F32)
-            .next()
+            .find(|config| config.channels() == 1 && config.sample_format() == SampleFormat::F32)
             .map(|config| config.with_max_sample_rate())
             .ok_or_else(|| anyhow!("no supported audio output configuration found"))?
             .config();

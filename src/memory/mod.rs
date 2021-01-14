@@ -408,10 +408,11 @@ impl Mmu {
             0x8000..=0x9FFF => panic!("graphics RAM is present on the PPU"),
 
             // Cartridge (External) RAM
-            0xA000..=0xBFFF => match self.mbc {
-                Some(ref mut mbc) => mbc.write_byte(address, byte),
-                None => (),
-            },
+            0xA000..=0xBFFF => {
+                if let Some(mbc) = &mut self.mbc {
+                    mbc.write_byte(address, byte)
+                }
+            }
 
             // Working RAM
             0xC000..=0xFDFF => {

@@ -17,7 +17,7 @@ pub fn parse_command(emulator: &mut Emulator, command: &str) -> Result<()> {
 
     match &command[..1] {
         "s" => {
-            let step = parse_step(command)?.unwrap_or_else(|| 1);
+            let step = parse_step(command)?.unwrap_or(1);
 
             for _ in 0..step {
                 emulator.step();
