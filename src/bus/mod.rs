@@ -314,7 +314,7 @@ impl Bus {
 
             // IE - Interrupt Enable
             0xFFFF => {
-                let mut byte = 0xFF;
+                let mut byte = 0x00; // FIXME
 
                 byte.set_bit(0, interrupts.vblank.enabled);
                 byte.set_bit(1, interrupts.lcd_status.enabled);

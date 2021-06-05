@@ -263,7 +263,7 @@ impl Cpu {
             // Docs. However, it matches the value after execution of the real BIOS in this
             // emulator, as well as the value in BGB.
             self.reg.a = 0x01;
-            self.reg.f = Flags::from_bits_truncate(0x90);
+            self.reg.f = Flags::from_bits_truncate(0xB0);
             self.reg.bc_mut().write(0x0013);
             self.reg.de_mut().write(0x00d8);
             self.reg.hl_mut().write(0x014d);

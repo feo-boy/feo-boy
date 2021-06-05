@@ -356,6 +356,8 @@ impl Ppu {
 
     /// Returns the number of the current graphics mode.
     pub fn mode(&self) -> u8 {
+        println!("{:?} {:?}", self.control, self.mode);
+
         if self.control.display_enabled {
             self.mode as u8
         } else {

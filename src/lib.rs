@@ -54,7 +54,23 @@ pub struct Emulator {
     /// Other components of the emulator.
     pub bus: Bus,
 
+    traces: std::collections::VecDeque<Trace>,
+    cycles: u64,
+
     debug: Option<Debugger>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Trace {
+    a: u8,
+    f: cpu::Flags,
+    bc: u16,
+    de: u16,
+    hl: u16,
+    sp: u16,
+    pc: u16,
+    cycles: u64,
+    mode: u8,
 }
 
 impl Emulator {
@@ -238,6 +254,20 @@ impl Emulator {
 
     /// Fetch and execute a single instruction. Returns the number of cycles executed.
     pub fn step(&mut self) -> TCycles {
+        let trace = self.traces.pop_front().unwrap();
+
+        pretty_assertions::assert_eq!(trace, Trace {
+            a: self.cpu.reg.a,
+            f: self.cpu.reg.f,
+            bc: self.cpu.reg.bc(),
+            de: self.cpu.reg.de(),
+            hl: self.cpu.reg.hl(),
+            sp: self.cpu.reg.sp,
+            pc: self.cpu.reg.pc,
+            cycles: self.cycles,
+            mode: self.bus.ppu.mode(),
+        });
+
         self.bus.timer.reset_diff();
 
         let mut cycles = MCycles(0);
@@ -260,6 +290,8 @@ impl Emulator {
                 debugger.paused = true;
             }
         }
+
+        self.cycles += u64::from(TCycles::from(cycles).0);
 
         TCycles::from(cycles)
     }
@@ -399,6 +431,43 @@ impl EmulatorBuilder {
             SoundController::default()
         };
 
+        use std::io::BufRead;
+
+        let f = std::fs::File::open("awakening.trace").unwrap();
+        let traces = std::io::BufReader::new(f).lines().map(|line| {
+            let line = line.unwrap();
+            let (a, f, bc, de, hl, sp, pc, cycles, mode) = scan_fmt::scan_fmt!(
+                &line,
+                "A:{x} F:{} BC:{x} DE:{x} HL:{x} SP:{x} PC:{x} (cy: {}) ppu:{}",
+                [hex u8], String, [hex u16], [hex u16], [hex u16], [hex u16], [hex u16], u64, String).unwrap();
+
+            let mut flags = cpu::Flags::default();
+            if f.contains("Z") {
+                flags.insert(cpu::Flags::ZERO);
+            }
+            if f.contains("N") {
+                flags.insert(cpu::Flags::SUBTRACT);
+            }
+            if f.contains("H") {
+                flags.insert(cpu::Flags::HALF_CARRY);
+            }
+            if f.contains("C") {
+                flags.insert(cpu::Flags::CARRY);
+            }
+
+            Trace {
+                a,
+                f: flags,
+                bc,
+                de,
+                hl,
+                sp,
+                cycles,
+                pc,
+                mode: mode.trim_start_matches(vec!['+', '-'].as_slice()).parse().unwrap(),
+            }
+        }).collect();
+
         Emulator {
             cpu: Cpu::new(),
             bus: Bus {
@@ -413,6 +482,8 @@ impl EmulatorBuilder {
             } else {
                 None
             },
+            traces,
+            cycles: 0,
         }
     }
 }
