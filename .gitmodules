@@ -1,3 +1,6 @@
 [submodule "tests/gb-test-roms"]
 	path = tests/gb-test-roms
 	url = https://github.com/retrio/gb-test-roms
+[submodule "tests/mooneye-gb"]
+	path = tests/mooneye-gb
+	url = https://github.com/Gekkio/mooneye-gb.git

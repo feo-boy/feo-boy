@@ -14,6 +14,11 @@ name = "feo-boy"
 doc = false
 path = "src/main.rs"
 
+[[test]]
+name = "mooneye"
+harness = false
+path = "tests/mooneye.rs"
+
 [dependencies]
 anyhow = "1.0.31"
 bitflags = "1.2.1"
@@ -43,7 +48,10 @@ serde = { version = "1.0.111", features = ["derive"] }
 
 [dev-dependencies]
 indoc = "1.0.3"
+libtest-mimic = "0.3.0"
 pipe = "0.4.0"
 proptest = "0.10.1"
 quickcheck = "0.9.2"
 rand = "0.7.3"
+walkdir = "2.3.2"
+which = "4.1.0"
