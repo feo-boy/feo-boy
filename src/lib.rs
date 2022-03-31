@@ -191,7 +191,7 @@ impl Emulator {
 
                 if let Some(size) = input.window_resized() {
                     // FIXME: User-specified scaling is currently ignored: parasyte/pixels/issues/89
-                    pixels.resize(size.width, size.height);
+                    pixels.resize_surface(size.width, size.height);
                 }
 
                 let current_time = Instant::now();

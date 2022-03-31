@@ -470,8 +470,7 @@ mod tests {
 
     use std::{u16, u8};
 
-    use quickcheck::{QuickCheck, StdGen, TestResult};
-    use rand;
+    use quickcheck::{QuickCheck, Gen, TestResult};
 
     use crate::graphics::{BackgroundPalette, Shade, SpriteSize};
     use crate::input::Button;
@@ -493,7 +492,7 @@ mod tests {
         }
 
         QuickCheck::new()
-            .gen(StdGen::new(rand::thread_rng(), u16::MAX as usize))
+            .gen(Gen::new(u16::MAX as usize))
             .quickcheck(read_write as fn(u16, u8) -> TestResult);
     }
 
@@ -514,7 +513,7 @@ mod tests {
         }
 
         QuickCheck::new()
-            .gen(StdGen::new(rand::thread_rng(), u8::MAX as usize))
+            .gen(Gen::new(u8::MAX as usize))
             .quickcheck(read_write as fn(u8, u8) -> TestResult);
     }
 
