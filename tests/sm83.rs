@@ -1,3 +1,4 @@
+use feo_boy::Emulator;
 use serde::Deserialize;
 use test_each_file::test_each_file;
 
@@ -15,32 +16,29 @@ fn load_test(content: &str) {
 }
 
 fn test(test_case: TestCase) {
-    let mut cpu = Cpu::new();
-    let mut bus = Bus::default();
+    let mut emulator = Emulator::new();
 
-    cpu.reg.a = test_case.initial.a;
-    cpu.reg.b = test_case.initial.b;
-    cpu.reg.c = test_case.initial.c;
-    cpu.reg.d = test_case.initial.d;
-    cpu.reg.e = test_case.initial.e;
-    cpu.reg.f = Flags::from_bits(test_case.initial.f).unwrap();
-    cpu.reg.h = test_case.initial.h;
-    cpu.reg.l = test_case.initial.l;
-    cpu.reg.pc = test_case.initial.pc;
-    cpu.reg.sp = test_case.initial.sp;
+    emulator.cpu.reg.a = test_case.initial.a;
+    emulator.cpu.reg.b = test_case.initial.b;
+    emulator.cpu.reg.c = test_case.initial.c;
+    emulator.cpu.reg.d = test_case.initial.d;
+    emulator.cpu.reg.e = test_case.initial.e;
+    emulator.cpu.reg.f = Flags::from_bits(test_case.initial.f).unwrap();
+    emulator.cpu.reg.h = test_case.initial.h;
+    emulator.cpu.reg.l = test_case.initial.l;
+    emulator.cpu.reg.pc = test_case.initial.pc;
+    emulator.cpu.reg.sp = test_case.initial.sp;
 
     for (addr, value) in test_case.initial.ram {
-        bus.write_byte_no_tick(addr, value);
+        emulator.bus.write_byte_no_tick(addr, value);
     }
 
-    for _ in test_case.cycles {
-        bus.tick(MCycles(1));
-    }
+    emulator.step();
 
     macro_rules! assert_reg {
         ($reg:ident) => {
             let expected = test_case.r#final.$reg;
-            let actual = cpu.reg.$reg;
+            let actual = emulator.cpu.reg.$reg;
             assert_eq!(
                 expected,
                 actual,
