@@ -65,6 +65,7 @@ impl Output {
                 // able to fix some crackles in the output.
             },
             |err| panic!("{}", err),
+            None,
         )?;
 
         stream.play()?;
