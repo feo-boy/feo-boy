@@ -24,8 +24,9 @@ use pixels::{Pixels, SurfaceTexture};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use winit::dpi::LogicalSize;
-use winit::event::{Event, VirtualKeyCode};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::EventLoop;
+use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
@@ -142,7 +143,7 @@ impl Emulator {
 
     /// Open a graphical window and start execution of the emulator.
     pub fn run(mut self) -> Result<()> {
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new()?;
         let mut input = WinitInputHelper::new();
         let window = {
             let size = LogicalSize::new(SCREEN_DIMENSIONS.0, SCREEN_DIMENSIONS.1);
@@ -166,20 +167,20 @@ impl Emulator {
 
         let mut last_update = Instant::now();
 
-        event_loop.run(move |event, _, control_flow| {
-            if let Event::RedrawRequested(_) = event {
-                self.render(pixels.get_frame());
+        event_loop.run(move |event, elwt| {
+            if let Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } = event {
+                self.render(pixels.frame_mut());
 
                 if let Err(e) = pixels.render() {
-                    *control_flow = ControlFlow::Exit;
                     error!("unable to render: {}", e);
+                    elwt.exit();
                     return;
                 }
             }
 
             if input.update(&event) {
-                if input.quit() {
-                    *control_flow = ControlFlow::Exit;
+                if input.close_requested() {
+                    elwt.exit();
                     return;
                 }
 
@@ -197,12 +198,14 @@ impl Emulator {
                 let current_time = Instant::now();
                 if let Err(e) = self.update(current_time - last_update) {
                     error!("unable to update emulator state: {}", e);
-                    *control_flow = ControlFlow::Exit;
+                    elwt.exit();
                 }
                 last_update = current_time;
                 window.request_redraw();
             }
-        });
+        })?;
+
+        Ok(())
     }
 
     fn handle_keys(&mut self, input: &WinitInputHelper) {
@@ -220,14 +223,14 @@ impl Emulator {
         }
 
         button_mapping! {
-            VirtualKeyCode::Up => Button::Up,
-            VirtualKeyCode::Down => Button::Down,
-            VirtualKeyCode::Left => Button::Left,
-            VirtualKeyCode::Right => Button::Right,
-            VirtualKeyCode::X => Button::B,
-            VirtualKeyCode::Z => Button::A,
-            VirtualKeyCode::Return => Button::Start,
-            VirtualKeyCode::Back => Button::Select,
+            KeyCode::ArrowUp => Button::Up,
+            KeyCode::ArrowDown => Button::Down,
+            KeyCode::ArrowLeft => Button::Left,
+            KeyCode::ArrowRight => Button::Right,
+            KeyCode::KeyX => Button::B,
+            KeyCode::KeyZ => Button::A,
+            KeyCode::Enter => Button::Start,
+            KeyCode::Backspace => Button::Select,
         }
     }
 
