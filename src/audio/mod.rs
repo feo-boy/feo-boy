@@ -531,6 +531,9 @@ pub struct SoundController {
     /// Whether to output Vin to SO2.
     pub vin_so2: bool,
 
+    /// Number of cycles since the last output sample.
+    cycle_count: u32,
+
     /// Audio output. `None` if no output is desired.
     out: Option<Output>,
 }
@@ -549,11 +552,12 @@ impl SoundController {
             so2_vol: 0,
             vin_so1: false,
             vin_so2: false,
+            cycle_count: 0,
             out: None,
         }
     }
 
-    /// Creates an emulated sound controller tha
+    /// Creates an emulated sound controller that plays audio.
     pub fn new_with_playback() -> Result<SoundController> {
         Ok(SoundController {
             out: Some(Output::new()?),
@@ -585,7 +589,12 @@ impl SoundController {
                 sample += self.square_1.output as f32 / 100_f32;
                 sample += self.square_2.output as f32 / 100_f32;
 
-                out.sample_buffer.lock().unwrap().push_back(sample);
+                if self.cycle_count % out.decimation_factor == 0 {
+                    out.sample_buffer.lock().unwrap().push_back(sample);
+                    self.cycle_count = 0;
+                }
+
+                self.cycle_count += 1;
             }
         }
     }
