@@ -1,5 +1,5 @@
-use test_each_file::test_each_file;
 use serde::Deserialize;
+use test_each_file::test_each_file;
 
 use feo_boy::bus::Bus;
 use feo_boy::cpu::{Cpu, Flags, MCycles};
@@ -26,16 +26,41 @@ fn test(test_case: TestCase) {
     cpu.reg.f = Flags::from_bits(test_case.initial.f).unwrap();
     cpu.reg.h = test_case.initial.h;
     cpu.reg.l = test_case.initial.l;
+    cpu.reg.pc = test_case.initial.pc;
+    cpu.reg.sp = test_case.initial.sp;
 
     for (addr, value) in test_case.initial.ram {
         bus.write_byte_no_tick(addr, value);
     }
 
-    for cycle in test_case.cycles {
+    for _ in test_case.cycles {
         bus.tick(MCycles(1));
     }
 
-    assert_eq!(test_case.r#final.a, cpu.reg.a);
+    macro_rules! assert_reg {
+        ($reg:ident) => {
+            let expected = test_case.r#final.$reg;
+            let actual = cpu.reg.$reg;
+            assert_eq!(
+                expected,
+                actual,
+                "expected register {} to be {:#02x}, was {:#02x}",
+                stringify!($reg).to_uppercase(),
+                expected,
+                actual
+            );
+        };
+    }
+
+    // assert_reg!(pc); FIXME
+    assert_reg!(sp);
+    assert_reg!(a);
+    assert_reg!(b);
+    assert_reg!(c);
+    assert_reg!(d);
+    assert_reg!(e);
+    assert_reg!(h);
+    assert_reg!(l);
 }
 
 #[derive(Debug, Deserialize)]
